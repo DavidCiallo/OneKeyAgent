@@ -1,0 +1,39 @@
+{
+    "Common": {
+        "ButtonAdd": "新增",
+        "ButtonSave": "保存",
+        "ButtonConfirm": "确认",
+        "ButtonCancel": "取消",
+        "ButtonClose": "关闭",
+        "ToastSuccess": "操作成功",
+        "ToastFailed": "操作失败",
+        "ToastNetworkError": "网络异常，请稍后重试",
+        "ToastUnauthorized": "鉴权失效，请重新登录",
+        "ToastParamError": "参数错误，请检查输入",
+        "DefaultSelectPlaceholder": "请输入"
+    },
+
+    "Menu": {
+        "Demo": "示范页面"
+    },
+
+    "AuthPage": {
+        "Title": "TinyWeb 实例",
+        "LoginSuccess": "登录成功",
+        "LoginFailed": "登录失败",
+        "EmailLabel": "邮箱",
+        "EmailPlaceholder": "请输入账号",
+        "EmailError": "这格式可能有些滑稽",
+        "PasswordLabel": "密码",
+        "PasswordPlaceholder": "请输入密码",
+        "PasswordError": "显然这是必填项",
+        "ForgetPasswordLinkText": "忘记密码？",
+        "ForgetPasswordErrorText": "请联系管理员🙁",
+        "SubmitButtonText": "登录"
+    },
+    "HomePage": {
+        "MainText": "极简接口",
+        "Slogan": "小巧，精致，且快速。",
+        "ViewSource": "查看源代码"
+    }
+}

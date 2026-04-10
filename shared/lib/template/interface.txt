@@ -1,0 +1,201 @@
+import { BaseRequest, BaseResponse } from "../../lib/default/decorator";
+import { AccountEntity } from "./account.entity";
+
+// Base DTO
+export class AccountDTO {
+    public id: string = "";
+    //__DTO_FIELDS__//
+
+    private isTypeSafe: symbol = Symbol();
+
+    constructor(origin: AccountEntity) {
+        this.id = origin.id;
+        //__DTO_ASSIGN__//
+    }
+}
+
+// Body Definitions
+export class AccountQueryBody {
+    public id?: string;
+    //__DTO_FIELDS__//
+
+    private isTypeSafe: symbol = Symbol();
+
+    constructor(origin: Partial<AccountEntity>) {
+        origin.id !== undefined && (this.id = origin.id);
+        //__BODY_ASSIGN__//
+    }
+
+    static self(unsafe: AccountQueryBody) {
+        return new AccountQueryBody(unsafe);
+    }
+}
+
+export class AccountCreateBody {
+    //__DTO_FIELDS__//
+
+    private isTypeSafe: symbol = Symbol();
+
+    constructor(origin: Pick<AccountEntity, //__PICK_FIELDS__//>) {
+        //__DTO_ASSIGN__//
+    }
+
+    static self(unsafe: AccountCreateBody) {
+        return new AccountCreateBody(unsafe);
+    }
+}
+
+export class AccountUpdateBody {
+    //__DTO_FIELDS__//
+
+    private isTypeSafe: symbol = Symbol();
+
+    constructor(origin: Partial<AccountEntity> = {}) {
+        //__UPDATE_ASSIGN__//
+    }
+
+    static self(unsafe: AccountUpdateBody) {
+        return new AccountUpdateBody(unsafe);
+    }
+}
+
+// Interface Definitions
+export class AccountListRequest implements BaseRequest {
+    public auth?: string;
+    public page: number;
+    public filter?: AccountQueryBody;
+
+    constructor(origin: Partial<AccountListRequest>) {
+        origin.auth && (this.auth = origin.auth);
+        origin.filter && (this.filter = AccountQueryBody.self(origin.filter));
+        this.page = Number(origin.page || 1);
+    }
+    static self(unsafe: AccountListRequest) {
+        return new AccountListRequest(unsafe);
+    }
+}
+
+export class AccountListResponse implements BaseResponse<AccountDTO> {
+    public success: boolean;
+    public message: string;
+    public data: {
+        list: AccountDTO[],
+        total: number
+    };
+
+    constructor(origin: AccountListResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+        this.data = origin.data;
+    }
+}
+
+export class AccountDetailRequest implements BaseRequest {
+    public auth?: string;
+    public id: string;
+
+    constructor(origin: AccountDetailRequest) {
+        if (!origin.id) throw new Error("Id is required");
+        this.id = origin.id;
+        origin.auth && (this.auth = origin.auth);
+    }
+    static self(unsafe: AccountDetailRequest) {
+        return new AccountDetailRequest(unsafe);
+    }
+}
+
+export class AccountDetailResponse implements BaseResponse<AccountDTO> {
+    public success: boolean;
+    public message: string;
+    public data: {
+        account: AccountDTO | null
+    };
+
+    constructor(origin: AccountDetailResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+        this.data = origin.data;
+    }
+}
+
+export class AccountCreateRequest implements BaseRequest {
+    public auth?: string;
+    public account: AccountCreateBody;
+
+    constructor(origin: Partial<AccountCreateRequest>) {
+        if (!origin.account) throw new Error("Account data is required");
+        origin.auth && (this.auth = origin.auth);
+        this.account = AccountCreateBody.self(origin.account);
+    }
+    static self(unsafe: AccountCreateRequest) {
+        return new AccountCreateRequest(unsafe);
+    }
+}
+
+export class AccountCreateResponse implements BaseResponse<AccountDTO> {
+    public success: boolean;
+    public message: string;
+    public data: {
+        account: AccountDTO | null
+    };
+
+    constructor(origin: AccountCreateResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+        this.data = origin.data;
+    }
+}
+
+export class AccountUpdateRequest implements BaseRequest {
+    public auth?: string;
+    public id: string;
+    public account: AccountUpdateBody;
+
+    constructor(origin: Partial<AccountUpdateRequest>) {
+        if (!origin.id || !origin.account) throw new Error("Id and account data are required");
+        origin.auth && (this.auth = origin.auth);
+        this.id = origin.id;
+        this.account = AccountUpdateBody.self(origin.account);
+    }
+    static self(unsafe: AccountUpdateRequest) {
+        return new AccountUpdateRequest(unsafe);
+    }
+}
+
+export class AccountUpdateResponse implements BaseResponse<AccountDTO> {
+    public success: boolean;
+    public message: string;
+    public data: {
+        account: AccountDTO | null
+    };
+
+    constructor(origin: AccountUpdateResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+        this.data = origin.data;
+    }
+}
+
+export class AccountDeleteRequest implements BaseRequest {
+    public auth?: string;
+    public id: string;
+
+    constructor(origin: Partial<AccountDeleteRequest>) {
+        if (!origin.id) throw new Error("Id is required");
+        origin.auth && (this.auth = origin.auth);
+        this.id = origin.id;
+    }
+    static self(unsafe: AccountDeleteRequest) {
+        return new AccountDeleteRequest(unsafe);
+    }
+}
+
+export class AccountDeleteResponse implements BaseResponse<AccountDTO> {
+    public success: boolean;
+    public message: string;
+
+    constructor(origin: AccountDeleteResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+    }
+}

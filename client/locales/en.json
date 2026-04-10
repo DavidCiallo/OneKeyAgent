@@ -1,0 +1,40 @@
+{
+    "Common": {
+        "ButtonAdd": "Add",
+        "ButtonSave": "Save",
+        "ButtonConfirm": "Confirm",
+        "ButtonCancel": "Cancel",
+        "ButtonClose": "Close",
+        "ToastSuccess": "Operation successful",
+        "ToastFailed": "Operation failed",
+        "ToastNetworkError": "Network error, please try again later",
+        "ToastUnauthorized": "Authentication failed, please log in again",
+        "ToastParamError": "Parameter error, please check input",
+        "DefaultSelectPlaceholder": "Please enter"
+    },
+
+    "Menu": {
+        "Demo": "Demo Page"
+    },
+
+    "AuthPage": {
+        "Title": "app",
+        "LoginSuccess": "Login successful",
+        "LoginFailed": "Login failed",
+        "EmailLabel": "Email",
+        "EmailPlaceholder": "Please enter account",
+        "EmailError": "This format might be a bit odd",
+        "PasswordLabel": "Password",
+        "PasswordPlaceholder": "Please enter password",
+        "PasswordError": "This is obviously required",
+        "ForgetPasswordLinkText": "Forgot Password?",
+        "ForgetPasswordErrorText": "Please contact the administrator 🙁",
+        "SubmitButtonText": "Login"
+    },
+
+    "HomePage": {
+        "MainText": "Tiny Web",
+        "Slogan": "Quick, light and beautiful",
+        "ViewSource": "View Source Code"
+    }
+}
