@@ -1,104 +1,61 @@
-// @ts-ignore
-import fs from "fs";
+import Repository from "../../lib/repository";
+import {
+    aiSessionTable,
+    modelTable,
+    usageLogTable
+} from "../../lib/schema";
 
-// 模型池：只存储 URL 和用量
-export interface Model {
+// 定义实体类以便 Repository 使用
+export interface ModelEntity {
+    id: string;
+    alias: string;
     baseURL: string;
     model: string;
     apiKey?: string;
-    inputCount: number;
-    outCount: number;
-    lastReset: number; // 上次重置时间戳
+    create_time: number;
+    update_time: number;
+    delete_time: number | null;
 }
 
-let models: Model[] = JSON.parse(fs.readFileSync("./model.json").toString());
+export interface AiSessionEntity {
+    id: string;
+    apiKey: string;
+    modelId: string;
+    context: string; // JSON string
+    failureCount: number;
+    create_time: number;
+    update_time: number;
+    delete_time: number | null;
+}
 
-// 初始化 lastReset 字段（兼容旧数据）
-for (const m of models) {
-    if (!m.lastReset) {
-        m.lastReset = Date.now();
+export interface UsageLogEntity {
+    id: string;
+    apiKey: string;
+    sessionId: string;
+    modelId: string;
+    inputTokens: number;
+    outputTokens: number;
+    create_time: number;
+    update_time: number;
+    delete_time: number | null;
+}
+
+const modelRepo = Repository.instance<ModelEntity>("Model");
+[
+    {
+        "alias": "minimax-m2.7",
+        "baseURL": "http://192.168.1.2:11434/v1",
+        "apiKey": "",
+        "model": "minimax-m2.7:cloud",
+    },
+].forEach(async i => {
+    const exist = await modelRepo.findOne({ model: i.model, baseURL: i.baseURL });
+    if (!exist) {
+        modelRepo.insert({ model: i.model, baseURL: i.baseURL, apiKey: i.apiKey || "", alias: i.alias })
     }
-}
-
-// 检查是否到达本周一 0 点 (UTC)
-function shouldReset(): boolean {
-    const now = new Date();
-    const dayOfWeek = now.getUTCDay(); // 0=周日, 1=周一...
-    const hours = now.getUTCHours();
-
-    // 每周一 0 点重置
-    if (dayOfWeek === 1 && hours === 0) {
-        return true;
-    }
-    return false;
-}
-
-// 检查并重置用量
-function checkAndResetUsage() {
-    if (!shouldReset()) return;
-
-    // 所有模型的 lastReset 必须是上周的才重置
-    const now = Date.now();
-    const monday0 = getThisMonday0UTC();
-
-    for (const m of models) {
-        if (m.lastReset < monday0) {
-            m.inputCount = 0;
-            m.outCount = 0;
-            m.lastReset = now;
-            console.log(`[AI] Reset usage for model: ${m.model}`);
-        }
-    }
-    saveModels();
-    console.log(`[AI] Weekly reset at ${new Date().toISOString()}`);
-}
-
-// 获取本周一 0 点 UTC 时间戳
-function getThisMonday0UTC(): number {
-    const now = new Date();
-    const dayOfWeek = now.getUTCDay(); // 0=周日
-    const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    const monday = new Date(Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        now.getUTCDate() - diff,
-        0, 0, 0, 0
-    ));
-    return monday.getTime();
-}
-
-function saveModels() {
-    fs.writeFileSync("./model.json", JSON.stringify(models), null, 2);
-}
-
-// 启动时检查一次
-checkAndResetUsage();
-
-// 定期检查（每分钟）
-setInterval(checkAndResetUsage, 60 * 1000);
-
-// Session 池：只管理上下文
-export interface Session {
-    context: number[];
-    modelIdx: number;
-}
-
-const sessions: Map<string, Session> = new Map();
-const sessionOrder: string[] = [];
-const MAX_SESSIONS = 100;
-const OUT_COUNT_THRESHOLD = 100000;
-
-export function evictLRU() {
-    if (sessionOrder.length >= MAX_SESSIONS) {
-        sessions.delete(sessionOrder.shift()!);
-    }
-}
-
-export function touchSession(sid: string) {
-    const idx = sessionOrder.indexOf(sid);
-    if (idx !== -1) sessionOrder.splice(idx, 1);
-    sessionOrder.push(sid);
-}
+})
+const sessionRepo = Repository.instance<AiSessionEntity>("AiSession");
+const usageRepo = Repository.instance<UsageLogEntity>("UsageLog");
 
 export function getSessionId(body: Record<string, any>): string {
     const msgs = body.messages || [];
@@ -110,34 +67,80 @@ export function getSessionId(body: Record<string, any>): string {
     return Math.abs(h).toString(36);
 }
 
-export function getSession(sid: string): Session | undefined {
-    return sessions.get(sid);
+export async function getSession(sid: string): Promise<AiSessionEntity | null> {
+    return await sessionRepo.findOne({ id: sid });
 }
 
-export function createSession(sid: string, modelIdx: number, context: number[]) {
-    evictLRU();
-    sessions.set(sid, { context, modelIdx });
-    sessionOrder.push(sid);
+export async function createSession(sid: string, apiKey: string, modelId: string, messages: any[]) {
+    await sessionRepo.insert({
+        id: sid,
+        apiKey,
+        modelId,
+        context: JSON.stringify(messages),
+        failureCount: 0
+    });
 }
 
-export function pickModel(session: Session): Model {
-    checkAndResetUsage(); // 每次使用时检查是否需要重置
-    // 检查当前模型的 outCount 是否超过阈值，超过则换模型
-    if (models[session.modelIdx].outCount > OUT_COUNT_THRESHOLD) {
-        session.modelIdx = (session.modelIdx + 1) % models.length;
+export async function pickModel(session: AiSessionEntity): Promise<ModelEntity> {
+    const m = await getModelById(session.modelId);
+    if (m) return m;
+    const models = await getAllModels();
+    return models[0];
+}
+
+export async function getModelsByAlias(alias: string): Promise<ModelEntity[]> {
+    return await modelRepo.find({ alias });
+}
+
+export async function getFirstModelByAlias(alias: string): Promise<ModelEntity | null> {
+    const models = await getModelsByAlias(alias);
+    return models[0] || null;
+}
+
+export async function incrementFailureCount(sid: string): Promise<number> {
+    const session = await sessionRepo.findOne({ id: sid });
+    if (!session) return 0;
+    const newCount = (session.failureCount || 0) + 1;
+    await sessionRepo.update({ id: sid }, { failureCount: newCount });
+    return newCount;
+}
+
+export async function resetFailureCount(sid: string): Promise<void> {
+    await sessionRepo.update({ id: sid }, { failureCount: 0 });
+}
+
+export async function updateSessionModel(sid: string, modelId: string): Promise<void> {
+    await sessionRepo.update({ id: sid }, { modelId });
+}
+
+export async function pickModelWithFallback(session: AiSessionEntity): Promise<ModelEntity> {
+    const currentModel = await pickModel(session);
+    const aliases = await getModelsByAlias(currentModel.alias);
+
+    if (aliases.length <= 1) {
+        return currentModel;
     }
-    return models[session.modelIdx];
+
+    // 随机选一个不同的模型
+    const others = aliases.filter(m => m.id !== currentModel.id);
+    if (others.length === 0) return currentModel;
+    return others[Math.floor(Math.random() * others.length)];
 }
 
-export function updateUsage(sid: string, prompt_tokens: number, completion_tokens: number) {
-    const session = sessions.get(sid);
-    if (!session) return;
-    const m = models[session.modelIdx];
-    m.inputCount += prompt_tokens;
-    m.outCount += completion_tokens;
-    saveModels();
+export async function logUsage(usage: {
+    apiKey: string,
+    sessionId: string,
+    modelId: string,
+    inputTokens: number,
+    outputTokens: number
+}) {
+    await usageRepo.insert(usage);
 }
 
-export function getAllModels() {
-    return models;
+export async function getAllModels(): Promise<ModelEntity[]> {
+    return await modelRepo.find();
+}
+
+export async function getModelById(id: string): Promise<ModelEntity | null> {
+    return await modelRepo.findOne({ id });
 }

@@ -1,7 +1,11 @@
-import { AliveRequest, AliveResponse, LoginRequest, LoginResponse, } from "../../../shared/modules/auth/auth.interface";
+import {
+    AliveRequest, AliveResponse,
+    LoginRequest, LoginResponse,
+    RegisterRequest, RegisterResponse
+} from "../../../shared/modules/auth/auth.interface";
 import { AuthRouterInstance } from "../../../shared/modules/auth/auth.router";
 import { inject } from "../../lib/inject";
-import { getIdentifyByVerify, loginUser } from "./auth.service";
+import { getIdentifyByVerify, loginUser, registerUser } from "./auth.service";
 
 async function alive(request: AliveRequest): Promise<AliveResponse> {
     request = AliveRequest.self(request);
@@ -27,4 +31,18 @@ async function login(request: LoginRequest): Promise<LoginResponse> {
     return new LoginResponse({ success: true, message: "Login success", data: { token } });
 }
 
-export const authController = new AuthRouterInstance(inject, { alive, login });
+async function register(request: RegisterRequest): Promise<RegisterResponse> {
+    request = RegisterRequest.self(request);
+    const { identify } = request;
+    if (!identify) {
+        throw "Register data is missing";
+    }
+    const { name, email, password } = identify;
+    const { apiKey } = await registerUser(name, email, password);
+    if (!apiKey) {
+        return new RegisterResponse({ success: false, message: "注册失败，可能邮箱已存在", data: { apiKey: "" } });
+    }
+    return new RegisterResponse({ success: true, message: "注册成功", data: { apiKey } });
+}
+
+export const authController = new AuthRouterInstance(inject, { alive, login, register });

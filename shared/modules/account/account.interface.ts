@@ -11,6 +11,7 @@ export class AccountDTO {
     public id: string;
     public name: string;
     public email: string;
+    public apiKey: string;
 
     private isTypeSafe: symbol = Symbol();
 
@@ -18,6 +19,7 @@ export class AccountDTO {
         this.id = origin.id;
         this.name = origin.name;
         this.email = origin.email;
+        this.apiKey = origin.apiKey || "";
     }
 }
 
@@ -50,16 +52,18 @@ export class AccountCreateBody {
     public name: string;
     public email: string;
     public password: string;
+    public apiKey: string;
 
     private isTypeSafe: symbol = Symbol();
 
-    constructor(origin: Pick<AccountEntity, "name" | "email" | "password">) {
+    constructor(origin: Pick<AccountEntity, "name" | "email" | "password" | "apiKey">) {
         if (!origin.name || !origin.email || !origin.password) {
             throw new Error("Name and email are required");
         }
         this.name = origin.name;
         this.email = origin.email;
         this.password = origin.password;
+        this.apiKey = origin.apiKey || "";
     }
 
     static self(unsafe: AccountCreateBody) {
