@@ -1,3 +1,8 @@
+import { AccountEntity } from "../../../shared/modules/account/account.entity";
+import Repository from "../../lib/repository";
+
+const accountRepo = Repository.instance<AccountEntity>("Account");
+
 // ==================== API Key 验证 ====================
 // Key 格式: 随机字符串，长度 >= 16
 // 验证算法:
@@ -5,6 +10,50 @@
 //   2. 取中间 4 字符 ASCII 和，记为 B
 //   3. 取最后 4 字符 ASCII 和，记为 C
 //   4. 验证: A + B + C = 1024
+
+/**
+ * 验证 API Key 是否符合数学逻辑（快速过滤）
+ * @param key 字符串，长度 >= 16
+ * @returns true 如果合法
+ */
+export function validateApiKey(key: string): boolean {
+    if (!key || typeof key !== "string" || key.length < 16) {
+        return false;
+    }
+
+    // 前 4 字符 ASCII 和
+    let A = 0;
+    for (let i = 0; i < 4; i++) {
+        A += key.charCodeAt(i);
+    }
+
+    // 中间 4 字符 ASCII 和
+    const midStart = Math.floor((key.length - 4) / 2);
+    let B = 0;
+    for (let i = midStart; i < midStart + 4; i++) {
+        B += key.charCodeAt(i);
+    }
+
+    // 最后 4 字符 ASCII 和
+    let C = 0;
+    for (let i = key.length - 4; i < key.length; i++) {
+        C += key.charCodeAt(i);
+    }
+
+    // 验证: A + B + C = 1024
+    return A + B + C === 1024;
+}
+
+/**
+ * 验证 API Key 是否在数据库中存在
+ * @param key API Key
+ * @returns true 如果存在
+ */
+export async function verifyApiKeyInDb(key: string): Promise<boolean> {
+    if (!key) return false;
+    const account = await accountRepo.findOne({ apiKey: key });
+    return !!account;
+}
 
 /**
  * 生成合法的 API Key
@@ -54,7 +103,6 @@ function manualConstruct(): string {
 }
 
 function constructSum(target: number, len: number): string | null {
-    // 有效字符: 0-9(48-57), A-Z(65-90), a-z(97-122)
     const validChars = [
         ...Array.from({ length: 10 }, (_, i) => 48 + i),      // 0-9
         ...Array.from({ length: 26 }, (_, i) => 65 + i),      // A-Z
@@ -65,13 +113,11 @@ function constructSum(target: number, len: number): string | null {
         const result: number[] = [];
         let remaining = target;
         for (let i = 0; i < len; i++) {
-            // 剩余位置能用的最小/最大值
             const minPossible = validChars[0] * (len - i - 1);
             const maxPossible = validChars[validChars.length - 1] * (len - i - 1);
             const minHere = Math.max(validChars[0], remaining - maxPossible);
             const maxHere = Math.min(validChars[validChars.length - 1], remaining - minPossible);
 
-            // 过滤出在这个范围内且是有效字符的选项
             const validOptions = validChars.filter(c => c >= minHere && c <= maxHere);
             if (validOptions.length === 0) break;
 
@@ -84,37 +130,4 @@ function constructSum(target: number, len: number): string | null {
         }
     }
     return null;
-}
-
-/**
- * 验证 API Key
- * @param key 字符串，长度 >= 16
- * @returns true 如果合法
- */
-export function validateApiKey(key: string): boolean {
-    if (!key || typeof key !== "string" || key.length < 16) {
-        return false;
-    }
-
-    // 前 4 字符 ASCII 和
-    let A = 0;
-    for (let i = 0; i < 4; i++) {
-        A += key.charCodeAt(i);
-    }
-
-    // 中间 4 字符 ASCII 和
-    const midStart = Math.floor((key.length - 4) / 2);
-    let B = 0;
-    for (let i = midStart; i < midStart + 4; i++) {
-        B += key.charCodeAt(i);
-    }
-
-    // 最后 4 字符 ASCII 和
-    let C = 0;
-    for (let i = key.length - 4; i < key.length; i++) {
-        C += key.charCodeAt(i);
-    }
-
-    // 验证: A + B + C = 1024
-    return A + B + C === 1024;
 }

@@ -1,6 +1,7 @@
 import { aesDecrypt, aesEncrypt, hashGenerate } from "../../methods/crypto";
 import { AccountEntity } from "../../../shared/modules/account/account.entity";
 import Repository from "../../lib/repository";
+import { generateApiKey } from "../ai/ai.auth";
 
 const accountRepository: Repository<AccountEntity> = Repository.instance("Account");
 
@@ -14,11 +15,14 @@ export async function loginUser(email: string, password: string): Promise<{ toke
     }
 }
 
-export async function registerUser(name: string, email: string, password: string): Promise<AccountEntity | null> {
+export async function registerUser(name: string, email: string, password: string): Promise<{ account?: AccountEntity; apiKey?: string }> {
     const exist = await accountRepository.findOne({ email });
-    if (exist) { return null; }
+    if (exist) { return {}; }
     password = hashGenerate(password);
-    return await accountRepository.insert({ name, email, password });
+    const apiKey = generateApiKey();
+    const account = await accountRepository.insert({ name, email, password, apiKey });
+    if (!account) return {};
+    return { account, apiKey };
 }
 
 export function genTokenForIdentify(identity: string, expried: number = 1000 * 60 * 60 * 24): string {
