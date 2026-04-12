@@ -26,6 +26,53 @@ export class LoginBody {
 // Interface
 // 遵循 account.interface.ts 的 Request/Response 模式
 
+export class RegisterBody {
+    public name: string;
+    public email: string;
+    public password: string;
+
+    private isTypeSafe: symbol = Symbol();
+
+    constructor(origin: any) {
+        if (!origin.name || !origin.email || !origin.password) {
+            throw new Error("Name, email and password are required");
+        }
+        this.name = origin.name;
+        this.email = origin.email;
+        this.password = origin.password;
+    }
+
+    static self(unsafe: RegisterBody) {
+        return new RegisterBody(unsafe);
+    }
+}
+
+export class RegisterRequest implements BaseRequest {
+    public identify: RegisterBody;
+
+    constructor(origin: Partial<RegisterRequest>) {
+        if (!origin.identify) throw new Error("Register data is required");
+        this.identify = RegisterBody.self(origin.identify);
+    }
+    static self(unsafe: RegisterRequest) {
+        return new RegisterRequest(unsafe);
+    }
+}
+
+export class RegisterResponse implements BaseResponse<{ apiKey: string }> {
+    public success: boolean;
+    public message: string;
+    public data: {
+        apiKey: string;
+    };
+
+    constructor(origin: RegisterResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+        this.data = origin.data;
+    }
+}
+
 export class LoginRequest implements BaseRequest {
     public auth?: string;
     public identify: LoginBody;

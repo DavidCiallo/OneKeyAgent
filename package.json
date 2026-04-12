@@ -12,6 +12,7 @@
     "dependencies": {
         "@heroui/react": "^2.8.0-beta.5",
         "@twallpaper/react": "^2.1.2",
+        "@types/node": "^25.6.0",
         "@types/react-router-dom": "^5.3.3",
         "axios": "^1.11.0",
         "better-sqlite3": "^12.8.0",
@@ -22,7 +23,8 @@
         "gsap": "^3.13.0",
         "nanoid": "^5.1.6",
         "react-icons": "^5.5.0",
-        "react-router-dom": "^7.6.0"
+        "react-router-dom": "^7.6.0",
+        "undici": "^8.0.2"
     },
     "devDependencies": {
         "@rsbuild/core": "^1.3.15",

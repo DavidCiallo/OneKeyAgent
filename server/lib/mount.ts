@@ -5,7 +5,6 @@ export async function mounthttp(req: Request, controllers: BaseRouterInstance[])
     const url = new URL(req.url);
     const pathName = url.pathname;
     const method = req.method.toLowerCase();
-
     for (const controller of controllers) {
         const { base, prefix, router } = controller;
         for (const item of router) {
@@ -13,7 +12,7 @@ export async function mounthttp(req: Request, controllers: BaseRouterInstance[])
             const fullPath = `${base}${prefix}${path}`;
 
             if (pathName === fullPath) {
-                const auth = req.headers.get("token");
+                const auth = req.headers.get("token") || req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
                 let requestBody: Record<string, any> | null = {};
                 try {
                     requestBody = await req.json();
@@ -23,14 +22,15 @@ export async function mounthttp(req: Request, controllers: BaseRouterInstance[])
                 try {
                     const result = handler && (await handler({ ...requestBody, auth }));
 
-                    return new Response(JSON.stringify(result), {
+                    const response = new Response(JSON.stringify(result), {
                         headers: {
                             "Content-Type": "application/json",
                             "Access-Control-Allow-Origin": "*",
                             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                            "Access-Control-Allow-Headers": "Content-Type, token",
+                            "Access-Control-Allow-Headers": "Content-Type, token, Authorization",
                         },
                     });
+                    return response;
                 } catch (error: any) {
                     console.error(`Error in handler for ${fullPath}:`, error);
                     return new Response(JSON.stringify({
@@ -43,7 +43,7 @@ export async function mounthttp(req: Request, controllers: BaseRouterInstance[])
                             "Content-Type": "application/json",
                             "Access-Control-Allow-Origin": "*",
                             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                            "Access-Control-Allow-Headers": "Content-Type, token",
+                            "Access-Control-Allow-Headers": "Content-Type, token, Authorization",
                         },
                     });
                 }
@@ -110,7 +110,7 @@ export const wshandler = {
     open(ws: any) {
         activeSockets.add(ws);
     },
-    message(ws: any, message: any) {},
+    message(ws: any, message: any) { },
     close(ws: any, code: number, message: string) {
         activeSockets.delete(ws);
     },

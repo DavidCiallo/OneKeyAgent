@@ -9,20 +9,21 @@ const staticPath = path.dirname(fileURLToPath(import.meta.url));
 import { mounthttp, mountstatic } from "../lib/mount";
 import { authController } from "../modules/auth/auth.controller";
 import { demoController } from "../modules/demo/demo.controller";
+import { aiController } from "../modules/ai/ai.controller";
 
 const PORT = parseInt(process.env.SERVER_PORT || "3300");
 
 // @ts-ignore
 Bun.serve({
     port: PORT,
-    async fetch(req) {
+    async fetch(req: Request) {
         const url = new URL(req.url);
         const pathName = url.pathname;
-
         // API 路由处理
         const apiResponse = await mounthttp(req, [
             authController,
             demoController,
+            aiController,
         ]);
         if (apiResponse) return apiResponse;
         const staticResponse = await mountstatic(staticPath, pathName);
