@@ -1,3 +1,4 @@
+import { fetch, ProxyAgent } from "undici";
 import {
     ChatCompletionsServiceResponse,
     CompletionServiceResponse,
@@ -10,17 +11,9 @@ import {
     getAllModels,
     pickModel,
     logUsage,
-    getModelById,
-    pickModelWithFallback,
-    incrementFailureCount,
-    resetFailureCount,
     updateSessionModel,
-    getFirstModelByAlias
 } from "./ai.session";
 // @ts-ignore
-import fs from "fs";
-
-const MAX_FAILURES_BEFORE_SWITCH = 3;
 
 async function chatHex(body: Record<string, any>, apiKey: string): Promise<any> {
     const t0 = Date.now();
@@ -28,117 +21,142 @@ async function chatHex(body: Record<string, any>, apiKey: string): Promise<any> 
     const session = await getSession(sid);
 
     const models = await getAllModels();
-    let model = session ? await pickModel(session) : models[0];
-    let attemptModel = false;
+    models.sort((a, b) => b.tier - a.tier)
+    const startModel = session ? await pickModel(session) : models[0];
+    const startTier = startModel.tier;
 
-    // 检查是否需要更换模型（连续失败）
-    if (session && session.failureCount >= MAX_FAILURES_BEFORE_SWITCH) {
-        model = await pickModelWithFallback(session);
-        attemptModel = true;
-    }
+    // 从最高 tier 开始，失败则降级，同 tier 随机顺序
+    const tried = new Set<string>();
 
-    const requestBody: Record<string, any> = {
-        ...body,
-        stream: false,
-        model: model.model,
-    };
+    for (let tier = startTier; tier >= 1; tier--) {
+        const tierModels = models.filter(m => m.tier === tier && !tried.has(m.id));
+        if (tierModels.length === 0) continue;
 
-    const response = await fetch(`${model.baseURL}/chat/completions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", 'Authorization': `Bearer ${model.apiKey}` },
-        body: JSON.stringify(requestBody),
-    });
-    if (!response.ok) {
-        const errorText = await response.text();
-        const failureCount = await incrementFailureCount(sid);
+        // 同 tier 随机打乱
+        for (let i = tierModels.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [tierModels[i], tierModels[j]] = [tierModels[j], tierModels[i]];
+        }
 
-        // 尝试更换相同 alias 的模型
-        if (failureCount < MAX_FAILURES_BEFORE_SWITCH && session) {
-            const altModel = await pickModelWithFallback(session);
-            console.log(`[AI] Request failed (${response.status}), trying ${altModel.alias}:${altModel.baseURL}`);
+        for (const model of tierModels) {
+            tried.add(model.id);
+            const requestBody: Record<string, any> = {
+                ...body,
+                stream: false,
+                model: model.model,
+            };
 
-            const retryResponse = await fetch(`${altModel.baseURL}/chat/completions`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", 'Authorization': `Bearer ${altModel.apiKey}` },
-                body: JSON.stringify({ ...requestBody, model: altModel.model }),
+            let response: any;
+            try {
+                response = await fetch(`${model.baseURL}/chat/completions`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", 'Authorization': `Bearer ${model.apiKey}` },
+                    body: JSON.stringify(requestBody),
+                    dispatcher: model.proxyURL ? new ProxyAgent(model.proxyURL) : undefined,
+                });
+            } catch (e) {
+                console.log(`[AI] tier${tier} ${model.baseURL} failed: ${e}`);
+                continue;
+            }
+
+            if (!response.ok) {
+                console.log(`[AI] tier${tier} ${model.baseURL} error: ${response.status}`);
+                continue;
+            }
+
+            const data = await response.json();
+            const ms = Date.now() - t0;
+
+            if (session) {
+                await updateSessionModel(sid, model.id);
+            } else {
+                await createSession(sid, apiKey, model.id, body.messages);
+            }
+
+            const { usage } = data;
+            console.log(`[AI] Raw usage data:`, JSON.stringify(usage));
+            await logUsage({
+                apiKey,
+                sessionId: sid,
+                modelId: model.id,
+                inputTokens: usage?.prompt_tokens || 0,
+                outputTokens: usage?.completion_tokens || 0,
             });
 
-            if (retryResponse.ok) {
-                const data = await retryResponse.json();
-                await resetFailureCount(sid);
-                await updateSessionModel(sid, altModel.id);
-                return data;
-            } else {
-                await incrementFailureCount(sid);
-                throw new Error(`All ${altModel.alias} models failed: ${retryResponse.status}`);
-            }
+            const tps = usage?.completion_tokens ? ((usage.completion_tokens / ms) * 1000).toFixed(1) : "-";
+            console.log(`[AI] tier${tier} input: ${usage?.prompt_tokens}, output: ${usage?.completion_tokens}, ${tps} tok/s, ${ms}ms`);
+            return data;
         }
-
-        throw new Error(`API error: ${response.status} - ${errorText}`);
     }
 
-    const data = await response.json();
-    const ms = Date.now() - t0;
-
-    // 成功后重置失败计数
-    if (session) {
-        await resetFailureCount(sid);
-        if (attemptModel) {
-            await updateSessionModel(sid, model.id);
-        }
-    } else {
-        await createSession(sid, apiKey, model.id, body.messages);
-    }
-
-    const { usage } = data;
-    console.log(`[AI] Raw usage data:`, JSON.stringify(usage));
-    await logUsage({
-        apiKey,
-        sessionId: sid,
-        modelId: model.id,
-        inputTokens: usage?.prompt_tokens || 0,
-        outputTokens: usage?.completion_tokens || 0,
-    });
-
-    const tps = usage?.completion_tokens ? ((usage.completion_tokens / ms) * 1000).toFixed(1) : "-";
-    console.log(`[AI] input: ${usage?.prompt_tokens}, output: ${usage?.completion_tokens}, ${tps} tok/s, ${ms}ms`);
-    return data;
+    throw new Error("All models failed");
 }
 
 async function completeHex(body: Record<string, any>, apiKey: string): Promise<any> {
     const t0 = Date.now();
     const sid = getSessionId(body);
     const session = await getSession(sid);
+
     const models = await getAllModels();
-    const model = session ? await pickModel(session) : models[0];
+    const startModel = session ? await pickModel(session) : models[0];
+    const startTier = startModel.tier;
 
-    const response = await fetch(`${model.baseURL}/completions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", 'Authorization': `Bearer ${model.apiKey}` },
-        body: JSON.stringify({
-            ...body,
-            stream: false,
-            model: model.model,
-        }),
-    });
-    if (!response.ok) {
-        throw new Error(`Hex API error: ${response.status} ${response.statusText}`);
+    const tried = new Set<string>();
+
+    for (let tier = startTier; tier >= 1; tier--) {
+        const tierModels = models.filter(m => m.tier === tier && !tried.has(m.id));
+        if (tierModels.length === 0) continue;
+
+        for (let i = tierModels.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [tierModels[i], tierModels[j]] = [tierModels[j], tierModels[i]];
+        }
+
+        for (const model of tierModels) {
+            tried.add(model.id);
+            let response: any;
+            try {
+                response = await fetch(`${model.baseURL}/completions`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", 'Authorization': `Bearer ${model.apiKey}` },
+                    body: JSON.stringify({ ...body, stream: false, model: model.model }),
+                    dispatcher: model.proxyURL ? new ProxyAgent(model.proxyURL) : undefined,
+                });
+            } catch (e) {
+                console.log(`[AI] tier${tier} ${model.baseURL} failed: ${e}`);
+                continue;
+            }
+
+            if (!response.ok) {
+                console.log(`[AI] tier${tier} ${model.baseURL} error: ${response.status}`);
+                continue;
+            }
+
+            const data = (await response.json()) as { usage: { prompt_tokens: number, completion_tokens: number } };
+            const ms = Date.now() - t0;
+
+            if (session) {
+                await updateSessionModel(sid, model.id);
+            } else {
+                await createSession(sid, apiKey, model.id, body.messages);
+            }
+
+            const { usage } = data;
+            await logUsage({
+                apiKey,
+                sessionId: sid,
+                modelId: model.id,
+                inputTokens: usage?.prompt_tokens || 0,
+                outputTokens: usage?.completion_tokens || 0,
+            });
+
+            const tps = usage?.completion_tokens ? ((usage.completion_tokens / ms) * 1000).toFixed(1) : "-";
+            console.log(`[AI] tier${tier} input: ${usage?.prompt_tokens}, output: ${usage?.completion_tokens}, ${tps} tok/s, ${ms}ms`);
+            return data;
+        }
     }
-    const data = await response.json();
-    const ms = Date.now() - t0;
-    const { usage } = data;
 
-    await logUsage({
-        apiKey,
-        sessionId: sid,
-        modelId: model.id,
-        inputTokens: usage.prompt_tokens || 0,
-        outputTokens: usage.completion_tokens || 0,
-    });
-
-    const tps = usage?.completion_tokens ? ((usage.completion_tokens / ms) * 1000).toFixed(1) : "-";
-    console.log(`[AI] input: ${usage?.prompt_tokens}, output: ${usage?.completion_tokens}, ${tps} tok/s, ${ms}ms`);
-    return data;
+    throw new Error("All models failed");
 }
 
 export class AiService {
