@@ -2,10 +2,11 @@ import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 
 export const modelTable = sqliteTable("model", {
     id: text("id").primaryKey(),
-    alias: text("alias").notNull(),
+    tier: integer("tier").notNull(),
     baseURL: text("base_url").notNull(),
     model: text("model").notNull(),
     apiKey: text("api_key"),
+    proxyURL: text("proxy_url"),
     create_time: integer("create_time"),
     update_time: integer("update_time"),
     delete_time: integer("delete_time"),
@@ -16,7 +17,6 @@ export const aiSessionTable = sqliteTable("ai_session", {
     apiKey: text("api_key").notNull(),
     modelId: text("model_id").notNull(),
     context: text("context").notNull(), // 存储为 JSON 字符串
-    failureCount: integer("failure_count").notNull().default(0),
     create_time: integer("create_time"),
     update_time: integer("update_time"),
     delete_time: integer("delete_time"),
