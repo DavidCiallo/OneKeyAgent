@@ -66,7 +66,7 @@ const Component = () => {
 
                         <div className="mt-10 flex items-center gap-x-6">
                             <a
-                                href="/demo"
+                                href="/model"
                                 className="rounded-md bg-indigo-500 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-400 focus-visible:outline"
                             >
                                 Start Free

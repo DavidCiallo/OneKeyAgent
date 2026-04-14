@@ -15,12 +15,12 @@ export default function Component() {
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const { email, password } = Object.fromEntries(new FormData(event.currentTarget));
-        const { success, data, message } = await AuthRouter.login({
-            identify: {
+        const { success, data, message } = await AuthRouter.login(new LoginRequest({
+            identify: new LoginBody({
                 email: email.toString(),
                 password: password.toString(),
-            },
-        });
+            })
+        }));
         if (!success || !data) {
             toast({ title: message || locale.LoginFailed, color: "danger" });
             return;
@@ -30,7 +30,7 @@ export default function Component() {
         await new Promise((r) => setTimeout(r, 1000));
         setAuthStatus({ access_token: token, expires_in: 3600 });
         setUserInfo({ email: email.toString() });
-        navigate("/demo");
+        navigate("/model");
     };
 
     return (
