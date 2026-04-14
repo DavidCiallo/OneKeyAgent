@@ -13,6 +13,14 @@ export const MenuComp = ({ now }: { now?: string }) => {
             name: locale.Demo,
             link: "/demo",
         },
+        {
+            name: locale.Model,
+            link: "/model",
+        },
+        {
+            name: locale.Usage,
+            link: "/usage",
+        },
     ];
 
     function renderBody(onClose: Function) {
