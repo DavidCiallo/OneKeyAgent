@@ -2,6 +2,9 @@ FROM oven/bun:1-alpine
 
 WORKDIR /app
 
+# Install build tools for native addons (better-sqlite3)
+RUN apk add --no-cache python3 make g++ gcc
+
 # Copy package files
 COPY package.json bun.lock ./
 
