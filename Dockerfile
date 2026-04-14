@@ -20,6 +20,8 @@ RUN bun run build
 # Create data directory for SQLite
 RUN mkdir -p data
 
+RUN bun run dbsync
+
 # Expose port
 EXPOSE 3300
 
