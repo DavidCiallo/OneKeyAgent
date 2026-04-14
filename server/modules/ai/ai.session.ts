@@ -3,12 +3,8 @@ import { AiSessionEntity, ModelEntity, UsageLogEntity } from "../../../shared/mo
 
 const modelRepo = Repository.instance<ModelEntity>("Model");
 [
-    {
-        "alias": "minimax-m2.7",
-        "baseURL": "http://192.168.1.2:11434/v1",
-        "apiKey": "",
-        "model": "minimax-m2.7:cloud",
-    },
+    { tier: 3, baseURL: "https://api.minimax.io/v1", model: "minimax-m2.7", apiKey: "sk-cp-CHXriMdgB4LHELLFNraY5MVDCyRfE-_FCDnZe7tAzgl_V7tay_Pt7K0p1aE4W8tLk6FcETqIf5SDLIgcBjMz5nWLvjwME2RqRGhV3kkcGmyeHhbRc0HbMns", proxyURL: "proxyuser:cocos123@223.254.147.67:827" },
+    { tier: 4, baseURL: "http://192.168.1.110:11434/v1", model: "glm-5.1:cloud" },
 ].forEach(async i => {
     const exist = await modelRepo.findOne({ model: i.model, baseURL: i.baseURL });
     if (!exist) {
