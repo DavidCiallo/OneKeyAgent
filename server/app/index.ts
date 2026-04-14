@@ -5,7 +5,7 @@ import { initialize } from "./initialize";
 
 config();
 
-const staticPath = path.dirname(fileURLToPath(import.meta.url));
+const staticPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../dist");
 
 import { mounthttp, mountstatic } from "../lib/mount";
 import { authController } from "../modules/auth/auth.controller";
