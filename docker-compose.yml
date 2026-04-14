@@ -1,0 +1,17 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3300:3300"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - SERVER_PORT=3300
+      - SECRET=MySecretPassphrase1234567890abcABCEFGefg
+      - NONCE_LENGTH=8
+      - ADMIN_NAME=Administrator
+      - ADMIN_EMAIL=mail@example.com
+      - ADMIN_PASSWORD=demo123@
+    restart: unless-stopped
