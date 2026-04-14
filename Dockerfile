@@ -20,10 +20,13 @@ RUN bun run build
 # Create data directory for SQLite
 RUN mkdir -p data
 
-CMD ["bun", "run", "dbsync"]
+# Copy entrypoint script
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 # Expose port
 EXPOSE 3300
 
 # Start the server
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["bun", "run", "server/app/index.ts"]
