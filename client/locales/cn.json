@@ -14,7 +14,43 @@
     },
 
     "Menu": {
-        "Demo": "示范页面"
+        "Model": "模型管理",
+        "Usage": "用量统计"
+    },
+
+    "ModelPage": {
+        "Tier": "层级",
+        "TierPlaceholder": "筛选层级",
+        "BaseURL": "BaseURL",
+        "BaseURLPlaceholder": "筛选 BaseURL",
+        "Model": "模型",
+        "ApiKey": "ApiKey",
+        "ProxyURL": "代理URL",
+        "Actions": "操作",
+        "Edit": "编辑",
+        "Delete": "删除",
+        "CreateTitle": "新增模型",
+        "EditTitle": "编辑模型",
+        "NoData": "暂无数据",
+        "Usage": "用量",
+        "UsageCardTitle": "用量统计"
+    },
+
+    "UsagePage": {
+        "ApiKey": "ApiKey",
+        "ApiKeyPlaceholder": "筛选 ApiKey",
+        "SessionId": "SessionId",
+        "SessionIdPlaceholder": "筛选 SessionId",
+        "ModelId": "ModelId",
+        "ModelIdPlaceholder": "筛选 ModelId",
+        "InputTokens": "输入 Token",
+        "OutputTokens": "输出 Token",
+        "Time": "时间",
+        "NoData": "暂无数据",
+        "Today": "今日",
+        "Last24h": "近一天",
+        "Last7Days": "近一周",
+        "Total": "总用量"
     },
 
     "AuthPage": {

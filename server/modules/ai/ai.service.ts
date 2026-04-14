@@ -28,8 +28,11 @@ async function chatHex(body: Record<string, any>, apiKey: string): Promise<any> 
     // 从最高 tier 开始，失败则降级，同 tier 随机顺序
     const tried = new Set<string>();
 
-    for (let tier = startTier; tier >= 1; tier--) {
-        const tierModels = models.filter(m => m.tier === tier && !tried.has(m.id));
+    // for (let tier = startTier; tier >= 1; tier--) {
+    for (let count = 0; count < 100; count++) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        // const tierModels = models.filter(m => m.tier === tier && !tried.has(m.id));
+        const tierModels = models;
         if (tierModels.length === 0) continue;
 
         // 同 tier 随机打乱
@@ -55,12 +58,12 @@ async function chatHex(body: Record<string, any>, apiKey: string): Promise<any> 
                     dispatcher: model.proxyURL ? new ProxyAgent(model.proxyURL) : undefined,
                 });
             } catch (e) {
-                console.log(`[AI] tier${tier} ${model.baseURL} failed: ${e}`);
+                console.log(`[AI] ${model.baseURL} failed: ${e}`);
                 continue;
             }
 
             if (!response.ok) {
-                console.log(`[AI] tier${tier} ${model.baseURL} error: ${response.status}`);
+                console.log(`[AI] ${model.baseURL} error: ${response.status}, ${response.statusText}`);
                 continue;
             }
 
@@ -84,7 +87,7 @@ async function chatHex(body: Record<string, any>, apiKey: string): Promise<any> 
             });
 
             const tps = usage?.completion_tokens ? ((usage.completion_tokens / ms) * 1000).toFixed(1) : "-";
-            console.log(`[AI] tier${tier} input: ${usage?.prompt_tokens}, output: ${usage?.completion_tokens}, ${tps} tok/s, ${ms}ms`);
+            console.log(`[AI] ${model.model} input: ${usage?.prompt_tokens}, output: ${usage?.completion_tokens}, ${tps} tok/s, ${ms}ms`);
             return data;
         }
     }
