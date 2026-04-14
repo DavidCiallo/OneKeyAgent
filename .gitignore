@@ -4,6 +4,4 @@ dist
 node_modules
 data/*
 
-bun.lock
-
 *.local.json
