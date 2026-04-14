@@ -49,7 +49,7 @@ function buildPeriod(logs: UsageLogEntity[], periodStart: number, periodEnd: num
 
 export class UsageService {
     static async find(page: number, filter: Partial<UsageLogEntity>): Promise<{ list: UsageLogEntity[], total: number }> {
-        const list = await usageRepo.find(filter, { offset: (page - 1) * 10, limit: 10 });
+        const list = await usageRepo.find(filter, { offset: (page - 1) * 40, limit: 40 });
         const total = await usageRepo.count(filter);
         return { list, total };
     }
