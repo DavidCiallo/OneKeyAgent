@@ -7,8 +7,9 @@
         "build": "rsbuild build",
         "dev": "rsbuild dev",
         "serve": "bun run server/app",
-        "dbsync": "bun drizzle-kit push",
-        "dbreset": "rm -f data/tiny_web.db && bun drizzle-kit push"
+        "dbsync": "bun run server/scripts/db-init.ts",
+        "dbsync:drizzle": "bun drizzle-kit push",
+        "dbreset": "rm -f data/tiny_web.db && bun run server/scripts/db-init.ts"
     },
     "dependencies": {
         "@heroui/react": "^2.8.0-beta.5",
