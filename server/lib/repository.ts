@@ -5,7 +5,7 @@ import { nanoid } from "nanoid";
 import fs from "fs";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import * as schema from "./schema";
-import { eq, and, isNull, sql } from "drizzle-orm";
+import { eq, and, isNull, sql, desc } from "drizzle-orm";
 
 const DB_DIR = "data";
 const DB_FILE = "tiny_web.db";
@@ -70,7 +70,11 @@ class Repository<
         let query = db
             .select()
             .from(this.table)
-            .where(and(...filters));
+            .where(and(...filters))
+            .orderBy(desc(this.table.create_time));
+
+        if (config?.limit !== undefined) query = query.limit(config.limit);
+        if (config?.offset !== undefined) query = query.offset(config.offset);
 
         const result = await query.execute();
         return result as T[];
