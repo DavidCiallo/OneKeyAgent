@@ -15,12 +15,12 @@ export default function Component() {
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const { email, password } = Object.fromEntries(new FormData(event.currentTarget));
-        const { success, data, message } = await AuthRouter.login({
-            identify: {
+        const { success, data, message } = await AuthRouter.login(new LoginRequest({
+            identify: new LoginBody({
                 email: email.toString(),
                 password: password.toString(),
-            },
-        });
+            })
+        }));
         if (!success || !data) {
             toast({ title: message || locale.LoginFailed, color: "danger" });
             return;

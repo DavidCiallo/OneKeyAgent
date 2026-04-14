@@ -14,7 +14,44 @@
     },
 
     "Menu": {
-        "Demo": "Demo Page"
+        "Demo": "Demo Page",
+        "Model": "Model",
+        "Usage": "Usage"
+    },
+
+    "ModelPage": {
+        "Tier": "Tier",
+        "TierPlaceholder": "Filter by tier",
+        "BaseURL": "BaseURL",
+        "BaseURLPlaceholder": "Filter by BaseURL",
+        "Model": "Model",
+        "ApiKey": "ApiKey",
+        "ProxyURL": "Proxy URL",
+        "Actions": "Actions",
+        "Edit": "Edit",
+        "Delete": "Delete",
+        "CreateTitle": "Create Model",
+        "EditTitle": "Edit Model",
+        "NoData": "No data",
+        "Usage": "Usage",
+        "UsageCardTitle": "Usage Stats"
+    },
+
+    "UsagePage": {
+        "ApiKey": "ApiKey",
+        "ApiKeyPlaceholder": "Filter by ApiKey",
+        "SessionId": "SessionId",
+        "SessionIdPlaceholder": "Filter by SessionId",
+        "ModelId": "ModelId",
+        "ModelIdPlaceholder": "Filter by ModelId",
+        "InputTokens": "Input Tokens",
+        "OutputTokens": "Output Tokens",
+        "Time": "Time",
+        "NoData": "No data",
+        "Today": "Today",
+        "Last24h": "Last 24h",
+        "Last7Days": "Last 7 Days",
+        "Total": "Total"
     },
 
     "AuthPage": {
