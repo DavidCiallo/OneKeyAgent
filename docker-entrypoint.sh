@@ -1,12 +1,8 @@
 #!/bin/sh
 set -e
 
-# Initialize database only once (persistent across restarts)
-if [ ! -f /app/data/.initialized ]; then
-    echo "Initializing database..."
-    bun run dbsync
-    touch /app/data/.initialized
-    echo "Database initialized."
-fi
+# Sync database schema on every start (drizzle-kit push is a no-op when already up-to-date)
+echo "Syncing database schema..."
+bun run dbsync
 
 exec "$@"
