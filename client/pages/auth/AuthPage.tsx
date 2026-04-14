@@ -30,7 +30,7 @@ export default function Component() {
         await new Promise((r) => setTimeout(r, 1000));
         setAuthStatus({ access_token: token, expires_in: 3600 });
         setUserInfo({ email: email.toString() });
-        navigate("/demo");
+        navigate("/model");
     };
 
     return (
