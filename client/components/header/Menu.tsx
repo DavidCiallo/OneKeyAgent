@@ -10,10 +10,6 @@ export const MenuComp = ({ now }: { now?: string }) => {
 
     const menuList = [
         {
-            name: locale.Demo,
-            link: "/demo",
-        },
-        {
             name: locale.Model,
             link: "/model",
         },

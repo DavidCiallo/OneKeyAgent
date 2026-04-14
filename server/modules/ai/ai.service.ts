@@ -87,7 +87,7 @@ async function chatHex(body: Record<string, any>, apiKey: string): Promise<any> 
             });
 
             const tps = usage?.completion_tokens ? ((usage.completion_tokens / ms) * 1000).toFixed(1) : "-";
-            console.log(`[AI] input: ${usage?.prompt_tokens}, output: ${usage?.completion_tokens}, ${tps} tok/s, ${ms}ms`);
+            console.log(`[AI] ${model.model} input: ${usage?.prompt_tokens}, output: ${usage?.completion_tokens}, ${tps} tok/s, ${ms}ms`);
             return data;
         }
     }

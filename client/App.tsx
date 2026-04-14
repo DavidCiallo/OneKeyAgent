@@ -5,7 +5,6 @@ import AuthPage from "./pages/auth/AuthPage";
 import { toast } from "./methods/notify";
 import HomePage from "./pages/home/HomePage";
 import { AuthStatus, clearAuthData, getAuthStatus } from "./methods/auth";
-import DemoPage from "./pages/demo/DemoPage";
 import ModelPage from "./pages/model/ModelPage";
 import UsagePage from "./pages/usage/UsagePage";
 import { AuthRouter } from "./api/instance";
@@ -31,7 +30,6 @@ const App = () => {
                 <Route path="/home" element={<HomePage />} />
                 <Route path="/auth" element={<AuthPage />} />
                 <Route element={<PrivateRoute />}>
-                    <Route path="/demo" element={<DemoPage />} />
                     <Route path="/model" element={<ModelPage />} />
                     <Route path="/usage" element={<UsagePage />} />
                 </Route>

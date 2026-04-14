@@ -19,16 +19,6 @@ type Props = {
     onConfirm: () => void;
 };
 
-const TierOptions = () => (
-    <>
-        <SelectItem key="1">1</SelectItem>
-        <SelectItem key="2">2</SelectItem>
-        <SelectItem key="3">3</SelectItem>
-        <SelectItem key="4">4</SelectItem>
-        <SelectItem key="5">5</SelectItem>
-    </>
-);
-
 export function ModelFormModal({ isOpen, onOpenChange, mode, form, onFormChange, onConfirm }: Props) {
     const locale = Locale("ModelPage");
     const common = Locale("Common");
@@ -44,7 +34,11 @@ export function ModelFormModal({ isOpen, onOpenChange, mode, form, onFormChange,
                             selectedKeys={[String(form.tier)]}
                             onChange={e => onFormChange({ ...form, tier: parseInt(e.target.value) })}
                         >
-                            <TierOptions />
+                            <SelectItem key="1">1</SelectItem>
+                            <SelectItem key="2">2</SelectItem>
+                            <SelectItem key="3">3</SelectItem>
+                            <SelectItem key="4">4</SelectItem>
+                            <SelectItem key="5">5</SelectItem>
                         </Select>
                         <Input
                             label={locale.BaseURL}
