@@ -41,7 +41,7 @@ export function setUserInfo(info: { email: string; is_admin?: number; roles?: { 
     const { email, is_admin, roles } = info;
     localStorage.setItem("user_email", email);
     if (is_admin !== undefined) localStorage.setItem("user_is_admin", String(is_admin));
-    if (roles) localStorage.setItem("user_roles", JSON.stringify(roles));
+    if (roles && roles.length > 0) localStorage.setItem("user_roles", JSON.stringify(roles));
 }
 
 export function isAdmin(): boolean {

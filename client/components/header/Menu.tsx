@@ -3,13 +3,14 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerBody, useDisclosure } from "
 import MenuIcon from "../icons/menu";
 import { Link } from "react-router-dom";
 import { Locale } from "../../methods/locale";
-import { isAdmin, getRoles } from "../../methods/auth";
+import { useAuth } from "../../methods/auth-context";
 
 const ALL_MENUS = ["model", "usage", "account"] as const;
 
 export const MenuComp = ({ now }: { now?: string }) => {
     const locale = Locale("Menu");
     const { isOpen, onOpen, onOpenChange } = useDisclosure();
+    const { is_admin, roles } = useAuth();
 
     const menuMap: Record<string, { name: string; link: string }> = {
         model: { name: locale.Model, link: "/model" },
@@ -18,8 +19,7 @@ export const MenuComp = ({ now }: { now?: string }) => {
         nocontent: { name: locale.NoContent, link: "/nocontent" },
     };
 
-    const roles = getRoles();
-    const menuKeys = isAdmin()
+    const menuKeys = is_admin
         ? ALL_MENUS
         : (roles.length > 0
             ? roles.filter(r => r.type === "menu").map(r => r.name)
