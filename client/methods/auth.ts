@@ -26,18 +26,25 @@ export function setAuthStatus(status: { access_token: string; expires_in: number
     localStorage.setItem("expires_at", expires_at.toString());
 }
 
-export function getUserInfo(): { email: string | null } {
+export function getUserInfo(): { email: string | null; role?: string } {
     const email = localStorage.getItem("user_email");
-    return { email };
+    const role = localStorage.getItem("user_role");
+    return { email, role: role || undefined };
 }
 
-export function setUserInfo(info: { email: string }) {
-    const { email } = info;
+export function setUserInfo(info: { email: string; role?: string }) {
+    const { email, role } = info;
     localStorage.setItem("user_email", email);
+    if (role) localStorage.setItem("user_role", role);
+}
+
+export function isAdmin(): boolean {
+    return localStorage.getItem("user_role") === "admin";
 }
 
 export function clearAuthData() {
     localStorage.removeItem("access_token");
     localStorage.removeItem("expires_at");
     localStorage.removeItem("user_email");
+    localStorage.removeItem("user_role");
 }

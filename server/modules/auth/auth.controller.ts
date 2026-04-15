@@ -5,15 +5,17 @@ import {
 } from "../../../shared/modules/auth/auth.interface";
 import { AuthRouterInstance } from "../../../shared/modules/auth/auth.router";
 import { inject } from "../../lib/inject";
-import { getIdentifyByVerify, loginUser, registerUser } from "./auth.service";
+import { getIdentifyByVerify, loginUser, registerUser, getAccountByEmail } from "./auth.service";
 
 async function alive(request: AliveRequest): Promise<AliveResponse> {
     request = AliveRequest.self(request);
     const { auth } = request;
     if (auth && getIdentifyByVerify(auth)) {
-        return new AliveResponse({ success: true, message: "Authorized" });
+        const email = getIdentifyByVerify(auth)!;
+        const account = await getAccountByEmail(email);
+        return new AliveResponse({ success: true, message: "Authorized", data: { role: account?.role } });
     } else {
-        return new AliveResponse({ success: false, message: "Unauthorized" });
+        return new AliveResponse({ success: false, message: "Unauthorized", data: {} });
     }
 }
 
@@ -24,11 +26,11 @@ async function login(request: LoginRequest): Promise<LoginResponse> {
         throw "Authorized failed";
     }
     const { email, password } = request.identify;
-    const { token } = await loginUser(email, password);
+    const { token, role } = await loginUser(email, password);
     if (!token) {
         return new LoginResponse({ success: false, message: "账号或密码错误", data: { token: "" } });
     }
-    return new LoginResponse({ success: true, message: "Login success", data: { token } });
+    return new LoginResponse({ success: true, message: "Login success", data: { token, role } });
 }
 
 async function register(request: RegisterRequest): Promise<RegisterResponse> {

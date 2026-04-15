@@ -85,6 +85,24 @@ class Repository<
         return results.length > 0 ? results[0] : null;
     }
 
+    async findIgnoreDelete(where: Partial<T>): Promise<T | null> {
+        const filters: any[] = [];
+        if (where) {
+            Object.entries(where).forEach(([key, val]) => {
+                if (val !== undefined && val !== null && val !== "" && this.table[key]) {
+                    filters.push(eq(this.table[key], val));
+                }
+            });
+        }
+        const result = await db
+            .select()
+            .from(this.table)
+            .where(filters.length > 0 ? and(...filters) : undefined)
+            .limit(1)
+            .get();
+        return (result as T) || null;
+    }
+
     async insert(entity: Partial<T>): Promise<T> {
         const id = entity.id || nanoid(6);
         const now = Date.now();
