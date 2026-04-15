@@ -6,7 +6,7 @@ export const accountTable = sqliteTable("account", {
     email: text("email").notNull(),
     password: text("password").notNull(),
     apiKey: text("api_key"),
-    role: text("role").notNull().default("user"),
+    is_admin: integer("is_admin").notNull().default(0),
     create_time: integer("create_time").notNull(),
     update_time: integer("update_time"),
     delete_time: integer("delete_time"),

@@ -6,6 +6,7 @@ import {
 import { AuthRouterInstance } from "../../../shared/modules/auth/auth.router";
 import { inject } from "../../lib/inject";
 import { getIdentifyByVerify, loginUser, registerUser, getAccountByEmail } from "./auth.service";
+import { AccountRoleService } from "../role/role.service";
 
 async function alive(request: AliveRequest): Promise<AliveResponse> {
     request = AliveRequest.self(request);
@@ -13,7 +14,13 @@ async function alive(request: AliveRequest): Promise<AliveResponse> {
     if (auth && getIdentifyByVerify(auth)) {
         const email = getIdentifyByVerify(auth)!;
         const account = await getAccountByEmail(email);
-        return new AliveResponse({ success: true, message: "Authorized", data: { role: account?.role } });
+        if (account) {
+            const roles = account.is_admin
+                ? []
+                : (await AccountRoleService.findByAccount(account.id)).map(r => ({ name: r.name, type: r.type }));
+            return new AliveResponse({ success: true, message: "Authorized", data: { is_admin: account.is_admin, roles } });
+        }
+        return new AliveResponse({ success: true, message: "Authorized", data: { is_admin: 0, roles: [] } });
     } else {
         return new AliveResponse({ success: false, message: "Unauthorized", data: {} });
     }
@@ -26,11 +33,11 @@ async function login(request: LoginRequest): Promise<LoginResponse> {
         throw "Authorized failed";
     }
     const { email, password } = request.identify;
-    const { token, role } = await loginUser(email, password);
+    const { token, is_admin, roles } = await loginUser(email, password);
     if (!token) {
         return new LoginResponse({ success: false, message: "账号或密码错误", data: { token: "" } });
     }
-    return new LoginResponse({ success: true, message: "Login success", data: { token, role } });
+    return new LoginResponse({ success: true, message: "Login success", data: { token, is_admin, roles } });
 }
 
 async function register(request: RegisterRequest): Promise<RegisterResponse> {
