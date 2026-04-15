@@ -82,6 +82,8 @@
         "Email": "邮箱",
         "EmailPlaceholder": "筛选邮箱",
         "IsAdmin": "管理员",
+        "ApiKey": "ApiKey",
+        "User": "用户",
         "Actions": "操作",
         "Edit": "编辑",
         "Delete": "删除",
