@@ -19,9 +19,11 @@ import {
     UsageQueryBody,
 } from "../../../shared/modules/usage/usage.interface";
 import { ModelListRequest } from "../../../shared/modules/model/model.interface";
+import { useAuth } from "../../methods/auth-context";
 
 export default function UsagePage() {
     const locale = Locale("UsagePage");
+    const { hasPermission } = useAuth();
 
     const [list, setList] = useState<UsageDTO[]>([]);
     const [total, setTotal] = useState(0);
@@ -43,9 +45,7 @@ export default function UsagePage() {
     }, []);
 
     const fetchList = useCallback(async (p: number) => {
-        const filter: Record<string, string> = {};
-
-        const req = new UsageListRequest({ page: p, filter: new UsageQueryBody(filter), auth: getToken() });
+        const req = new UsageListRequest({ page: p, filter: new UsageQueryBody({}), auth: getToken() });
         const res = await UsageRouter.list(req);
         if (res.success && res.data) {
             setList(res.data.list);
@@ -63,63 +63,33 @@ export default function UsagePage() {
 
     const totalPages = Math.ceil(total / 30) || 1;
 
-    const topList = list.slice(0, 15);
-    const bottomList = list.slice(15, 30);
-
-    const renderRow = (item: UsageDTO) => (
-        <TableRow key={item.id}>
-            <TableCell className="max-w-xs truncate">{item.apiKey || "—"}</TableCell>
-            <TableCell className="max-w-xs truncate">{item.modelId ? (modelMap[item.modelId] || item.modelId) : "—"}</TableCell>
-            <TableCell align="center">{item.inputTokens}</TableCell>
-            <TableCell align="center">{item.outputTokens}</TableCell>
-            <TableCell>{item.create_time ? new Date(item.create_time).toLocaleString() : "—"}</TableCell>
-        </TableRow>
-    );
-
-    const tableHeader = (
-        <TableHeader>
-            <TableColumn>{locale.ApiKey}</TableColumn>
-            <TableColumn align="center">{locale.Model}</TableColumn>
-            <TableColumn align="center">{locale.InputTokens}</TableColumn>
-            <TableColumn align="center">{locale.OutputTokens}</TableColumn>
-            <TableColumn align="center">{locale.Time}</TableColumn>
-        </TableHeader>
-    );
-
     return (
         <div className="max-w-screen flex flex-col h-screen">
             <Header name={Locale("Menu").Usage} />
             <div className="p-8 flex flex-col gap-4 flex-1 overflow-hidden">
-                <div className="grid grid-cols-2 gap-4">
-                    <Table
-                        aria-label="Usage list top"
-                        className="flex-1 overflow-auto"
-                    >
-                        {tableHeader}
-                        <TableBody emptyContent={locale.NoData}>
-                            {topList.map(renderRow)}
-                        </TableBody>
-                    </Table>
+                <Table aria-label="Usage list" className="flex-1 overflow-auto">
+                    <TableHeader>
+                        <TableColumn>{locale.ApiKey}</TableColumn>
+                        <TableColumn align="center">{locale.ModelId}</TableColumn>
+                        <TableColumn align="center">{locale.InputTokens}</TableColumn>
+                        <TableColumn align="center">{locale.OutputTokens}</TableColumn>
+                        <TableColumn align="center">{locale.Time}</TableColumn>
+                    </TableHeader>
+                    <TableBody emptyContent={locale.NoData}>
+                        {list.map(item => (
+                            <TableRow key={item.id}>
+                                <TableCell className="max-w-xs truncate">{item.apiKey || "—"}</TableCell>
+                                <TableCell>{item.modelId ? (modelMap[item.modelId] || item.modelId) : "—"}</TableCell>
+                                <TableCell>{item.inputTokens}</TableCell>
+                                <TableCell>{item.outputTokens}</TableCell>
+                                <TableCell>{item.create_time ? new Date(item.create_time).toLocaleString() : "—"}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
 
-                    {bottomList.length > 0 && <Table
-                        aria-label="Usage list bottom"
-                        className="flex-1 overflow-auto"
-                    >
-                        {tableHeader}
-                        <TableBody emptyContent="">
-                            {bottomList.map(renderRow)}
-                        </TableBody>
-                    </Table>}
-                </div>
-
-                {/* Pagination */}
                 <div className="flex justify-center">
-                    <Pagination
-                        total={totalPages}
-                        page={page}
-                        onChange={setPage}
-                        showControls
-                    />
+                    <Pagination total={totalPages} page={page} onChange={setPage} showControls />
                 </div>
             </div>
         </div>

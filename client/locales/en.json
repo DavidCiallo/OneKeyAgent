@@ -83,6 +83,8 @@
         "Email": "Email",
         "EmailPlaceholder": "Filter by email",
         "IsAdmin": "Admin",
+        "ApiKey": "ApiKey",
+        "User": "User",
         "Actions": "Actions",
         "Edit": "Edit",
         "Delete": "Delete",
