@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "../../methods/notify";
 import { setAuthStatus, setUserInfo } from "../../methods/auth";
 import { Locale } from "../../methods/locale";
+import { useAuth } from "../../methods/auth-context";
 import { LoginBody, LoginRequest } from "../../../shared/modules/auth/auth.interface";
 
 function getDefaultRoute(is_admin?: number, roles?: { name: string; type: string }[]): string {
@@ -20,6 +21,7 @@ function getDefaultRoute(is_admin?: number, roles?: { name: string; type: string
 export default function Component() {
     const navigate = useNavigate();
     const locale = Locale("AuthPage");
+    const { setAuthInfo } = useAuth();
 
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -37,8 +39,9 @@ export default function Component() {
         const { token } = data;
         toast({ title: locale.LoginSuccess, color: "success" });
         await new Promise((r) => setTimeout(r, 1000));
-        setAuthStatus({ access_token: token, expires_in: 3600 });
+        setAuthStatus({ access_token: token, expires_in: 60 * 60 * 24 * 3 });
         setUserInfo({ email: email.toString(), is_admin: data!.is_admin, roles: data!.roles });
+        setAuthInfo({ is_admin: data!.is_admin, roles: data!.roles });
         navigate(getDefaultRoute(data!.is_admin, data!.roles));
     };
 

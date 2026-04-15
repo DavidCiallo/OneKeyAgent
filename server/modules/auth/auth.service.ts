@@ -34,7 +34,7 @@ export async function getAccountByEmail(email: string): Promise<AccountEntity | 
     return await accountRepository.findOne({ email });
 }
 
-export function genTokenForIdentify(identity: string, expried: number = 1000 * 60 * 60 * 24): string {
+export function genTokenForIdentify(identity: string, expried: number = 1000 * 60 * 60 * 24 * 3): string {
     expried = Date.now() + expried;
     const token = [identity, expried.toString()].join("|-|");
     return aesEncrypt(token);

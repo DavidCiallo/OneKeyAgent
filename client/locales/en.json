@@ -17,7 +17,8 @@
         "Model": "Model",
         "Usage": "Usage",
         "Account": "Account",
-        "NoContent": "No Content"
+        "NoContent": "No Content",
+        "Logout": "Logout"
     },
 
     "ModelPage": {
