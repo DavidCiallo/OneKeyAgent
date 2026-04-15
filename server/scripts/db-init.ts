@@ -1,3 +1,4 @@
+// @ts-ignore
 import { Database } from "bun:sqlite";
 import path from "path";
 import fs from "fs";
