@@ -43,7 +43,7 @@ export default function AccountPage() {
         const req = new AccountListRequest({ page: p, filter: new AccountQueryBody(filter), auth: getToken() });
         const res = await AccountRouter.list(req);
         if (res.success && res.data) {
-            setList(res.data.list);
+            setList(res?.data?.list.sort((a, _) => a.is_admin ? -1 : 1));
             setTotal(res.data.total);
         }
     }, [filterName, filterEmail]);

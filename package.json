@@ -9,7 +9,7 @@
         "serve": "bun run server/app",
         "dbsync": "bun run server/scripts/db-init.ts",
         "dbsync:drizzle": "bun drizzle-kit push",
-        "dbreset": "rm -f data/tiny_web.db && bun run server/scripts/db-init.ts"
+        "dbreset": "rm -f data/onekey.db && bun run server/scripts/db-init.ts"
     },
     "dependencies": {
         "@heroui/react": "^2.8.0-beta.5",

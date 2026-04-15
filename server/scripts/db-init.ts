@@ -1,10 +1,10 @@
-// @ts-ignore
+// @ts-nocheck
 import { Database } from "bun:sqlite";
 import path from "path";
 import fs from "fs";
 
 const DB_DIR = "data";
-const DB_FILE = "tiny_web.db";
+const DB_FILE = "onekey.db";
 
 if (!fs.existsSync(DB_DIR)) {
     fs.mkdirSync(DB_DIR, { recursive: true });
