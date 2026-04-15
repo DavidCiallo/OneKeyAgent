@@ -17,7 +17,8 @@
         "Model": "Model",
         "Usage": "Usage",
         "Account": "Account",
-        "NoContent": "No Content"
+        "NoContent": "No Content",
+        "Logout": "Logout"
     },
 
     "ModelPage": {
@@ -71,7 +72,7 @@
     },
 
     "HomePage": {
-        "MainText": "Tiny Web",
+        "MainText": "OneKey",
         "Slogan": "Quick, light and beautiful",
         "ViewSource": "View Source Code"
     },
@@ -82,6 +83,8 @@
         "Email": "Email",
         "EmailPlaceholder": "Filter by email",
         "IsAdmin": "Admin",
+        "ApiKey": "ApiKey",
+        "User": "User",
         "Actions": "Actions",
         "Edit": "Edit",
         "Delete": "Delete",

@@ -17,7 +17,8 @@
         "Model": "模型管理",
         "Usage": "用量统计",
         "Account": "账号管理",
-        "NoContent": "未授权"
+        "NoContent": "未授权",
+        "Logout": "退出登录"
     },
 
     "ModelPage": {
@@ -56,7 +57,7 @@
     },
 
     "AuthPage": {
-        "Title": "TinyWeb 实例",
+        "Title": "OneKey",
         "LoginSuccess": "登录成功",
         "LoginFailed": "登录失败",
         "EmailLabel": "邮箱",
@@ -81,6 +82,8 @@
         "Email": "邮箱",
         "EmailPlaceholder": "筛选邮箱",
         "IsAdmin": "管理员",
+        "ApiKey": "ApiKey",
+        "User": "用户",
         "Actions": "操作",
         "Edit": "编辑",
         "Delete": "删除",

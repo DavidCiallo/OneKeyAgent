@@ -1,16 +1,18 @@
 import { Drawer, DrawerContent, DrawerHeader, DrawerBody, useDisclosure } from "@heroui/react";
 
 import MenuIcon from "../icons/menu";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Locale } from "../../methods/locale";
 import { useAuth } from "../../methods/auth-context";
+import { clearAuthData } from "../../methods/auth";
 
 const ALL_MENUS = ["model", "usage", "account"] as const;
 
 export const MenuComp = ({ now }: { now?: string }) => {
     const locale = Locale("Menu");
     const { isOpen, onOpen, onOpenChange } = useDisclosure();
-    const { is_admin, roles } = useAuth();
+    const { is_admin, roles, resetAuth } = useAuth();
+    const navigate = useNavigate();
 
     const menuMap: Record<string, { name: string; link: string }> = {
         model: { name: locale.Model, link: "/model" },
@@ -28,6 +30,12 @@ export const MenuComp = ({ now }: { now?: string }) => {
         .filter((key): key is string => key in menuMap)
         .map(key => menuMap[key]);
 
+    function handleLogout() {
+        clearAuthData();
+        resetAuth();
+        navigate("/auth", { replace: true });
+    }
+
     function renderBody(onClose: Function) {
         const list = menuList.map(({ name, link }) => {
             return (
@@ -44,7 +52,9 @@ export const MenuComp = ({ now }: { now?: string }) => {
                 <DrawerBody className="h-screen flex flex-col justify-between">
                     <div className="flex flex-col justify-start items-start">{list}</div>
                     <div className="flex flex-row justify-start items-center h-20">
-                        <span>{/* {localStorage.getItem("email")} */}</span>
+                        <div className="m-2 text-lg text-red-500 cursor-pointer" onClick={() => { onClose(); handleLogout(); }}>
+                            {locale.Logout}
+                        </div>
                     </div>
                 </DrawerBody>
             </>
