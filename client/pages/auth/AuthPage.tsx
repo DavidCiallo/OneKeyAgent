@@ -29,7 +29,7 @@ export default function Component() {
         toast({ title: locale.LoginSuccess, color: "success" });
         await new Promise((r) => setTimeout(r, 1000));
         setAuthStatus({ access_token: token, expires_in: 3600 });
-        setUserInfo({ email: email.toString() });
+        setUserInfo({ email: email.toString(), role: data!.role });
         navigate("/model");
     };
 

@@ -48,6 +48,7 @@ export class RegisterBody {
 }
 
 export class RegisterRequest implements BaseRequest {
+    public auth?: string;
     public identify: RegisterBody;
 
     constructor(origin: Partial<RegisterRequest>) {
@@ -88,11 +89,12 @@ export class LoginRequest implements BaseRequest {
     }
 }
 
-export class LoginResponse implements BaseResponse<{ token: string }> {
+export class LoginResponse implements BaseResponse<{ token: string; role?: string }> {
     public success: boolean;
     public message: string;
     public data: {
         token: string;
+        role?: string;
     };
 
     constructor(origin: LoginResponse) {
@@ -114,12 +116,14 @@ export class AliveRequest implements BaseRequest {
     }
 }
 
-export class AliveResponse implements BaseResponse<{}> {
+export class AliveResponse implements BaseResponse<{ role?: string }> {
     public success: boolean;
     public message: string;
+    public data: { role?: string };
 
     constructor(origin: AliveResponse) {
         this.success = origin.success;
         this.message = origin.message;
+        this.data = origin.data;
     }
 }

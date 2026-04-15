@@ -1,5 +1,5 @@
 import { BaseRequest, BaseResponse } from "../../lib/default/decorator";
-import { AccountEntity } from "./account.entity";
+import { AccountEntity, AccountRole } from "./account.entity";
 
 
 // DTO 的字段均只来自于实体，不允许添加额外字段
@@ -12,6 +12,7 @@ export class AccountDTO {
     public name: string;
     public email: string;
     public apiKey: string;
+    public role: string;
 
     private isTypeSafe: symbol = Symbol();
 
@@ -20,6 +21,7 @@ export class AccountDTO {
         this.name = origin.name;
         this.email = origin.email;
         this.apiKey = origin.apiKey || "";
+        this.role = origin.role;
     }
 }
 
@@ -53,10 +55,11 @@ export class AccountCreateBody {
     public email: string;
     public password: string;
     public apiKey: string;
+    public role: AccountRole;
 
     private isTypeSafe: symbol = Symbol();
 
-    constructor(origin: Pick<AccountEntity, "name" | "email" | "password" | "apiKey">) {
+    constructor(origin: Pick<AccountEntity, "name" | "email" | "password"> & Partial<Pick<AccountEntity, "apiKey" | "role">>) {
         if (!origin.name || !origin.email || !origin.password) {
             throw new Error("Name and email are required");
         }
@@ -64,6 +67,7 @@ export class AccountCreateBody {
         this.email = origin.email;
         this.password = origin.password;
         this.apiKey = origin.apiKey || "";
+        this.role = origin.role || "user";
     }
 
     static self(unsafe: AccountCreateBody) {
@@ -72,36 +76,27 @@ export class AccountCreateBody {
 }
 
 export class AccountUpdateBody {
-    public name: string;
-    public email: string;
-    public password: string;
+    public name?: string;
+    public email?: string;
+    public password?: string;
+    public role?: AccountRole;
 
     private isTypeSafe: symbol = Symbol();
 
     constructor(origin: Partial<AccountEntity> = {}) {
-        if (!origin.name && !origin.email && !origin.password) {
-            throw new Error("Least one field not null");
+        if (!origin.name && !origin.email && !origin.password && !origin.role) {
+            throw new Error("At least one field is required");
         }
-        this.name = origin.name || "";
-        this.email = origin.email || "";
-        this.password = origin.password || "";
+        origin.name && (this.name = origin.name);
+        origin.email && (this.email = origin.email);
+        origin.password && (this.password = origin.password);
+        origin.role && (this.role = origin.role);
     }
 
     static self(unsafe: AccountUpdateBody) {
         return new AccountUpdateBody(unsafe);
     }
 }
-
-// Interface
-// throw 仅在构造函数中使用
-
-// 客户端使用，使用new用于构造合法请求，非法请求在本地构建时throw
-// 服务端使用，使用self进行重复构造，非法请求会被拒绝throw并且返回错误
-
-// 来自客户端的请求，使用同框架client发送的，已经在构建时就检验了
-// 但服务端仍需要在每个请求开头进行检查，以防第三方请求非法
-
-// 服务端的返回可以保证符合接口声明，无需额外检验
 
 export class AccountListRequest implements BaseRequest {
     public auth?: string;

@@ -15,7 +15,8 @@
 
     "Menu": {
         "Model": "Model",
-        "Usage": "Usage"
+        "Usage": "Usage",
+        "Account": "Account"
     },
 
     "ModelPage": {
@@ -72,5 +73,23 @@
         "MainText": "Tiny Web",
         "Slogan": "Quick, light and beautiful",
         "ViewSource": "View Source Code"
+    },
+
+    "AccountPage": {
+        "Name": "Name",
+        "NamePlaceholder": "Filter by name",
+        "Email": "Email",
+        "EmailPlaceholder": "Filter by email",
+        "Role": "Role",
+        "RoleAdmin": "Admin",
+        "RoleUser": "User",
+        "Actions": "Actions",
+        "Edit": "Edit",
+        "Delete": "Delete",
+        "CreateTitle": "Create Account",
+        "EditTitle": "Edit Account",
+        "NoData": "No data",
+        "Password": "Password",
+        "DeleteConfirm": "Are you sure you want to delete this account?"
     }
 }

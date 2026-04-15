@@ -15,7 +15,8 @@
 
     "Menu": {
         "Model": "模型管理",
-        "Usage": "用量统计"
+        "Usage": "用量统计",
+        "Account": "账号管理"
     },
 
     "ModelPage": {
@@ -71,5 +72,23 @@
         "MainText": "极简接口",
         "Slogan": "小巧，精致，且快速。",
         "ViewSource": "查看源代码"
+    },
+
+    "AccountPage": {
+        "Name": "用户名",
+        "NamePlaceholder": "筛选用户名",
+        "Email": "邮箱",
+        "EmailPlaceholder": "筛选邮箱",
+        "Role": "角色",
+        "RoleAdmin": "管理员",
+        "RoleUser": "普通用户",
+        "Actions": "操作",
+        "Edit": "编辑",
+        "Delete": "删除",
+        "CreateTitle": "新增账号",
+        "EditTitle": "编辑账号",
+        "NoData": "暂无数据",
+        "Password": "密码",
+        "DeleteConfirm": "确定要删除该账号吗？"
     }
 }
