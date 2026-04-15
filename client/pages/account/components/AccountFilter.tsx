@@ -1,5 +1,6 @@
 import { Input, Button } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
+import { isAdmin } from "../../../methods/auth";
 
 type Props = {
     filterName: string;
@@ -12,6 +13,7 @@ type Props = {
 export function AccountFilter({ filterName, filterEmail, onNameChange, onEmailChange, onAdd }: Props) {
     const locale = Locale("AccountPage");
     const common = Locale("Common");
+    const admin = isAdmin();
 
     return (
         <div className="px-4 flex flex-row gap-3 justify-between items-end flex-wrap">
@@ -33,9 +35,11 @@ export function AccountFilter({ filterName, filterEmail, onNameChange, onEmailCh
                     size="sm"
                 />
             </div>
-            <Button color="primary" size="sm" onPress={onAdd}>
-                {common.ButtonAdd}
-            </Button>
+            {admin && (
+                <Button color="primary" size="sm" onPress={onAdd}>
+                    {common.ButtonAdd}
+                </Button>
+            )}
         </div>
     );
 }

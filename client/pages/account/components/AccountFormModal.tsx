@@ -1,12 +1,29 @@
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input } from "@heroui/react";
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Checkbox, CheckboxGroup, Input } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
-import { AccountRole } from "../../../../shared/modules/account/account.entity";
+
+type Permission = { name: string; type: string };
+
+const PERMISSION_OPTIONS: Permission[] = [
+    { name: "model", type: "menu" },
+    { name: "usage", type: "menu" },
+    { name: "account", type: "menu" },
+    { name: "model", type: "page" },
+    { name: "usage", type: "page" },
+    { name: "account", type: "page" },
+];
+
+const TYPE_LABEL: Record<string, string> = {
+    menu: "菜单",
+    page: "页面",
+    api: "接口",
+};
 
 type AccountForm = {
     name: string;
     email: string;
     password: string;
-    role: AccountRole;
+    is_admin: number;
+    permissions: string[]; // "menu:model" format for checkbox values
 };
 
 type Props = {
@@ -17,6 +34,15 @@ type Props = {
     onFormChange: (f: AccountForm) => void;
     onConfirm: () => void;
 };
+
+function permToKey(p: Permission): string {
+    return `${p.type}:${p.name}`;
+}
+
+function keyToPerm(key: string): Permission {
+    const [type, name] = key.split(":");
+    return { name, type };
+}
 
 export function AccountFormModal({ isOpen, onOpenChange, mode, form, onFormChange, onConfirm }: Props) {
     const locale = Locale("AccountPage");
@@ -49,14 +75,23 @@ export function AccountFormModal({ isOpen, onOpenChange, mode, form, onFormChang
                                 isRequired
                             />
                         )}
-                        <Select
-                            label={locale.Role}
-                            selectedKeys={[form.role]}
-                            onChange={e => onFormChange({ ...form, role: e.target.value as AccountRole })}
-                        >
-                            <SelectItem key="admin">{locale.RoleAdmin}</SelectItem>
-                            <SelectItem key="user">{locale.RoleUser}</SelectItem>
-                        </Select>
+                        {mode === "edit" && form.is_admin ? (
+                            <p className="text-sm text-gray-500">{locale.AdminAllPermissions}</p>
+                        ) : (
+                            <CheckboxGroup
+                                label={locale.Permissions}
+                                value={form.permissions}
+                                onChange={val => onFormChange({ ...form, permissions: val as string[] })}
+                            >
+                                <div className="grid grid-cols-3">
+                                    {PERMISSION_OPTIONS.map(p => (
+                                        <Checkbox key={permToKey(p)} value={permToKey(p)}>
+                                            {p.name} ({TYPE_LABEL[p.type] || p.type})
+                                        </Checkbox>
+                                    ))}
+                                </div>
+                            </CheckboxGroup>
+                        )}
                     </div>
                 </ModalBody>
                 <ModalFooter>
@@ -67,3 +102,5 @@ export function AccountFormModal({ isOpen, onOpenChange, mode, form, onFormChang
         </Modal>
     );
 }
+
+export { permToKey, keyToPerm, PERMISSION_OPTIONS };

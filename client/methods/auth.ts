@@ -26,25 +26,49 @@ export function setAuthStatus(status: { access_token: string; expires_in: number
     localStorage.setItem("expires_at", expires_at.toString());
 }
 
-export function getUserInfo(): { email: string | null; role?: string } {
+export function getUserInfo(): { email: string | null; is_admin?: number; roles?: { name: string; type: string }[] } {
     const email = localStorage.getItem("user_email");
-    const role = localStorage.getItem("user_role");
-    return { email, role: role || undefined };
+    const isAdmin = localStorage.getItem("user_is_admin");
+    const rolesRaw = localStorage.getItem("user_roles");
+    let roles: { name: string; type: string }[] | undefined;
+    if (rolesRaw) {
+        try { roles = JSON.parse(rolesRaw); } catch { roles = undefined; }
+    }
+    return { email, is_admin: isAdmin ? Number(isAdmin) : undefined, roles };
 }
 
-export function setUserInfo(info: { email: string; role?: string }) {
-    const { email, role } = info;
+export function setUserInfo(info: { email: string; is_admin?: number; roles?: { name: string; type: string }[] }) {
+    const { email, is_admin, roles } = info;
     localStorage.setItem("user_email", email);
-    if (role) localStorage.setItem("user_role", role);
+    if (is_admin !== undefined) localStorage.setItem("user_is_admin", String(is_admin));
+    if (roles) localStorage.setItem("user_roles", JSON.stringify(roles));
 }
 
 export function isAdmin(): boolean {
-    return localStorage.getItem("user_role") === "admin";
+    return localStorage.getItem("user_is_admin") === "1";
+}
+
+export function getRoles(): { name: string; type: string }[] {
+    const raw = localStorage.getItem("user_roles");
+    if (!raw) return [];
+    try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+}
+
+export function hasPermission(name: string, type: string): boolean {
+    if (isAdmin()) return true;
+    const roles = getRoles();
+    return roles.some(r => r.name === name && r.type === type);
 }
 
 export function clearAuthData() {
     localStorage.removeItem("access_token");
     localStorage.removeItem("expires_at");
     localStorage.removeItem("user_email");
-    localStorage.removeItem("user_role");
+    localStorage.removeItem("user_is_admin");
+    localStorage.removeItem("user_roles");
 }

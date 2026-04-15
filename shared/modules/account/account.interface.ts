@@ -1,5 +1,5 @@
 import { BaseRequest, BaseResponse } from "../../lib/default/decorator";
-import { AccountEntity, AccountRole } from "./account.entity";
+import { AccountEntity } from "./account.entity";
 
 
 // DTO 的字段均只来自于实体，不允许添加额外字段
@@ -12,7 +12,7 @@ export class AccountDTO {
     public name: string;
     public email: string;
     public apiKey: string;
-    public role: string;
+    public is_admin: number;
 
     private isTypeSafe: symbol = Symbol();
 
@@ -21,7 +21,7 @@ export class AccountDTO {
         this.name = origin.name;
         this.email = origin.email;
         this.apiKey = origin.apiKey || "";
-        this.role = origin.role;
+        this.is_admin = origin.is_admin;
     }
 }
 
@@ -55,11 +55,11 @@ export class AccountCreateBody {
     public email: string;
     public password: string;
     public apiKey: string;
-    public role: AccountRole;
+    public is_admin: number;
 
     private isTypeSafe: symbol = Symbol();
 
-    constructor(origin: Pick<AccountEntity, "name" | "email" | "password"> & Partial<Pick<AccountEntity, "apiKey" | "role">>) {
+    constructor(origin: Pick<AccountEntity, "name" | "email" | "password"> & Partial<Pick<AccountEntity, "apiKey" | "is_admin">>) {
         if (!origin.name || !origin.email || !origin.password) {
             throw new Error("Name and email are required");
         }
@@ -67,7 +67,7 @@ export class AccountCreateBody {
         this.email = origin.email;
         this.password = origin.password;
         this.apiKey = origin.apiKey || "";
-        this.role = origin.role || "user";
+        this.is_admin = origin.is_admin ?? 0;
     }
 
     static self(unsafe: AccountCreateBody) {
@@ -79,18 +79,18 @@ export class AccountUpdateBody {
     public name?: string;
     public email?: string;
     public password?: string;
-    public role?: AccountRole;
+    public is_admin?: number;
 
     private isTypeSafe: symbol = Symbol();
 
     constructor(origin: Partial<AccountEntity> = {}) {
-        if (!origin.name && !origin.email && !origin.password && !origin.role) {
+        if (!origin.name && !origin.email && !origin.password && origin.is_admin === undefined) {
             throw new Error("At least one field is required");
         }
         origin.name && (this.name = origin.name);
         origin.email && (this.email = origin.email);
         origin.password && (this.password = origin.password);
-        origin.role && (this.role = origin.role);
+        origin.is_admin !== undefined && (this.is_admin = origin.is_admin);
     }
 
     static self(unsafe: AccountUpdateBody) {

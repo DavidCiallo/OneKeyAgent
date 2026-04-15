@@ -22,7 +22,7 @@ async function requireAdmin(auth?: string): Promise<void> {
     const email = getIdentifyByVerify(auth);
     if (!email) throw "Authorization failed";
     const account = await getAccountByEmail(email);
-    if (!account || account.role !== "admin") throw "Permission denied";
+    if (!account || !account.is_admin) throw "Permission denied";
 }
 
 async function list(request: AccountListRequest): Promise<AccountListResponse> {
@@ -72,7 +72,7 @@ async function create(request: AccountCreateRequest): Promise<AccountCreateRespo
     const existing = await AccountService.findByEmail(request.account.email);
     if (existing) throw "email already exists";
 
-    const { account } = await registerUser(request.account.name, request.account.email, request.account.password, request.account.role);
+    const { account } = await registerUser(request.account.name, request.account.email, request.account.password, request.account.is_admin);
     if (!account) throw "create failed";
     const data = new AccountDTO(account);
     return new AccountCreateResponse({
