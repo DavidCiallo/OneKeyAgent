@@ -8,7 +8,7 @@ import * as schema from "./schema";
 import { eq, and, isNull, sql, desc } from "drizzle-orm";
 
 const DB_DIR = "data";
-const DB_FILE = "tiny_web.db";
+const DB_FILE = "onekey.db";
 
 if (!fs.existsSync(DB_DIR)) {
     fs.mkdirSync(DB_DIR);
