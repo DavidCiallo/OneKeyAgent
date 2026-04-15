@@ -57,7 +57,7 @@
     },
 
     "AuthPage": {
-        "Title": "TinyWeb 实例",
+        "Title": "OneKey",
         "LoginSuccess": "登录成功",
         "LoginFailed": "登录失败",
         "EmailLabel": "邮箱",

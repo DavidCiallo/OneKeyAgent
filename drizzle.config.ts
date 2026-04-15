@@ -5,6 +5,6 @@ export default defineConfig({
     schema: "./server/lib/schema.ts",
     dialect: "sqlite",
     dbCredentials: {
-        url: "data/tiny_web.db",
+        url: "data/onekey.db",
     },
 });

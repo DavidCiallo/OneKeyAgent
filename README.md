@@ -1,80 +1,46 @@
-# Tiny-Web
+# OneKey 🔑
 
-## 项目介绍
+**OpenAI-compatible API gateway with automatic model failover.**
 
-本项目为全栈应用，前端基于 [React](https://react.dev/) [HeroUI](https://heroicons.com/) ，后端基于 [Express](https://expressjs.com/)，使用[TypeScript](https://www.typescriptlang.org/) 进行开发，推荐使用 [Bun](https://bun.sh/)。
+When a backend model becomes unavailable, requests are automatically routed to the next configured model. Client applications require no changes.
 
-## 技术栈
+---
 
--   前端：React + HeroUI
--   后端：Express
--   运行环境：Bun (nodejs)
+### Features
 
-## 快速开始
+- 🔄 Automatic failover — seamless fallback across configured models
+- 🎯 OpenAI-compatible — drop-in replacement for `/chat/completions` and `/completions`
+- 📊 Usage tracking — token consumption by API key, session, and model
+- 👥 Multi-tenant — account management with role-based access control
+- 🐳 Self-contained — Docker or bare metal, embedded SQLite, zero external dependencies
 
-### 克隆项目
-
-```bash
-git clone https://github.com/DavidCiallo/Tiny-Web
-cd Tiny-Web
-```
-
-### 安装依赖
-
-```bash
-npm install -g bun
-bun install
-```
-
-### 编辑环境变量
-
-新建.env 文件，内容可参考.env.example；或执行
+### Quick start
 
 ```bash
 cp .env.example .env
+docker compose up -d
 ```
 
-### 启动开发环境
+Admin credentials are configured via `.env`.
 
-#### 示例用
+<details>
+<summary>Bare metal</summary>
 
 ```bash
-npm run all
+bun install
+bun run dbsync
+bun run build
+bun run serve
 ```
+</details>
 
-#### 单独启用前端
+### Configuration
 
-```bash
-npm run dev
-```
-
-#### 单独启用后端
-
-```bash
-npm run serve
-```
-
-## 目录结构
-
-```
-.
-├── client/      # 前端代码（React + HeroUI + TypeScript）
-├── server/      # 后端代码（Express + TypeScript）
-├── shared/      # 共享代码（TypeScript）
-├── README.md
-```
-
-## 构建与部署
-
-```bash
-npm run build
-```
-
-构建产物提供两种部署模式：
-静态托管： dist/ 目录内容可部署至任何静态托管平台。
-服务器部署： bundle.js 文件用于部署在 Node.js 服务器上。
-本应用支持无头（Headless）部署，仅通过暴露服务端端口即可实现项目的全部功能。
-
-## 许可证
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SERVER_PORT` | Server port | `3300` |
+| `SECRET` | AES encryption key for tokens | — |
+| `ADMIN_EMAIL` | Initial admin account email | — |
+| `ADMIN_PASSWORD` | Initial admin account password | — |
 
 MIT
