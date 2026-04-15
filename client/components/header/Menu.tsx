@@ -15,6 +15,7 @@ export const MenuComp = ({ now }: { now?: string }) => {
         model: { name: locale.Model, link: "/model" },
         usage: { name: locale.Usage, link: "/usage" },
         account: { name: locale.Account, link: "/account" },
+        nocontent: { name: locale.NoContent, link: "/nocontent" },
     };
 
     const roles = getRoles();

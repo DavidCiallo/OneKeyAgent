@@ -89,12 +89,13 @@ export class LoginRequest implements BaseRequest {
     }
 }
 
-export class LoginResponse implements BaseResponse<{ token: string; role?: string }> {
+export class LoginResponse implements BaseResponse<{ token: string; is_admin?: number; roles?: { name: string; type: string }[] }> {
     public success: boolean;
     public message: string;
     public data: {
         token: string;
-        role?: string;
+        is_admin?: number;
+        roles?: { name: string; type: string }[];
     };
 
     constructor(origin: LoginResponse) {
@@ -116,10 +117,10 @@ export class AliveRequest implements BaseRequest {
     }
 }
 
-export class AliveResponse implements BaseResponse<{ role?: string }> {
+export class AliveResponse implements BaseResponse<{ is_admin?: number; roles?: { name: string; type: string }[] }> {
     public success: boolean;
     public message: string;
-    public data: { role?: string };
+    public data: { is_admin?: number; roles?: { name: string; type: string }[] };
 
     constructor(origin: AliveResponse) {
         this.success = origin.success;
