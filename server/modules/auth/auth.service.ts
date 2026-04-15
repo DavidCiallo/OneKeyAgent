@@ -1,26 +1,30 @@
 import { aesDecrypt, aesEncrypt, hashGenerate } from "../../methods/crypto";
-import { AccountEntity, AccountRole } from "../../../shared/modules/account/account.entity";
+import { AccountEntity } from "../../../shared/modules/account/account.entity";
 import Repository from "../../lib/repository";
 import { generateApiKey } from "../ai/ai.auth";
+import { RoleService, AccountRoleService } from "../role/role.service";
 
 const accountRepository: Repository<AccountEntity> = Repository.instance("Account");
 
-export async function loginUser(email: string, password: string): Promise<{ token?: string; role?: string }> {
+export async function loginUser(email: string, password: string): Promise<{ token?: string; is_admin?: number; roles?: { name: string; type: string }[] }> {
     password = hashGenerate(password);
     const emailItem = await accountRepository.findOne({ email, password });
     if (emailItem) {
-        return { token: genTokenForIdentify(email), role: emailItem.role };
+        const roles = emailItem.is_admin
+            ? [] // admin gets all permissions, no need to query
+            : (await AccountRoleService.findByAccount(emailItem.id)).map(r => ({ name: r.name, type: r.type }));
+        return { token: genTokenForIdentify(email), is_admin: emailItem.is_admin, roles };
     } else {
         return {};
     }
 }
 
-export async function registerUser(name: string, email: string, password: string, role: string = "user"): Promise<{ account?: AccountEntity; apiKey?: string }> {
+export async function registerUser(name: string, email: string, password: string, isAdmin: number = 0): Promise<{ account?: AccountEntity; apiKey?: string }> {
     const exist = await accountRepository.findIgnoreDelete({ email });
     if (exist) { return {}; }
     password = hashGenerate(password);
     const apiKey = generateApiKey();
-    const account = await accountRepository.insert({ name, email, password, apiKey, role: role as AccountRole });
+    const account = await accountRepository.insert({ name, email, password, apiKey, is_admin: isAdmin });
     if (!account) return {};
     return { account, apiKey };
 }

@@ -16,7 +16,8 @@
     "Menu": {
         "Model": "Model",
         "Usage": "Usage",
-        "Account": "Account"
+        "Account": "Account",
+        "NoContent": "No Content"
     },
 
     "ModelPage": {
@@ -80,9 +81,7 @@
         "NamePlaceholder": "Filter by name",
         "Email": "Email",
         "EmailPlaceholder": "Filter by email",
-        "Role": "Role",
-        "RoleAdmin": "Admin",
-        "RoleUser": "User",
+        "IsAdmin": "Admin",
         "Actions": "Actions",
         "Edit": "Edit",
         "Delete": "Delete",
@@ -90,6 +89,13 @@
         "EditTitle": "Edit Account",
         "NoData": "No data",
         "Password": "Password",
-        "DeleteConfirm": "Are you sure you want to delete this account?"
+        "DeleteConfirm": "Are you sure you want to delete this account?",
+        "AdminAllPermissions": "Admin has all permissions",
+        "Permissions": "Permissions"
+    },
+
+    "NoContentPage": {
+        "Title": "No Content",
+        "Message": "You don't have any permissions yet, please contact the administrator"
     }
 }
