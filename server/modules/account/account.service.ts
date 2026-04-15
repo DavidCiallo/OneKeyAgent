@@ -16,6 +16,10 @@ export class AccountService {
         return result;
     }
 
+    static async findByEmail(email: string): Promise<AccountEntity | null> {
+        return await accountRepository.findIgnoreDelete({ email });
+    }
+
     static async create(data: Partial<AccountEntity>): Promise<AccountEntity> {
         const result = await accountRepository.insert(data);
         return result;

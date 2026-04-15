@@ -3,6 +3,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerBody, useDisclosure } from "
 import MenuIcon from "../icons/menu";
 import { Link } from "react-router-dom";
 import { Locale } from "../../methods/locale";
+import { isAdmin } from "../../methods/auth";
 
 export const MenuComp = ({ now }: { now?: string }) => {
     const locale = Locale("Menu");
@@ -17,6 +18,10 @@ export const MenuComp = ({ now }: { now?: string }) => {
             name: locale.Usage,
             link: "/usage",
         },
+        ...(isAdmin() ? [{
+            name: locale.Account,
+            link: "/account",
+        }] : []),
     ];
 
     function renderBody(onClose: Function) {

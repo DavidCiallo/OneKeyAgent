@@ -7,7 +7,8 @@ export async function initialize() {
         await registerUser(
             process.env.ADMIN_NAME,
             process.env.ADMIN_EMAIL,
-            process.env.ADMIN_PASSWORD
+            process.env.ADMIN_PASSWORD,
+            "admin"
         );
     }
 }
