@@ -8,6 +8,8 @@ import { inject } from "../../lib/inject";
 import { getIdentifyByVerify, loginUser, registerUser, getAccountByEmail } from "./auth.service";
 import { AccountRoleService } from "../role/role.service";
 
+const ALL_MENUS = ["model", "usage", "account"];
+
 async function alive(request: AliveRequest): Promise<AliveResponse> {
     request = AliveRequest.self(request);
     const { auth } = request;
@@ -16,7 +18,7 @@ async function alive(request: AliveRequest): Promise<AliveResponse> {
         const account = await getAccountByEmail(email);
         if (account) {
             const roles = account.is_admin
-                ? []
+                ? ALL_MENUS.map(name => ({ name, type: "menu" }))
                 : (await AccountRoleService.findByAccount(account.id)).map(r => ({ name: r.name, type: r.type }));
             return new AliveResponse({ success: true, message: "Authorized", data: { is_admin: account.is_admin, roles } });
         }

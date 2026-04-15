@@ -4,6 +4,7 @@ import Repository from "../../lib/repository";
 import { generateApiKey } from "../ai/ai.auth";
 import { RoleService, AccountRoleService } from "../role/role.service";
 
+const ALL_MENUS = ["model", "usage", "account"];
 const accountRepository: Repository<AccountEntity> = Repository.instance("Account");
 
 export async function loginUser(email: string, password: string): Promise<{ token?: string; is_admin?: number; roles?: { name: string; type: string }[] }> {
@@ -11,7 +12,7 @@ export async function loginUser(email: string, password: string): Promise<{ toke
     const emailItem = await accountRepository.findOne({ email, password });
     if (emailItem) {
         const roles = emailItem.is_admin
-            ? [] // admin gets all permissions, no need to query
+            ? ALL_MENUS.map(name => ({ name, type: "menu" }))
             : (await AccountRoleService.findByAccount(emailItem.id)).map(r => ({ name: r.name, type: r.type }));
         return { token: genTokenForIdentify(email), is_admin: emailItem.is_admin, roles };
     } else {
