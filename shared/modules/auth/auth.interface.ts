@@ -60,11 +60,13 @@ export class RegisterRequest implements BaseRequest {
     }
 }
 
-export class RegisterResponse implements BaseResponse<{ apiKey: string }> {
+export class RegisterResponse implements BaseResponse<{ token: string; is_admin?: number; roles?: { name: string; type: string }[] }> {
     public success: boolean;
     public message: string;
     public data: {
-        apiKey: string;
+        token: string;
+        is_admin?: number;
+        roles?: { name: string; type: string }[];
     };
 
     constructor(origin: RegisterResponse) {

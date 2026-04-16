@@ -59,7 +59,7 @@
     },
 
     "AuthPage": {
-        "Title": "app",
+        "Title": "HEX.AI",
         "LoginSuccess": "Login successful",
         "LoginFailed": "Login failed",
         "EmailLabel": "Email",
@@ -70,7 +70,17 @@
         "PasswordError": "This is obviously required",
         "ForgetPasswordLinkText": "Forgot Password?",
         "ForgetPasswordErrorText": "Please contact the administrator 🙁",
-        "SubmitButtonText": "Login"
+        "SubmitButtonText": "Login",
+        "RegisterText": "Don't have an account?",
+        "RegisterLink": "Register",
+        "LoginText": "Already have an account?",
+        "LoginLink": "Login",
+        "NameLabel": "Name",
+        "NamePlaceholder": "Please enter your name",
+        "NameError": "Name cannot be empty",
+        "RegisterButtonText": "Register",
+        "RegisterSuccess": "Registration successful",
+        "RegisterFailed": "Registration failed, email may already exist"
     },
 
     "HomePage": {
@@ -127,6 +137,7 @@
         "Copy": "Copy",
         "Regenerate": "Regenerate",
         "RegenerateConfirm": "Are you sure you want to regenerate your API Key? The old key will be invalidated immediately.",
+        "Cancel": "Cancel",
         "EndpointSection": "API Info",
         "Endpoint": "Endpoint",
         "AvailableModels": "Available Models"
