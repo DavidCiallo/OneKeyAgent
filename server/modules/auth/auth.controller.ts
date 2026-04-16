@@ -49,11 +49,13 @@ async function register(request: RegisterRequest): Promise<RegisterResponse> {
         throw "Register data is missing";
     }
     const { name, email, password } = identify;
-    const { apiKey } = await registerUser(name, email, password);
-    if (!apiKey) {
-        return new RegisterResponse({ success: false, message: "注册失败，可能邮箱已存在", data: { apiKey: "" } });
+    const { account } = await registerUser(name, email, password);
+    if (!account) {
+        return new RegisterResponse({ success: false, message: "注册失败，可能邮箱已存在", data: { token: "" } });
     }
-    return new RegisterResponse({ success: true, message: "注册成功", data: { apiKey } });
+    // Auto-login after register
+    const { token, is_admin, roles } = await loginUser(email, identify.password);
+    return new RegisterResponse({ success: true, message: "注册成功", data: { token: token || "", is_admin, roles } });
 }
 
 export const authController = new AuthRouterInstance(inject, { alive, login, register });

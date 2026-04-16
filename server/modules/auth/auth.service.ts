@@ -27,6 +27,13 @@ export async function registerUser(name: string, email: string, password: string
     const apiKey = generateApiKey();
     const account = await accountRepository.insert({ name, email, password, apiKey, is_admin: isAdmin });
     if (!account) return {};
+    // Assign default permissions for new users
+    if (!isAdmin) {
+        await AccountRoleService.assignPermissions(account.id, [
+            { name: "profile", type: "menu" },
+            { name: "chat", type: "menu" },
+        ]);
+    }
     return { account, apiKey };
 }
 

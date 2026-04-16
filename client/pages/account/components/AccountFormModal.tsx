@@ -4,12 +4,11 @@ import { Locale } from "../../../methods/locale";
 type Permission = { name: string; type: string };
 
 const PERMISSION_OPTIONS: Permission[] = [
+    { name: "chat", type: "menu" },
+    { name: "profile", type: "menu" },
     { name: "model", type: "menu" },
     { name: "usage", type: "menu" },
     { name: "account", type: "menu" },
-    { name: "model", type: "page" },
-    { name: "usage", type: "page" },
-    { name: "account", type: "page" },
 ];
 
 const TYPE_LABEL: Record<string, string> = {
