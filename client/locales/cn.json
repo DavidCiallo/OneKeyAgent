@@ -126,6 +126,7 @@
         "Copy": "复制",
         "Regenerate": "重新生成",
         "RegenerateConfirm": "确定要重新生成 API Key 吗？旧 Key 将立即失效。",
+        "Cancel": "取消",
         "EndpointSection": "调用信息",
         "Endpoint": "接口地址",
         "AvailableModels": "可用模型"
