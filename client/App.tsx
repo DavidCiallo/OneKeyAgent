@@ -1,6 +1,6 @@
 import "./App.css";
 
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import { JSX, useEffect } from "react";
 import AuthPage from "./pages/auth/AuthPage";
 import HomePage from "./pages/home/HomePage";
@@ -8,10 +8,13 @@ import { AuthStatus, clearAuthData, getAuthStatus, setUserInfo } from "./methods
 import ModelPage from "./pages/model/ModelPage";
 import UsagePage from "./pages/usage/UsagePage";
 import AccountPage from "./pages/account/AccountPage";
+import ChatPage from "./pages/chat/ChatPage";
+import ProfilePage from "./pages/profile/ProfilePage";
 import NoContentPage from "./pages/nocontent/NoContentPage";
 import { AuthRouter } from "./api/instance";
 import { AliveRequest } from "../shared/modules/auth/auth.interface";
 import { AuthProvider, useAuth } from "./methods/auth-context";
+import { Locale } from "./methods/locale";
 
 const PrivateRoute = ({ redirectPath = "/auth" }) => {
     const isAuthenticated = getAuthStatus() == AuthStatus.AUTH;
@@ -43,6 +46,26 @@ const ProtectedRoute = ({ name, children }: { name: string; children: JSX.Elemen
     return hasPermission(name, "menu") ? children : <Navigate to="/nocontent" replace />;
 };
 
+const TITLE_MAP: Record<string, string> = {
+    "/home": "Home",
+    "/auth": "Login",
+    "/chat": "Chat",
+    "/model": "Model",
+    "/usage": "Usage",
+    "/account": "Account",
+    "/profile": "Profile",
+    "/nocontent": "No Content",
+};
+
+const TitleUpdater = () => {
+    const location = useLocation();
+    useEffect(() => {
+        const pageName = TITLE_MAP[location.pathname];
+        document.title = pageName ? `HEX.AI - ${pageName}` : "HEX.AI";
+    }, [location.pathname]);
+    return null;
+};
+
 const AppRoutes = () => {
     return (
         <Routes>
@@ -50,9 +73,11 @@ const AppRoutes = () => {
             <Route path="/auth" element={<AuthPage />} />
             <Route element={<PrivateRoute />}>
                 <Route path="/nocontent" element={<NoContentPage />} />
+                <Route path="/chat" element={<ProtectedRoute name="chat"><ChatPage /></ProtectedRoute>} />
                 <Route path="/model" element={<ProtectedRoute name="model"><ModelPage /></ProtectedRoute>} />
                 <Route path="/usage" element={<ProtectedRoute name="usage"><UsagePage /></ProtectedRoute>} />
                 <Route path="/account" element={<ProtectedRoute name="account"><AccountPage /></ProtectedRoute>} />
+                <Route path="/profile" element={<ProtectedRoute name="profile"><ProfilePage /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
@@ -63,6 +88,7 @@ const App = () => {
     return (
         <Router>
             <AuthProvider>
+                <TitleUpdater />
                 <AppRoutes />
             </AuthProvider>
         </Router>

@@ -6,7 +6,7 @@ import { Locale } from "../../methods/locale";
 import { useAuth } from "../../methods/auth-context";
 import { clearAuthData } from "../../methods/auth";
 
-const ALL_MENUS = ["model", "usage", "account"] as const;
+const ALL_MENUS = ["profile", "chat", "model", "usage", "account"] as const;
 
 export const MenuComp = ({ now }: { now?: string }) => {
     const locale = Locale("Menu");
@@ -15,6 +15,8 @@ export const MenuComp = ({ now }: { now?: string }) => {
     const navigate = useNavigate();
 
     const menuMap: Record<string, { name: string; link: string }> = {
+        profile: { name: locale.Profile, link: "/profile" },
+        chat: { name: locale.Chat, link: "/chat" },
         model: { name: locale.Model, link: "/model" },
         usage: { name: locale.Usage, link: "/usage" },
         account: { name: locale.Account, link: "/account" },
@@ -65,7 +67,7 @@ export const MenuComp = ({ now }: { now?: string }) => {
             <div className="w-15 h-12 flex items-center justify-center cursor-pointer" onClick={onOpen}>
                 <MenuIcon />
             </div>
-            <Drawer isOpen={isOpen} onOpenChange={onOpenChange} className="rounded-none w-60 md:w-96" placement="left">
+            <Drawer isOpen={isOpen} onOpenChange={onOpenChange} className="rounded-none w-48 md:w-60" placement="left">
                 <DrawerContent>{(onClose) => renderBody(onClose)}</DrawerContent>
             </Drawer>
         </>

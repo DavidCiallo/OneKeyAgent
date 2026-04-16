@@ -239,3 +239,56 @@ export class AccountDeleteResponse implements BaseResponse<AccountDTO> {
         this.message = origin.message;
     }
 }
+
+export class AccountProfileRequest implements BaseRequest {
+    public auth?: string;
+
+    constructor(origin: Partial<AccountProfileRequest>) {
+        if (false) throw new Error("Unexpected error");
+        origin.auth && (this.auth = origin.auth);
+    }
+    static self(unsafe: AccountProfileRequest) {
+        return new AccountProfileRequest(unsafe);
+    }
+}
+
+export class AccountProfileResponse implements BaseResponse<AccountDTO> {
+    public success: boolean;
+    public message: string;
+    public data: {
+        account: AccountDTO | null
+    };
+
+    constructor(origin: AccountProfileResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+        this.data = origin.data;
+    }
+}
+
+// ---- Regenerate API Key ----
+export class AccountRegenerateRequest implements BaseRequest {
+    public auth?: string;
+
+    constructor(origin: Partial<AccountRegenerateRequest>) {
+        if (false) throw new Error("Unexpected error");
+        origin.auth && (this.auth = origin.auth);
+    }
+    static self(unsafe: AccountRegenerateRequest) {
+        return new AccountRegenerateRequest(unsafe);
+    }
+}
+
+export class AccountRegenerateResponse implements BaseResponse<AccountDTO> {
+    public success: boolean;
+    public message: string;
+    public data: {
+        apiKey: string
+    };
+
+    constructor(origin: AccountRegenerateResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+        this.data = origin.data;
+    }
+}
