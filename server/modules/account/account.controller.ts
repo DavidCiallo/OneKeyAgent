@@ -11,11 +11,16 @@ import {
     AccountUpdateResponse,
     AccountDeleteRequest,
     AccountDeleteResponse,
+    AccountProfileRequest,
+    AccountProfileResponse,
+    AccountRegenerateRequest,
+    AccountRegenerateResponse,
 } from "../../../shared/modules/account/account.interface";
 import { AccountRouterInstance } from "../../../shared/modules/account/account.router"
 import { inject } from "../../lib/inject";
 import { getIdentifyByVerify, getAccountByEmail, registerUser } from "../auth/auth.service";
 import { AccountService } from "./account.service";
+import { generateApiKey } from "../ai/ai.auth";
 
 async function requireAdmin(auth?: string): Promise<void> {
     if (!auth) throw "Authorization failed";
@@ -116,4 +121,32 @@ async function del(request: AccountDeleteRequest): Promise<AccountDeleteResponse
     });
 }
 
-export const accountController = new AccountRouterInstance(inject, { list, detail, create, update, delete: del });
+async function profile(request: AccountProfileRequest): Promise<AccountProfileResponse> {
+    request = AccountProfileRequest.self(request);
+    const email = getIdentifyByVerify(request.auth || "");
+    if (!email) throw new Error("Unauthorized");
+    const account = await getAccountByEmail(email);
+    if (!account) throw new Error("Account not found");
+    return new AccountProfileResponse({
+        success: true,
+        message: "success",
+        data: { account: new AccountDTO(account) },
+    });
+}
+
+async function regenerate(request: AccountRegenerateRequest): Promise<AccountRegenerateResponse> {
+    request = AccountRegenerateRequest.self(request);
+    const email = getIdentifyByVerify(request.auth || "");
+    if (!email) throw new Error("Unauthorized");
+    const account = await getAccountByEmail(email);
+    if (!account) throw new Error("Account not found");
+    const newApiKey = generateApiKey();
+    await AccountService.update(account.id, { apiKey: newApiKey });
+    return new AccountRegenerateResponse({
+        success: true,
+        message: "success",
+        data: { apiKey: newApiKey },
+    });
+}
+
+export const accountController = new AccountRouterInstance(inject, { list, detail, create, update, delete: del, profile, regenerate });
