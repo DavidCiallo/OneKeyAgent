@@ -127,6 +127,7 @@
         "Copy": "Copy",
         "Regenerate": "Regenerate",
         "RegenerateConfirm": "Are you sure you want to regenerate your API Key? The old key will be invalidated immediately.",
+        "Cancel": "Cancel",
         "EndpointSection": "API Info",
         "Endpoint": "Endpoint",
         "AvailableModels": "Available Models"
