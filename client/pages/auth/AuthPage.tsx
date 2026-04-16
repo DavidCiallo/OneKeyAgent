@@ -10,7 +10,7 @@ import { useAuth } from "../../methods/auth-context";
 import { LoginBody, LoginRequest } from "../../../shared/modules/auth/auth.interface";
 
 function getDefaultRoute(is_admin?: number, roles?: { name: string; type: string }[]): string {
-    if (is_admin) return "/model";
+    if (is_admin) return "/profile";
     if (roles && roles.length > 0) {
         const menuRole = roles.find(r => r.type === "menu");
         if (menuRole) return `/${menuRole.name}`;

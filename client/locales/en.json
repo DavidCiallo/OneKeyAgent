@@ -17,6 +17,8 @@
         "Model": "Model",
         "Usage": "Usage",
         "Account": "Account",
+        "Chat": "Chat",
+        "Profile": "Profile",
         "NoContent": "No Content",
         "Logout": "Logout"
     },
@@ -100,5 +102,33 @@
     "NoContentPage": {
         "Title": "No Content",
         "Message": "You don't have any permissions yet, please contact the administrator"
+    },
+
+    "ChatPage": {
+        "NewChat": "New Chat",
+        "DeleteChat": "Delete",
+        "DeleteConfirm": "Are you sure you want to delete this chat?",
+        "Placeholder": "Type a message...",
+        "Send": "Send",
+        "EmptySession": "Start a new conversation",
+        "NoSession": "Select or create a chat"
+    },
+
+    "ProfilePage": {
+        "AccountInfo": "Account Info",
+        "Name": "Name",
+        "Email": "Email",
+        "Role": "Role",
+        "Admin": "Admin",
+        "User": "User",
+        "ApiKeySection": "API Key",
+        "Show": "Show",
+        "Hide": "Hide",
+        "Copy": "Copy",
+        "Regenerate": "Regenerate",
+        "RegenerateConfirm": "Are you sure you want to regenerate your API Key? The old key will be invalidated immediately.",
+        "EndpointSection": "API Info",
+        "Endpoint": "Endpoint",
+        "AvailableModels": "Available Models"
     }
 }

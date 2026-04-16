@@ -175,7 +175,7 @@ export class AiService {
         const models = await getAllModels();
         return {
             data: models.map(m => ({
-                id: m.id,
+                id: m.model,
                 object: "model",
                 created: m.create_time,
                 owned_by: "onekey",
