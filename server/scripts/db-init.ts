@@ -80,6 +80,25 @@ db.exec(`
         update_time INTEGER,
         delete_time INTEGER
     );
+
+    CREATE TABLE IF NOT EXISTS chat_session (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        title TEXT NOT NULL DEFAULT 'New Chat',
+        create_time INTEGER NOT NULL,
+        update_time INTEGER,
+        delete_time INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_message (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        create_time INTEGER NOT NULL,
+        update_time INTEGER,
+        delete_time INTEGER
+    );
 `);
 
 // Migrate: add 'is_admin' column to account if missing (replaces 'role')
