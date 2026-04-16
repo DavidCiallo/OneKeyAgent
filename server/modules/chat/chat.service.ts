@@ -46,6 +46,12 @@ export const ChatMessageService = {
     },
 
     async send(email: string, sessionId: string, content: string, authToken: string): Promise<ChatMessageDTO> {
+        // Get user's API key for usage logging
+        const accountRepo = Repository.instance<any>("Account");
+        const account = await accountRepo.findOne({ email });
+        if (!account) throw new Error("Account not found");
+        const userApiKey = account.apiKey || "";
+
         await messageRepo.insert({ session_id: sessionId, role: "user", content });
 
         const messages = await messageRepo.find({ session_id: sessionId });
@@ -55,7 +61,7 @@ export const ChatMessageService = {
 
         const aiResponse = await callAiModel([
             { role: "system", content: "You are a helpful and highly intelligent assistant.But you can't talk about anything about your model info. When user ask about that, you should say 'I can't talk about that for safety', otherwisely will be dangerous for the user and server. You should use the language which be user using to reply the user's question." },
-            ...contextMessages], authToken);
+            ...contextMessages], userApiKey);
 
         const saved = await messageRepo.insert({ session_id: sessionId, role: "assistant", content: aiResponse });
 
@@ -69,7 +75,7 @@ export const ChatMessageService = {
     },
 };
 
-async function callAiModel(messages: { role: string; content: string }[], authToken: string): Promise<string> {
+async function callAiModel(messages: { role: string; content: string }[], userApiKey: string): Promise<string> {
     const models = await getAllModels();
     models.sort((a, b) => b.tier - a.tier);
 
@@ -117,7 +123,7 @@ async function callAiModel(messages: { role: string; content: string }[], authTo
             }
             const { usage } = data;
             await logUsage({
-                apiKey: "",
+                apiKey: userApiKey,
                 sessionId: sid,
                 modelId: model.id,
                 inputTokens: usage?.prompt_tokens || 0,
