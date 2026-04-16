@@ -17,6 +17,7 @@
         "Model": "Model",
         "Usage": "Usage",
         "Account": "Account",
+        "Chat": "Chat",
         "NoContent": "No Content",
         "Logout": "Logout"
     },
@@ -100,5 +101,25 @@
     "NoContentPage": {
         "Title": "No Content",
         "Message": "You don't have any permissions yet, please contact the administrator"
+    },
+
+    "ChatPage": {
+        "NewChat": "New Chat",
+        "DeleteChat": "Delete",
+        "DeleteConfirm": "Are you sure you want to delete this chat?",
+        "Placeholder": "Type a message...",
+        "Send": "Send",
+        "EmptySession": "Start a new conversation",
+        "NoSession": "Select or create a chat"
+    },
+
+    "ChatPage": {
+        "NewChat": "New Chat",
+        "DeleteChat": "Delete",
+        "DeleteConfirm": "Are you sure you want to delete this chat?",
+        "Placeholder": "Type a message...",
+        "Send": "Send",
+        "EmptySession": "Start a new conversation",
+        "NoSession": "Select or create a chat"
     }
 }
