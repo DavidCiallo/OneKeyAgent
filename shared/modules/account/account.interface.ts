@@ -266,7 +266,6 @@ export class AccountProfileResponse implements BaseResponse<AccountDTO> {
     }
 }
 
-// ---- Regenerate API Key ----
 export class AccountRegenerateRequest implements BaseRequest {
     public auth?: string;
 

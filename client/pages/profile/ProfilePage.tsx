@@ -4,7 +4,7 @@ import { AccountRouter, AiRouter } from "../../api/instance";
 import { Locale } from "../../methods/locale";
 import { AccountProfileRequest, AccountRegenerateRequest } from "../../../shared/modules/account/account.interface";
 import { ModelsRequest } from "../../../shared/modules/ai/ai.interface";
-import { Button, Card, CardBody, CardHeader, Divider, Chip } from "@heroui/react";
+import { Button, Card, CardBody, CardHeader, Divider, Chip, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from "@heroui/react";
 import { AccountDTO } from "../../../shared/modules/account/account.interface";
 
 export default function ProfilePage() {
@@ -16,6 +16,7 @@ export default function ProfilePage() {
     const [showApiKey, setShowApiKey] = useState(false);
     const [models, setModels] = useState<string[]>([]);
     const [regenerating, setRegenerating] = useState(false);
+    const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onClose: onConfirmClose, onOpenChange: onConfirmChange } = useDisclosure();
 
     const fetchProfile = useCallback(async () => {
         const res = await AccountRouter.profile(new AccountProfileRequest({ auth: getToken() }));
@@ -37,7 +38,7 @@ export default function ProfilePage() {
     }, [fetchProfile, fetchModels]);
 
     const handleRegenerate = async () => {
-        if (!window.confirm(locale.RegenerateConfirm)) return;
+        onConfirmClose();
         setRegenerating(true);
         try {
             const res = await AccountRouter.regenerate(new AccountRegenerateRequest({ auth: getToken() }));
@@ -111,7 +112,8 @@ export default function ProfilePage() {
                                 color="danger"
                                 variant="bordered"
                                 size="sm"
-                                onPress={handleRegenerate}
+                                className="font-bold"
+                                onPress={onConfirmOpen}
                                 isLoading={regenerating}
                             >
                                 {locale.Regenerate}
@@ -119,7 +121,6 @@ export default function ProfilePage() {
                         </CardBody>
                     </Card>
 
-                    {/* API Endpoint & Models */}
                     <Card>
                         <CardHeader className="px-6 py-4 font-semibold text-lg">{locale.EndpointSection}</CardHeader>
                         <Divider />
@@ -143,6 +144,23 @@ export default function ProfilePage() {
                     </Card>
                 </div>
             </div>
+
+            <Modal isOpen={isConfirmOpen} onOpenChange={onConfirmChange}>
+                <ModalContent>
+                    {(onClose) => (
+                        <>
+                            <ModalHeader>{locale.Regenerate}</ModalHeader>
+                            <ModalBody>
+                                <p className="text-sm text-gray-600">{locale.RegenerateConfirm}</p>
+                            </ModalBody>
+                            <ModalFooter>
+                                <Button size="sm" variant="flat" onPress={onClose}>{locale.Cancel}</Button>
+                                <Button size="sm" color="danger" onPress={handleRegenerate} isLoading={regenerating}>{locale.Regenerate}</Button>
+                            </ModalFooter>
+                        </>
+                    )}
+                </ModalContent>
+            </Modal>
         </div>
     );
 }
