@@ -8,7 +8,7 @@ import { inject } from "../../lib/inject";
 import { getIdentifyByVerify, loginUser, registerUser, getAccountByEmail } from "./auth.service";
 import { AccountRoleService } from "../role/role.service";
 
-const ALL_MENUS = ["model", "usage", "account"];
+const ALL_MENUS = ["chat", "model", "usage", "account"];
 
 async function alive(request: AliveRequest): Promise<AliveResponse> {
     request = AliveRequest.self(request);
