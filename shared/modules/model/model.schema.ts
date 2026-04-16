@@ -5,6 +5,7 @@ export const modelTable = sqliteTable("model", {
     tier: integer("tier").notNull(),
     baseURL: text("base_url").notNull(),
     model: text("model").notNull(),
+    alias: text("alias"),
     apiKey: text("api_key"),
     proxyURL: text("proxy_url"),
     create_time: integer("create_time"),

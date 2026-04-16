@@ -29,6 +29,7 @@
         "BaseURL": "BaseURL",
         "BaseURLPlaceholder": "筛选 BaseURL",
         "Model": "模型",
+        "Alias": "别名",
         "ApiKey": "ApiKey",
         "ProxyURL": "代理URL",
         "Actions": "操作",

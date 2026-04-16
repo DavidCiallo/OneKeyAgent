@@ -29,6 +29,7 @@
         "BaseURL": "BaseURL",
         "BaseURLPlaceholder": "Filter by BaseURL",
         "Model": "Model",
+        "Alias": "Alias",
         "ApiKey": "ApiKey",
         "ProxyURL": "Proxy URL",
         "Actions": "Actions",
