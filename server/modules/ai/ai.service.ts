@@ -9,6 +9,7 @@ import {
     getSession,
     createSession,
     getAllModels,
+    getModelsByAlias,
     pickModel,
     logUsage,
     updateSessionModel,
@@ -20,26 +21,27 @@ async function chatHex(body: Record<string, any>, apiKey: string): Promise<any> 
     const sid = getSessionId(body);
     const session = await getSession(sid);
 
-    const models = await getAllModels();
-    models.sort((a, b) => b.tier - a.tier)
-    const startModel = session ? await pickModel(session) : models[0];
-    const startTier = startModel.tier;
+    const requestedAlias = body.model;
+    const models = await getModelsByAlias(requestedAlias);
+    if (models.length === 0) throw new Error(`No models found for alias: ${requestedAlias}`);
 
-    // 从最高 tier 开始，失败则降级，同 tier 随机顺序
+    const startModel = session ? await pickModel(session) : models[0];
+
     const tried = new Set<string>();
 
-    // for (let tier = startTier; tier >= 1; tier--) {
+    // 优先使用 session 绑定的模型（如果它在 alias 列表中），否则从最高 tier 开始
+    let allToTry = [...models];
+    if (startModel && allToTry.some(m => m.id === startModel.id)) {
+        const idx = allToTry.findIndex(m => m.id === startModel.id);
+        if (idx > 0) {
+            [allToTry[0], allToTry[idx]] = [allToTry[idx], allToTry[0]];
+        }
+    }
+
     for (let count = 0; count < 100; count++) {
         await new Promise(resolve => setTimeout(resolve, 300));
-        // const tierModels = models.filter(m => m.tier === tier && !tried.has(m.id));
-        const tierModels = models;
-        if (tierModels.length === 0) continue;
-
-        // 同 tier 随机打乱
-        for (let i = tierModels.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [tierModels[i], tierModels[j]] = [tierModels[j], tierModels[i]];
-        }
+        const tierModels = allToTry.filter(m => !tried.has(m.id));
+        if (tierModels.length === 0) break;
 
         for (const model of tierModels) {
             tried.add(model.id);
@@ -88,6 +90,11 @@ async function chatHex(body: Record<string, any>, apiKey: string): Promise<any> 
 
             const tps = usage?.completion_tokens ? ((usage.completion_tokens / ms) * 1000).toFixed(1) : "-";
             console.log(`[AI] ${model.model} input: ${usage?.prompt_tokens}, output: ${usage?.completion_tokens}, ${tps} tok/s, ${ms}ms`);
+
+            if (model.alias) {
+                data.model = model.alias;
+            }
+
             return data;
         }
     }
@@ -100,14 +107,24 @@ async function completeHex(body: Record<string, any>, apiKey: string): Promise<a
     const sid = getSessionId(body);
     const session = await getSession(sid);
 
-    const models = await getAllModels();
+    const requestedAlias = body.model;
+    const models = await getModelsByAlias(requestedAlias);
+    if (models.length === 0) throw new Error(`No models found for alias: ${requestedAlias}`);
+
     const startModel = session ? await pickModel(session) : models[0];
-    const startTier = startModel.tier;
 
     const tried = new Set<string>();
 
-    for (let tier = startTier; tier >= 1; tier--) {
-        const tierModels = models.filter(m => m.tier === tier && !tried.has(m.id));
+    let allToTry = [...models];
+    if (startModel && allToTry.some(m => m.id === startModel.id)) {
+        const idx = allToTry.findIndex(m => m.id === startModel.id);
+        if (idx > 0) {
+            [allToTry[0], allToTry[idx]] = [allToTry[idx], allToTry[0]];
+        }
+    }
+
+    for (let tier = models[0].tier; tier >= 1; tier--) {
+        const tierModels = allToTry.filter(m => m.tier === tier && !tried.has(m.id));
         if (tierModels.length === 0) continue;
 
         for (let i = tierModels.length - 1; i > 0; i--) {
@@ -173,13 +190,20 @@ export class AiService {
 
     static async listModels(): Promise<ModelsServiceResponse> {
         const models = await getAllModels();
-        return {
-            data: models.map(m => ({
-                id: m.model,
-                object: "model",
-                created: m.create_time,
-                owned_by: "onekey",
-            })),
-        };
+        const seen = new Set<string>();
+        const data = [];
+        for (const m of models) {
+            const name = m.alias || m.model;
+            if (!seen.has(name)) {
+                seen.add(name);
+                data.push({
+                    id: name,
+                    object: "model",
+                    created: m.create_time,
+                    owned_by: "onekey",
+                });
+            }
+        }
+        return { data };
     }
 }

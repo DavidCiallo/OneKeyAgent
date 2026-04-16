@@ -6,6 +6,7 @@ export class ModelDTO {
     public tier: number;
     public baseURL: string;
     public model: string;
+    public alias?: string;
     public apiKey?: string;
     public proxyURL?: string;
     public create_time: number;
@@ -19,6 +20,7 @@ export class ModelDTO {
         this.tier = origin.tier;
         this.baseURL = origin.baseURL;
         this.model = origin.model;
+        this.alias = origin.alias;
         this.apiKey = origin.apiKey;
         this.proxyURL = origin.proxyURL;
         this.create_time = origin.create_time;
@@ -32,6 +34,7 @@ export class ModelQueryBody {
     public tier?: number;
     public baseURL?: string;
     public model?: string;
+    public alias?: string;
 
     private isTypeSafe: symbol = Symbol();
 
@@ -41,6 +44,7 @@ export class ModelQueryBody {
         origin.tier && (this.tier = origin.tier);
         origin.baseURL && (this.baseURL = origin.baseURL);
         origin.model && (this.model = origin.model);
+        origin.alias && (this.alias = origin.alias);
     }
 
     static self(unsafe: Partial<ModelEntity>) {
@@ -52,18 +56,20 @@ export class ModelCreateBody {
     public tier: number;
     public baseURL: string;
     public model: string;
+    public alias?: string;
     public apiKey?: string;
     public proxyURL?: string;
 
     private isTypeSafe: symbol = Symbol();
 
-    constructor(origin: Pick<ModelEntity, "tier" | "baseURL" | "model"> & Partial<Pick<ModelEntity, "apiKey" | "proxyURL">>) {
+    constructor(origin: Pick<ModelEntity, "tier" | "baseURL" | "model"> & Partial<Pick<ModelEntity, "alias" | "apiKey" | "proxyURL">>) {
         if (!origin.tier || !origin.baseURL || !origin.model) {
             throw new Error("tier, baseURL and model are required");
         }
         this.tier = origin.tier;
         this.baseURL = origin.baseURL;
         this.model = origin.model;
+        this.alias = origin.alias;
         this.apiKey = origin.apiKey;
         this.proxyURL = origin.proxyURL;
     }
@@ -77,18 +83,20 @@ export class ModelUpdateBody {
     public tier?: number;
     public baseURL?: string;
     public model?: string;
+    public alias?: string;
     public apiKey?: string;
     public proxyURL?: string;
 
     private isTypeSafe: symbol = Symbol();
 
     constructor(origin: Partial<ModelEntity> = {}) {
-        if (!origin.tier && !origin.baseURL && !origin.model && !origin.apiKey && !origin.proxyURL) {
+        if (!origin.tier && !origin.baseURL && !origin.model && !origin.alias && !origin.apiKey && !origin.proxyURL) {
             throw new Error("At least one field is required");
         }
         origin.tier !== undefined && (this.tier = origin.tier);
         origin.baseURL && (this.baseURL = origin.baseURL);
         origin.model && (this.model = origin.model);
+        origin.alias !== undefined && (this.alias = origin.alias);
         origin.apiKey !== undefined && (this.apiKey = origin.apiKey);
         origin.proxyURL !== undefined && (this.proxyURL = origin.proxyURL);
     }

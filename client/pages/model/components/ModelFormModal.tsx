@@ -6,6 +6,7 @@ type ModelForm = {
     tier: number;
     baseURL: string;
     model: string;
+    alias?: string;
     apiKey?: string;
     proxyURL?: string;
 };
@@ -51,6 +52,11 @@ export function ModelFormModal({ isOpen, onOpenChange, mode, form, onFormChange,
                             value={form.model}
                             onChange={e => onFormChange({ ...form, model: e.target.value })}
                             isRequired
+                        />
+                        <Input
+                            label={locale.Alias}
+                            value={form.alias || ""}
+                            onChange={e => onFormChange({ ...form, alias: e.target.value })}
                         />
                         <Input
                             label={locale.ApiKey}

@@ -58,10 +58,10 @@ export default function ProfilePage() {
     const maskedKey = (key: string) => {
         if (!key) return "—";
         if (showApiKey) return key;
-        return key.slice(0, 8) + "****" + key.slice(-4);
+        return key.slice(0, 8) + "******" + key.slice(-4);
     };
 
-    const endpoint = `${window.location.origin}/api/chat/completions`;
+    const endpoint = `${window.location.origin}/api`;
 
     if (!account) return null;
 
@@ -70,7 +70,6 @@ export default function ProfilePage() {
             <Header name={menuLocale.Profile} />
             <div className="flex-1 overflow-y-auto p-6">
                 <div className="max-w-2xl mx-auto space-y-6">
-                    {/* Account Info */}
                     <Card>
                         <CardHeader className="px-6 py-4 font-semibold text-lg">{locale.AccountInfo}</CardHeader>
                         <Divider />
@@ -92,7 +91,6 @@ export default function ProfilePage() {
                         </CardBody>
                     </Card>
 
-                    {/* API Key */}
                     <Card>
                         <CardHeader className="px-6 py-4 font-semibold text-lg">{locale.ApiKeySection}</CardHeader>
                         <Divider />
@@ -138,7 +136,9 @@ export default function ProfilePage() {
                             </div>
                             <div className="flex flex-row gap-2 items-center">
                                 <span className="text-sm text-gray-500 block">{locale.AvailableModels}</span>
-                                <Chip color="primary" variant="flat">hex</Chip>
+                                {models.map((model, index) => (
+                                    <Chip key={index} color="primary" variant="flat">{model}</Chip>
+                                ))}
                             </div>
                         </CardBody>
                     </Card>

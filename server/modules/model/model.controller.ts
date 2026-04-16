@@ -27,6 +27,7 @@ async function list(request: ModelListRequest): Promise<ModelListResponse> {
     if (filter?.tier !== undefined) search.tier = filter.tier;
     if (filter?.baseURL) search.baseURL = filter.baseURL;
     if (filter?.model) search.model = filter.model;
+    if (filter?.alias) search.alias = filter.alias;
 
     const { list: data, total } = await ModelService.find(page, search);
     const list = data.map(item => new ModelDTO(item));

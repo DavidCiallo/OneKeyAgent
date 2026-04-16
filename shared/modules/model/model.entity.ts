@@ -5,6 +5,7 @@ export interface ModelEntity extends BaseEntity {
     tier: number;
     baseURL: string;
     model: string;
+    alias?: string;
     apiKey?: string;
     proxyURL?: string;
     create_time: number;
@@ -17,6 +18,7 @@ export class ModelDTO {
     public tier: number;
     public baseURL: string;
     public model: string;
+    public alias?: string;
     public apiKey?: string;
     public proxyURL?: string;
     public create_time: number;
@@ -28,6 +30,7 @@ export class ModelDTO {
         this.tier = origin.tier;
         this.baseURL = origin.baseURL;
         this.model = origin.model;
+        this.alias = origin.alias;
         this.apiKey = origin.apiKey;
         this.proxyURL = origin.proxyURL;
         this.create_time = origin.create_time;
