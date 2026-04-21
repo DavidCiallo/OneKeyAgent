@@ -45,8 +45,6 @@
     "UsagePage": {
         "ApiKey": "ApiKey",
         "ApiKeyPlaceholder": "筛选 ApiKey",
-        "SessionId": "SessionId",
-        "SessionIdPlaceholder": "筛选 SessionId",
         "ModelId": "ModelId",
         "ModelIdPlaceholder": "筛选 ModelId",
         "InputTokens": "输入 Token",

@@ -1,3 +1,4 @@
+import { UsageLogEntity } from "../../../shared/modules/usage/usage.entity";
 import {
     UsageListRequest,
     UsageListResponse,
@@ -5,7 +6,6 @@ import {
     UsageStatsRequest,
     UsageStatsResponse,
 } from "../../../shared/modules/usage/usage.interface";
-import { UsageLogEntity } from "../../../shared/modules/ai/ai.entity";
 import { UsageRouterInstance } from "../../../shared/modules/usage/usage.router";
 import { inject } from "../../lib/inject";
 import { getIdentifyByVerify } from "../auth/auth.service";
@@ -20,7 +20,6 @@ async function list(request: UsageListRequest): Promise<UsageListResponse> {
 
     const search: Partial<UsageLogEntity> = {};
     if (filter?.apiKey) search.apiKey = filter.apiKey;
-    if (filter?.sessionId) search.sessionId = filter.sessionId;
     if (filter?.modelId) search.modelId = filter.modelId;
 
     const { list: data, total } = await UsageService.find(page, search);

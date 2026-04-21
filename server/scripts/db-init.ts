@@ -42,20 +42,10 @@ db.exec(`
         delete_time INTEGER
     );
 
-    CREATE TABLE IF NOT EXISTS ai_session (
-        id TEXT PRIMARY KEY,
-        api_key TEXT NOT NULL,
-        model_id TEXT NOT NULL,
-        context TEXT NOT NULL,
-        create_time INTEGER,
-        update_time INTEGER,
-        delete_time INTEGER
-    );
 
     CREATE TABLE IF NOT EXISTS usage_log (
         id TEXT PRIMARY KEY,
         api_key TEXT NOT NULL,
-        session_id TEXT NOT NULL,
         model_id TEXT NOT NULL,
         input_tokens INTEGER NOT NULL,
         output_tokens INTEGER NOT NULL,
@@ -93,7 +83,6 @@ db.exec(`
 
     CREATE TABLE IF NOT EXISTS chat_message (
         id TEXT PRIMARY KEY,
-        session_id TEXT NOT NULL,
         role TEXT NOT NULL,
         content TEXT NOT NULL,
         create_time INTEGER NOT NULL,
