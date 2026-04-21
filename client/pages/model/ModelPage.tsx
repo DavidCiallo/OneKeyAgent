@@ -23,6 +23,7 @@ type ModelForm = {
     tier: number;
     baseURL: string;
     model: string;
+    alias?: string;
     apiKey?: string;
     proxyURL?: string;
 };
@@ -69,7 +70,7 @@ export default function ModelPage() {
 
     const openCreate = () => {
         setFormMode("create");
-        setForm({ tier: 1, baseURL: "", model: "" });
+        setForm({ tier: 1, baseURL: "", model: "", alias: "" });
         onFormOpen();
     };
 
@@ -80,6 +81,7 @@ export default function ModelPage() {
             tier: item.tier,
             baseURL: item.baseURL,
             model: item.model,
+            alias: item.alias || "",
             apiKey: item.apiKey || "",
             proxyURL: item.proxyURL || "",
         });
@@ -98,6 +100,7 @@ export default function ModelPage() {
                     tier: form.tier,
                     baseURL: form.baseURL,
                     model: form.model,
+                    alias: form.alias || undefined,
                     apiKey: form.apiKey || undefined,
                     proxyURL: form.proxyURL || undefined,
                 }),
@@ -116,6 +119,7 @@ export default function ModelPage() {
                     tier: form.tier,
                     baseURL: form.baseURL,
                     model: form.model,
+                    alias: form.alias || undefined,
                     apiKey: form.apiKey || undefined,
                     proxyURL: form.proxyURL || undefined,
                 }),

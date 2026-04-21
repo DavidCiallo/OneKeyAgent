@@ -1,5 +1,5 @@
 import Repository from "../../lib/repository";
-import { UsageLogEntity } from "../../../shared/modules/ai/ai.entity";
+import { UsageLogEntity } from "../../../shared/modules/usage/usage.entity";
 import { UsageStatsPeriod, UsageStatsResult, UsageAmountData } from "../../../shared/modules/usage/usage.interface";
 
 const usageRepo = Repository.instance<UsageLogEntity>("UsageLog");

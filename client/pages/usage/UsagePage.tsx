@@ -61,32 +61,54 @@ export default function UsagePage() {
         fetchList(page);
     }, [page, fetchList]);
 
-    const totalPages = Math.ceil(total / 30) || 1;
+    const totalPages = Math.ceil(total / 40) || 1;
 
     return (
         <div className="max-w-screen flex flex-col h-screen">
             <Header name={Locale("Menu").Usage} />
             <div className="p-8 flex flex-col gap-4 flex-1 overflow-hidden">
-                <Table aria-label="Usage list" className="flex-1 overflow-auto">
-                    <TableHeader>
-                        <TableColumn>{locale.ApiKey}</TableColumn>
-                        <TableColumn align="center">{locale.ModelId}</TableColumn>
-                        <TableColumn align="center">{locale.InputTokens}</TableColumn>
-                        <TableColumn align="center">{locale.OutputTokens}</TableColumn>
-                        <TableColumn align="center">{locale.Time}</TableColumn>
-                    </TableHeader>
-                    <TableBody emptyContent={locale.NoData}>
-                        {list.map(item => (
-                            <TableRow key={item.id}>
-                                <TableCell className="max-w-xs truncate">{item.apiKey || "—"}</TableCell>
-                                <TableCell>{item.modelId ? (modelMap[item.modelId] || item.modelId) : "—"}</TableCell>
-                                <TableCell>{item.inputTokens}</TableCell>
-                                <TableCell>{item.outputTokens}</TableCell>
-                                <TableCell>{item.create_time ? new Date(item.create_time).toLocaleString() : "—"}</TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
+                <div className="flex flex-row">
+                    <Table aria-label="Usage list 1" className="flex-1 overflow-auto">
+                        <TableHeader>
+                            <TableColumn>{locale.ApiKey}</TableColumn>
+                            <TableColumn align="center">{locale.ModelId}</TableColumn>
+                            <TableColumn align="center">{locale.InputTokens}</TableColumn>
+                            <TableColumn align="center">{locale.OutputTokens}</TableColumn>
+                            <TableColumn align="center">{locale.Time}</TableColumn>
+                        </TableHeader>
+                        <TableBody emptyContent={locale.NoData}>
+                            {list.slice(0, 20).map(item => (
+                                <TableRow key={item.id}>
+                                    <TableCell className="max-w-xs truncate">{item.apiKey || "—"}</TableCell>
+                                    <TableCell>{item.modelId ? (modelMap[item.modelId] || item.modelId) : "—"}</TableCell>
+                                    <TableCell>{item.inputTokens}</TableCell>
+                                    <TableCell>{item.outputTokens}</TableCell>
+                                    <TableCell>{item.create_time ? new Date(item.create_time).toLocaleString() : "—"}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                    {list.length > 20 && <Table aria-label="Usage list 2" className="flex-1 overflow-auto">
+                        <TableHeader>
+                            <TableColumn>{locale.ApiKey}</TableColumn>
+                            <TableColumn align="center">{locale.ModelId}</TableColumn>
+                            <TableColumn align="center">{locale.InputTokens}</TableColumn>
+                            <TableColumn align="center">{locale.OutputTokens}</TableColumn>
+                            <TableColumn align="center">{locale.Time}</TableColumn>
+                        </TableHeader>
+                        <TableBody emptyContent={locale.NoData}>
+                            {list.slice(20).map(item => (
+                                <TableRow key={item.id}>
+                                    <TableCell className="max-w-xs truncate">{item.apiKey || "—"}</TableCell>
+                                    <TableCell>{item.modelId ? (modelMap[item.modelId] || item.modelId) : "—"}</TableCell>
+                                    <TableCell>{item.inputTokens}</TableCell>
+                                    <TableCell>{item.outputTokens}</TableCell>
+                                    <TableCell>{item.create_time ? new Date(item.create_time).toLocaleString() : "—"}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>}
+                </div>
 
                 <div className="flex justify-center">
                     <Pagination total={totalPages} page={page} onChange={setPage} showControls />

@@ -3,7 +3,7 @@ import { pluginReact } from "@rsbuild/plugin-react";
 
 export default defineConfig({
     html: {
-        title: "app",
+        title: "HEX.AI",
     },
     plugins: [pluginReact()],
     source: {

@@ -18,6 +18,7 @@ export function ModelTable({ list, onEdit, onDelete, onUsageClick }: Props) {
                 <TableColumn align="center" className="min-w-20">{locale.Tier}</TableColumn>
                 <TableColumn>{locale.BaseURL}</TableColumn>
                 <TableColumn align="center">{locale.Model}</TableColumn>
+                <TableColumn align="center">{locale.Alias}</TableColumn>
                 <TableColumn align="center">{locale.ApiKey}</TableColumn>
                 <TableColumn align="center" className="min-w-40">{locale.ProxyURL}</TableColumn>
                 <TableColumn>{locale.Actions}</TableColumn>
@@ -28,6 +29,7 @@ export function ModelTable({ list, onEdit, onDelete, onUsageClick }: Props) {
                         <TableCell>{item.tier}</TableCell>
                         <TableCell className="max-w-xs truncate">{item.baseURL}</TableCell>
                         <TableCell>{item.model}</TableCell>
+                        <TableCell>{item.alias || "—"}</TableCell>
                         <TableCell className="max-w-xs truncate">
                             {item.apiKey ? item.apiKey.slice(0, 12) + '...' + item.apiKey.slice(-8) : "—"}
                         </TableCell>

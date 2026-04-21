@@ -29,6 +29,7 @@
         "BaseURL": "BaseURL",
         "BaseURLPlaceholder": "筛选 BaseURL",
         "Model": "模型",
+        "Alias": "别名",
         "ApiKey": "ApiKey",
         "ProxyURL": "代理URL",
         "Actions": "操作",
@@ -44,8 +45,6 @@
     "UsagePage": {
         "ApiKey": "ApiKey",
         "ApiKeyPlaceholder": "筛选 ApiKey",
-        "SessionId": "SessionId",
-        "SessionIdPlaceholder": "筛选 SessionId",
         "ModelId": "ModelId",
         "ModelIdPlaceholder": "筛选 ModelId",
         "InputTokens": "输入 Token",

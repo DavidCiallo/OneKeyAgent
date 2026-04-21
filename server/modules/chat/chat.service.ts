@@ -5,7 +5,7 @@ import { ChatSessionDTO } from "../../../shared/modules/chat_session/chat_sessio
 import { ChatMessageDTO } from "../../../shared/modules/chat_message/chat_message.interface";
 import { fetch, ProxyAgent } from "undici";
 import { getAllModels } from "../ai/ai.session";
-import { logUsage, createSession, getSession, getSessionId, updateSessionModel } from "../ai/ai.session";
+import { logUsage } from "../ai/ai.session";
 import { getIdentifyByVerify } from "../auth/auth.service";
 
 const sessionRepo = Repository.instance<ChatSessionEntity>("ChatSession");
@@ -113,18 +113,9 @@ async function callAiModel(messages: { role: string; content: string }[], userAp
             const data = await response.json();
             const ms = Date.now() - startTime;
 
-            // Log usage
-            const sid = getSessionId({ messages });
-            const existingSession = await getSession(sid);
-            if (existingSession) {
-                await updateSessionModel(sid, model.id);
-            } else {
-                await createSession(sid, "", model.id, messages);
-            }
             const { usage } = data;
             await logUsage({
                 apiKey: userApiKey,
-                sessionId: sid,
                 modelId: model.id,
                 inputTokens: usage?.prompt_tokens || 0,
                 outputTokens: usage?.completion_tokens || 0,

@@ -1,7 +1,5 @@
 import { BaseRequest, BaseResponse } from "../../lib/default/decorator";
 
-// ============ Message ============
-
 export class Message {
     role: "system" | "user" | "assistant";
     content: string;
@@ -74,7 +72,6 @@ export class ModelsRequest implements BaseRequest {
     }
 }
 
-// ============ Service Response Interfaces ============
 
 export interface ChatCompletionsServiceResponse {
     id: string;
@@ -114,8 +111,6 @@ export interface ModelsServiceResponse {
         owned_by: string;
     }>;
 }
-
-// ============ Response Classes ============
 
 export class ChatCompletionsResponse implements BaseResponse<Message> {
     success: boolean;
@@ -189,8 +184,6 @@ export class ModelsResponse implements BaseResponse<any> {
         this.data = data.data;
     }
 }
-
-// ============ Service Interface Types ============
 
 export interface AiService {
     chatCompletions: (request: ChatCompletionsRequest) => Promise<ChatCompletionsResponse>;
