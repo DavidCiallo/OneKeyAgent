@@ -3,7 +3,6 @@ import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 export const usageLogTable = sqliteTable("usage_log", {
     id: text("id").primaryKey(),
     apiKey: text("api_key").notNull(),
-    sessionId: text("session_id").notNull(),
     modelId: text("model_id").notNull(),
     inputTokens: integer("input_tokens").notNull(),
     outputTokens: integer("output_tokens").notNull(),

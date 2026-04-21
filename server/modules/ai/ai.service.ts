@@ -4,47 +4,21 @@ import {
     CompletionServiceResponse,
     ModelsServiceResponse,
 } from "../../../shared/modules/ai/ai.interface";
-import {
-    getSessionId,
-    getSession,
-    createSession,
-    getAllModels,
-    getModelsByAlias,
-    pickModel,
-    logUsage,
-    updateSessionModel,
-} from "./ai.session";
+import { getAllModels, getModelsByAlias, logUsage, } from "./ai.session";
 // @ts-ignore
 
 async function chatHex(body: Record<string, any>, apiKey: string): Promise<any> {
     const t0 = Date.now();
-    const sid = getSessionId(body);
-    const session = await getSession(sid);
 
     const requestedAlias = body.model;
     const models = await getModelsByAlias(requestedAlias);
     if (models.length === 0) throw new Error(`No models found for alias: ${requestedAlias}`);
 
-    const startModel = session ? await pickModel(session) : models[0];
-
-    const tried = new Set<string>();
-
-    // 优先使用 session 绑定的模型（如果它在 alias 列表中），否则从最高 tier 开始
-    let allToTry = [...models];
-    if (startModel && allToTry.some(m => m.id === startModel.id)) {
-        const idx = allToTry.findIndex(m => m.id === startModel.id);
-        if (idx > 0) {
-            [allToTry[0], allToTry[idx]] = [allToTry[idx], allToTry[0]];
-        }
-    }
 
     for (let count = 0; count < 100; count++) {
         await new Promise(resolve => setTimeout(resolve, 300));
-        const tierModels = allToTry.filter(m => !tried.has(m.id));
-        if (tierModels.length === 0) break;
 
-        for (const model of tierModels) {
-            tried.add(model.id);
+        for (const model of models) {
             const requestBody: Record<string, any> = {
                 ...body,
                 stream: false,
@@ -60,29 +34,17 @@ async function chatHex(body: Record<string, any>, apiKey: string): Promise<any> 
                     dispatcher: model.proxyURL ? new ProxyAgent(model.proxyURL) : undefined,
                 });
             } catch (e) {
-                console.log(`[AI] ${model.baseURL} failed: ${e}`);
                 continue;
             }
-
-            if (!response.ok) {
-                console.log(`[AI] ${model.baseURL} error: ${response.status}, ${response.statusText}`);
-                continue;
-            }
+            if (!response.ok) continue;
 
             const data = await response.json();
             const ms = Date.now() - t0;
-
-            if (session) {
-                await updateSessionModel(sid, model.id);
-            } else {
-                await createSession(sid, apiKey, model.id, body.messages);
-            }
 
             const { usage } = data;
             console.log(`[AI] Raw usage data:`, JSON.stringify(usage));
             await logUsage({
                 apiKey,
-                sessionId: sid,
                 modelId: model.id,
                 inputTokens: usage?.prompt_tokens || 0,
                 outputTokens: usage?.completion_tokens || 0,
@@ -104,36 +66,14 @@ async function chatHex(body: Record<string, any>, apiKey: string): Promise<any> 
 
 async function completeHex(body: Record<string, any>, apiKey: string): Promise<any> {
     const t0 = Date.now();
-    const sid = getSessionId(body);
-    const session = await getSession(sid);
 
     const requestedAlias = body.model;
     const models = await getModelsByAlias(requestedAlias);
     if (models.length === 0) throw new Error(`No models found for alias: ${requestedAlias}`);
 
-    const startModel = session ? await pickModel(session) : models[0];
-
-    const tried = new Set<string>();
-
-    let allToTry = [...models];
-    if (startModel && allToTry.some(m => m.id === startModel.id)) {
-        const idx = allToTry.findIndex(m => m.id === startModel.id);
-        if (idx > 0) {
-            [allToTry[0], allToTry[idx]] = [allToTry[idx], allToTry[0]];
-        }
-    }
-
     for (let tier = models[0].tier; tier >= 1; tier--) {
-        const tierModels = allToTry.filter(m => m.tier === tier && !tried.has(m.id));
-        if (tierModels.length === 0) continue;
 
-        for (let i = tierModels.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [tierModels[i], tierModels[j]] = [tierModels[j], tierModels[i]];
-        }
-
-        for (const model of tierModels) {
-            tried.add(model.id);
+        for (const model of models) {
             let response: any;
             try {
                 response = await fetch(`${model.baseURL}/completions`, {
@@ -155,16 +95,9 @@ async function completeHex(body: Record<string, any>, apiKey: string): Promise<a
             const data = (await response.json()) as { usage: { prompt_tokens: number, completion_tokens: number } };
             const ms = Date.now() - t0;
 
-            if (session) {
-                await updateSessionModel(sid, model.id);
-            } else {
-                await createSession(sid, apiKey, model.id, body.messages);
-            }
-
             const { usage } = data;
             await logUsage({
                 apiKey,
-                sessionId: sid,
                 modelId: model.id,
                 inputTokens: usage?.prompt_tokens || 0,
                 outputTokens: usage?.completion_tokens || 0,
@@ -185,7 +118,8 @@ export class AiService {
     }
 
     static async completions(data: Record<string, any>, apiKey: string = ""): Promise<CompletionServiceResponse> {
-        return await completeHex(data, apiKey) as any;
+        let res = null;
+        return await completeHex(data, apiKey);
     }
 
     static async listModels(): Promise<ModelsServiceResponse> {
@@ -193,8 +127,8 @@ export class AiService {
         const seen = new Set<string>();
         const data = [];
         for (const m of models) {
-            const name = m.alias || m.model;
-            if (!seen.has(name)) {
+            const name = m.alias || "";
+            if (name && !seen.has(name)) {
                 seen.add(name);
                 data.push({
                     id: name,

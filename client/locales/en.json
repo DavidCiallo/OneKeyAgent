@@ -45,8 +45,6 @@
     "UsagePage": {
         "ApiKey": "ApiKey",
         "ApiKeyPlaceholder": "Filter by ApiKey",
-        "SessionId": "SessionId",
-        "SessionIdPlaceholder": "Filter by SessionId",
         "ModelId": "ModelId",
         "ModelIdPlaceholder": "Filter by ModelId",
         "InputTokens": "Input Tokens",

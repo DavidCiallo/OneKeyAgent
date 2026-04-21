@@ -61,7 +61,7 @@ export default function UsagePage() {
         fetchList(page);
     }, [page, fetchList]);
 
-    const totalPages = Math.ceil(total / 30) || 1;
+    const totalPages = Math.ceil(total / 40) || 1;
 
     return (
         <div className="max-w-screen flex flex-col h-screen">
@@ -77,7 +77,7 @@ export default function UsagePage() {
                             <TableColumn align="center">{locale.Time}</TableColumn>
                         </TableHeader>
                         <TableBody emptyContent={locale.NoData}>
-                            {list.slice(0, 15).map(item => (
+                            {list.slice(0, 20).map(item => (
                                 <TableRow key={item.id}>
                                     <TableCell className="max-w-xs truncate">{item.apiKey || "—"}</TableCell>
                                     <TableCell>{item.modelId ? (modelMap[item.modelId] || item.modelId) : "—"}</TableCell>
@@ -88,7 +88,7 @@ export default function UsagePage() {
                             ))}
                         </TableBody>
                     </Table>
-                    {list.length > 15 && <Table aria-label="Usage list 2" className="flex-1 overflow-auto">
+                    {list.length > 20 && <Table aria-label="Usage list 2" className="flex-1 overflow-auto">
                         <TableHeader>
                             <TableColumn>{locale.ApiKey}</TableColumn>
                             <TableColumn align="center">{locale.ModelId}</TableColumn>
@@ -97,7 +97,7 @@ export default function UsagePage() {
                             <TableColumn align="center">{locale.Time}</TableColumn>
                         </TableHeader>
                         <TableBody emptyContent={locale.NoData}>
-                            {list.slice(15).map(item => (
+                            {list.slice(20).map(item => (
                                 <TableRow key={item.id}>
                                     <TableCell className="max-w-xs truncate">{item.apiKey || "—"}</TableCell>
                                     <TableCell>{item.modelId ? (modelMap[item.modelId] || item.modelId) : "—"}</TableCell>
