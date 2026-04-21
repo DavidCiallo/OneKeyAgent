@@ -34,6 +34,7 @@ db.exec(`
         tier INTEGER NOT NULL,
         base_url TEXT NOT NULL,
         model TEXT NOT NULL,
+        alias TEXT,
         api_key TEXT,
         proxy_url TEXT,
         create_time INTEGER,
@@ -41,20 +42,10 @@ db.exec(`
         delete_time INTEGER
     );
 
-    CREATE TABLE IF NOT EXISTS ai_session (
-        id TEXT PRIMARY KEY,
-        api_key TEXT NOT NULL,
-        model_id TEXT NOT NULL,
-        context TEXT NOT NULL,
-        create_time INTEGER,
-        update_time INTEGER,
-        delete_time INTEGER
-    );
 
     CREATE TABLE IF NOT EXISTS usage_log (
         id TEXT PRIMARY KEY,
         api_key TEXT NOT NULL,
-        session_id TEXT NOT NULL,
         model_id TEXT NOT NULL,
         input_tokens INTEGER NOT NULL,
         output_tokens INTEGER NOT NULL,
@@ -92,7 +83,6 @@ db.exec(`
 
     CREATE TABLE IF NOT EXISTS chat_message (
         id TEXT PRIMARY KEY,
-        session_id TEXT NOT NULL,
         role TEXT NOT NULL,
         content TEXT NOT NULL,
         create_time INTEGER NOT NULL,
@@ -106,6 +96,13 @@ const accountCols = db.prepare("PRAGMA table_info(account)").all() as { name: st
 if (!accountCols.some((c: { name: string }) => c.name === "is_admin")) {
     db.exec("ALTER TABLE account ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0;");
     console.log("Migrated: added 'is_admin' column to account table");
+}
+
+// Migrate: add 'alias' column to model if missing
+const modelCols = db.prepare("PRAGMA table_info(model)").all() as { name: string }[];
+if (!modelCols.some((c: { name: string }) => c.name === "alias")) {
+    db.exec("ALTER TABLE model ADD COLUMN alias TEXT;");
+    console.log("Migrated: added 'alias' column to model table");
 }
 // Migrate: convert existing 'role' column values to 'is_admin'
 if (accountCols.some((c: { name: string }) => c.name === "role")) {

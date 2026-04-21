@@ -44,7 +44,7 @@ export function ModelUsageCard({ isOpen, onOpenChange, model }: Props) {
             <ModalContent>
                 <ModalHeader>{locale.UsageCardTitle} — {model.baseURL}</ModalHeader>
                 <ModalBody>
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-4 overflow-hidden">
                         {stats ? (
                             <UsageChart
                                 today={stats.today}

@@ -1,5 +1,5 @@
 import { BaseRequest, BaseResponse } from "../../lib/default/decorator";
-import { UsageLogEntity } from "../../modules/ai/ai.entity";
+import { UsageLogEntity } from "./usage.entity";
 
 export interface UsageAmountData {
     ts: number;
@@ -52,7 +52,6 @@ export class UsageStatsResponse implements BaseResponse<UsageStatsPeriod> {
 export class UsageDTO {
     public id: string;
     public apiKey: string;
-    public sessionId: string;
     public modelId: string;
     public inputTokens: number;
     public outputTokens: number;
@@ -63,7 +62,6 @@ export class UsageDTO {
     constructor(origin: UsageLogEntity) {
         this.id = origin.id;
         this.apiKey = origin.apiKey;
-        this.sessionId = origin.sessionId;
         this.modelId = origin.modelId;
         this.inputTokens = origin.inputTokens;
         this.outputTokens = origin.outputTokens;
@@ -73,7 +71,6 @@ export class UsageDTO {
 
 export class UsageQueryBody {
     public apiKey?: string;
-    public sessionId?: string;
     public modelId?: string;
 
     private isTypeSafe: symbol = Symbol();
@@ -81,7 +78,6 @@ export class UsageQueryBody {
     constructor(origin: Partial<UsageLogEntity>) {
         if (false) throw new Error("Unexpected error");
         origin.apiKey && (this.apiKey = origin.apiKey);
-        origin.sessionId && (this.sessionId = origin.sessionId);
         origin.modelId && (this.modelId = origin.modelId);
     }
 
