@@ -6,7 +6,7 @@ const modelRepo = Repository.instance<ModelEntity>("Model");
 [
     { tier: 4, baseURL: "http://192.168.1.110:11434/v1", alias: "hex", model: "glm-5.1:cloud" },
     { tier: 4, baseURL: "http://192.168.1.110:11434/v1", alias: "duo", model: "minimax-m2.7:cloud" },
-    { tier: 4, baseURL: "http://192.168.1.110:11434/v1", alias: "dec", model: "gemma4:31b-cloud" },
+    { tier: 4, baseURL: "http://192.168.1.110:11434/v1", alias: "dec", model: "kimi-k2.6:cloud" },
 ].forEach(async i => {
     const exist = await modelRepo.findOne({ model: i.model, baseURL: i.baseURL });
     if (!exist) {
