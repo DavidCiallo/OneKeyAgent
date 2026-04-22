@@ -9,7 +9,7 @@ const staticPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 
 import { mounthttp, mountstatic } from "../lib/mount";
 import { authController } from "../modules/auth/auth.controller";
-import { aiController } from "../modules/ai/ai.controller";
+import { aiController, aiOldController } from "../modules/ai/ai.controller";
 import { modelController } from "../modules/model/model.controller";
 import { usageController } from "../modules/usage/usage.controller";
 import { accountController } from "../modules/account/account.controller";
@@ -28,6 +28,7 @@ Bun.serve({
         const apiResponse = await mounthttp(req, [
             authController,
             aiController,
+            aiOldController,
             modelController,
             usageController,
             accountController,
