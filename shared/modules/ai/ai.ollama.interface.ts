@@ -63,7 +63,7 @@ export class OllamaChatResponse implements BaseResponse<Message> {
         this.model = data.model;
         this.choices = data.choices.map(c => ({
             ...c,
-            message: new Message(c.message),
+            message: new Message(c.message as Pick<Message, "role" | "content">),
         }));
         this.usage = data.usage;
     }
