@@ -3,6 +3,7 @@ import path from "path";
 
 export async function mounthttp(req: Request, controllers: BaseRouterInstance[]): Promise<Response | null> {
     const url = new URL(req.url);
+    console.log(`Received request: ${req.method} ${url.pathname}`);
     const pathName = url.pathname;
     const method = req.method.toLowerCase();
     for (const controller of controllers) {
@@ -21,10 +22,9 @@ export async function mounthttp(req: Request, controllers: BaseRouterInstance[])
                 }
                 try {
                     const result = handler && (await handler({ ...requestBody, auth }));
-
                     const response = new Response(JSON.stringify(result), {
                         headers: {
-                            "Content-Type": "application/json",
+                            "Content-Type": "application/grpc",
                             "Access-Control-Allow-Origin": "*",
                             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
                             "Access-Control-Allow-Headers": "Content-Type, token, Authorization",
