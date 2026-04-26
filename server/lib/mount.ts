@@ -3,6 +3,7 @@ import path from "path";
 
 export async function mounthttp(req: Request, controllers: BaseRouterInstance[]): Promise<Response | null> {
     const url = new URL(req.url);
+    console.log(`Received request: ${req.method} ${url.pathname}`);
     const pathName = url.pathname;
     const method = req.method.toLowerCase();
     for (const controller of controllers) {
@@ -21,6 +22,11 @@ export async function mounthttp(req: Request, controllers: BaseRouterInstance[])
                 }
                 try {
                     const result = handler && (await handler({ ...requestBody, auth }));
+
+                    // 如果 handler 直接返回了 Response 对象 (如 stream)，透传
+                    if (result instanceof Response || (result && result.constructor?.name === "Response")) {
+                        return result as any;
+                    }
 
                     const response = new Response(JSON.stringify(result), {
                         headers: {
