@@ -5,10 +5,13 @@ import {
     UsageDTO,
     UsageStatsRequest,
     UsageStatsResponse,
+    MyUsageRequest,
+    MyUsageResponse,
 } from "../../../shared/modules/usage/usage.interface";
 import { UsageRouterInstance } from "../../../shared/modules/usage/usage.router";
 import { inject } from "../../lib/inject";
 import { getIdentifyByVerify } from "../auth/auth.service";
+import { AccountService } from "../account/account.service";
 import { UsageService } from "./usage.service";
 
 async function list(request: UsageListRequest): Promise<UsageListResponse> {
@@ -46,4 +49,24 @@ async function stats(request: UsageStatsRequest): Promise<UsageStatsResponse> {
     });
 }
 
-export const usageController = new UsageRouterInstance(inject, { list, stats });
+async function mystats(request: MyUsageRequest): Promise<MyUsageResponse> {
+    request = MyUsageRequest.self(request);
+    const { auth } = request;
+    if (!auth) throw "Authorization failed";
+    const email = getIdentifyByVerify(auth);
+    if (!email) throw "Authorization failed";
+
+    const account = await AccountService.findByEmail(email);
+    if (!account) throw "Account not found";
+
+    const apiKey = account.apiKey;
+    const data = await UsageService.myStats(apiKey);
+
+    return new MyUsageResponse({
+        success: true,
+        message: "success",
+        data,
+    });
+}
+
+export const usageController = new UsageRouterInstance(inject, { list, stats, mystats });

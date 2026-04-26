@@ -99,7 +99,7 @@ const Component = () => {
             </header>
 
             {/* ===== Hero ===== */}
-            <section className="relative isolate overflow-hidden pt-64 pb-28 sm:pb-36">
+            <section className="relative isolate overflow-hidden pt-54 pb-32 sm:pb-36">
                 <div className="mx-auto max-w-4xl px-6">
                     <div className="text-center">
                         <h1 className="text-6xl font-bold tracking-tight text-gray-900 sm:text-7xl lg:text-8xl">

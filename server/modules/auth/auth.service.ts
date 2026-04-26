@@ -4,7 +4,7 @@ import Repository from "../../lib/repository";
 import { generateApiKey } from "../ai/ai.auth";
 import { RoleService, AccountRoleService } from "../role/role.service";
 
-const ALL_MENUS = ["chat", "model", "usage", "account", "profile"];
+const ALL_MENUS = ["model", "usage", "account", "profile"];
 const accountRepository: Repository<AccountEntity> = Repository.instance("Account");
 
 export async function loginUser(email: string, password: string): Promise<{ token?: string; is_admin?: number; roles?: { name: string; type: string }[] }> {
@@ -31,7 +31,6 @@ export async function registerUser(name: string, email: string, password: string
     if (!isAdmin) {
         await AccountRoleService.assignPermissions(account.id, [
             { name: "profile", type: "menu" },
-            { name: "chat", type: "menu" },
         ]);
     }
     return { account, apiKey };

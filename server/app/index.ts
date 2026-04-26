@@ -10,12 +10,10 @@ const staticPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 import { mounthttp, mountstatic } from "../lib/mount";
 import { authController } from "../modules/auth/auth.controller";
 import { aiController } from "../modules/ai/ai.controller";
-import { aiOllamaController } from "../modules/ai/ai.ollama.controller";
 import { modelController } from "../modules/model/model.controller";
 import { usageController } from "../modules/usage/usage.controller";
 import { accountController } from "../modules/account/account.controller";
 import { roleController } from "../modules/role/role.controller";
-import { chatSessionController, chatMessageController } from "../modules/chat/chat.controller";
 
 const PORT = parseInt(process.env.SERVER_PORT || "3300");
 initialize();
@@ -29,13 +27,10 @@ Bun.serve({
         const apiResponse = await mounthttp(req, [
             authController,
             aiController,
-            aiOllamaController,
             modelController,
             usageController,
             accountController,
             roleController,
-            chatSessionController,
-            chatMessageController,
         ]);
         if (apiResponse) return apiResponse;
         const staticResponse = await mountstatic(staticPath, pathName);
