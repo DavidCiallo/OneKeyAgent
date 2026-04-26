@@ -22,6 +22,7 @@ async function chatHex(body: Record<string, any>, apiKey: string): Promise<any> 
             const requestBody: Record<string, any> = {
                 ...body,
                 stream: false,
+                thinking: { type: "disabled" },
                 model: model.model,
             };
 
