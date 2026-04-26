@@ -8,7 +8,6 @@ import { AuthStatus, clearAuthData, getAuthStatus, setUserInfo } from "./methods
 import ModelPage from "./pages/model/ModelPage";
 import UsagePage from "./pages/usage/UsagePage";
 import AccountPage from "./pages/account/AccountPage";
-import ChatPage from "./pages/chat/ChatPage";
 import ProfilePage from "./pages/profile/ProfilePage";
 import NoContentPage from "./pages/nocontent/NoContentPage";
 import { AuthRouter } from "./api/instance";
@@ -49,7 +48,6 @@ const ProtectedRoute = ({ name, children }: { name: string; children: JSX.Elemen
 const TITLE_MAP: Record<string, string> = {
     "/home": "Home",
     "/auth": "Login",
-    "/chat": "Chat",
     "/model": "Model",
     "/usage": "Usage",
     "/account": "Account",
@@ -73,7 +71,6 @@ const AppRoutes = () => {
             <Route path="/auth" element={<AuthPage />} />
             <Route element={<PrivateRoute />}>
                 <Route path="/nocontent" element={<NoContentPage />} />
-                <Route path="/chat" element={<ProtectedRoute name="chat"><ChatPage /></ProtectedRoute>} />
                 <Route path="/model" element={<ProtectedRoute name="model"><ModelPage /></ProtectedRoute>} />
                 <Route path="/usage" element={<ProtectedRoute name="usage"><UsagePage /></ProtectedRoute>} />
                 <Route path="/account" element={<ProtectedRoute name="account"><AccountPage /></ProtectedRoute>} />

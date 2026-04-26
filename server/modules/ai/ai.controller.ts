@@ -20,14 +20,24 @@ export const aiController = new AiRouterInstance(inject, {
 
         const result = await AiService.chatCompletions(request, apiKey);
 
-        // if (request.stream) {
-        //     const content =
-        //         result.choices?.[0]?.message?.content || "";
-        //     const id = result.id || `chatcmpl-${Date.now()}`;
-        //     const model = result.model || request.model || "";
-        //     const created = Math.floor(Date.now() / 1000);
-        //     return createPseudoStream(content, id, model, created);
-        // }
+        if (request.stream) {
+            const content = result.choices?.[0]?.message?.content || "";
+            const toolCalls = (result.choices?.[0]?.message as any)?.tool_calls;
+            const id = result.id || `chatcmpl-${Date.now()}`;
+            const model = result.model || request.model || "";
+            const created = Math.floor(Date.now() / 1000);
+            const stream = createPseudoStream(content, id, model, created, toolCalls);
+            return new Response(stream as any, {
+                headers: {
+                    "Content-Type": "text/event-stream",
+                    "Cache-Control": "no-cache",
+                    Connection: "keep-alive",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type, token, Authorization",
+                },
+            });
+        }
 
         return result;
     },
@@ -45,7 +55,17 @@ export const aiController = new AiRouterInstance(inject, {
             const id = result.id || `cmpl-${Date.now()}`;
             const model = result.model || request.model || "";
             const created = Math.floor(Date.now() / 1000);
-            return createPseudoCompletionStream(text, id, model, created);
+            const stream = createPseudoCompletionStream(text, id, model, created);
+            return new Response(stream as any, {
+                headers: {
+                    "Content-Type": "text/event-stream",
+                    "Cache-Control": "no-cache",
+                    Connection: "keep-alive",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type, token, Authorization",
+                },
+            });
         }
 
         return result;
