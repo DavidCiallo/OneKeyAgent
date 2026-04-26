@@ -84,7 +84,7 @@
 
     "HomePage": {
         "MainText": "HEX",
-        "Slogan": "Powerful, reliable, ready out of the box. The future-ready AI model, built for developers.",
+        "Slogan": "Plain words, profound intelligence.",
         "ViewSource": "View Source Code",
         "StartFree": "Get Started",
         "TryChat": "Try Online",
@@ -101,7 +101,7 @@
         "StatRegions": "Regions Covered",
         "StatUptime": "Uptime",
         "StatTokensValue": "1.2B",
-        "StatRegionsValue": "5",
+        "StatRegionsValue": "15",
         "StatUptimeValue": "99.3%",
         "FooterDesc": "HEX — The future-ready AI model, built for developers.",
         "FooterContact": "Contact Us",
