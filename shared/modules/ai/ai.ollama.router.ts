@@ -10,7 +10,7 @@ import {
 
 export class AiOllamaRouterInstance extends BaseRouterInstance {
     base = "/api";
-    prefix = "";
+    prefix = "/api";
     router = [
         { path: "/chat", handler: Function },
         { path: "/generate", handler: Function },

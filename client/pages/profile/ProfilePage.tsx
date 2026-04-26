@@ -140,6 +140,7 @@ export default function ProfilePage() {
                                     <Chip key={index} color="primary" variant="flat">{model}</Chip>
                                 ))}
                             </div>
+
                         </CardBody>
                     </Card>
                 </div>
@@ -155,7 +156,9 @@ export default function ProfilePage() {
                             </ModalBody>
                             <ModalFooter>
                                 <Button size="sm" variant="flat" onPress={onClose}>{locale.Cancel}</Button>
-                                <Button size="sm" color="danger" onPress={handleRegenerate} isLoading={regenerating}>{locale.Regenerate}</Button>
+                                <Button size="sm" color="danger" onPress={handleRegenerate} isLoading={regenerating}>
+                                    {locale.Regenerate}
+                                </Button>
                             </ModalFooter>
                         </>
                     )}
