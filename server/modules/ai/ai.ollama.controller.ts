@@ -12,74 +12,7 @@ import { AiService } from "./ai.service";
 import { validateApiKey, verifyApiKeyInDb } from "./ai.auth";
 
 const CHUNK_COUNT = 15;
-
-function createChatStream(
-    content: string,
-    model: string,
-): ReadableStream<Uint8Array> {
-    const created_at = new Date().toISOString();
-    return new ReadableStream({
-        async start(controller) {
-            const encoder = new TextEncoder();
-            const chunks = splitIntoChunks(content, CHUNK_COUNT);
-
-            for (let i = 0; i < chunks.length; i++) {
-                const chunk = {
-                    model,
-                    created_at,
-                    message: { role: "assistant", content: chunks[i] },
-                    done: false,
-                };
-                controller.enqueue(encoder.encode(JSON.stringify(chunk) + "\n"));
-                await new Promise(r => setTimeout(r, 20));
-            }
-
-            const doneChunk = {
-                model,
-                created_at,
-                message: { role: "assistant", content: "" },
-                done: true,
-                done_reason: "stop",
-            };
-            controller.enqueue(encoder.encode(JSON.stringify(doneChunk) + "\n"));
-            controller.close();
-        },
-    });
-}
-
-function createGenerateStream(
-    text: string,
-    model: string,
-): ReadableStream<Uint8Array> {
-    const created_at = new Date().toISOString();
-    return new ReadableStream({
-        async start(controller) {
-            const encoder = new TextEncoder();
-            const chunks = splitIntoChunks(text, CHUNK_COUNT);
-
-            for (let i = 0; i < chunks.length; i++) {
-                const chunk = {
-                    model,
-                    created_at,
-                    response: chunks[i],
-                    done: false,
-                };
-                controller.enqueue(encoder.encode(JSON.stringify(chunk) + "\n"));
-                await new Promise(r => setTimeout(r, 20));
-            }
-
-            const doneChunk = {
-                model,
-                created_at,
-                response: "",
-                done: true,
-                done_reason: "stop",
-            };
-            controller.enqueue(encoder.encode(JSON.stringify(doneChunk) + "\n"));
-            controller.close();
-        },
-    });
-}
+const HEARTBEAT_INTERVAL_MS = 8000;
 
 function splitIntoChunks(text: string, count: number): string[] {
     if (!text) return [""];
@@ -100,12 +33,65 @@ export const aiOllamaController = new AiOllamaRouterInstance(inject, {
         }
         OllamaChatRequest.self(request);
 
-        const result = await AiService.chatCompletions(request, apiKey);
-        console.log(new Date(), "Chat completion result:", request.model);
         if (request.stream) {
-            const content = result.choices?.[0]?.message?.content || "";
-            const model = result.model || request.model || "";
-            const stream = createChatStream(content, model);
+            const model = request.model || "";
+            const stream = new ReadableStream({
+                async start(controller) {
+                    const encoder = new TextEncoder();
+                    const created_at = new Date().toISOString();
+
+                    const heartbeat = setInterval(() => {
+                        try {
+                            controller.enqueue(encoder.encode(JSON.stringify({
+                                model,
+                                created_at,
+                                message: { role: "assistant", content: "" },
+                                done: false,
+                            }) + "\n"));
+                        } catch (_) { /* 流已关闭，忽略 */ }
+                    }, HEARTBEAT_INTERVAL_MS);
+
+                    try {
+                        // 阻塞等完整响应
+                        const result = await AiService.chatCompletions(request, apiKey);
+                        clearInterval(heartbeat);
+
+                        const content = result.choices?.[0]?.message?.content || "";
+                        const modelName = result.model || model;
+                        const chunks = splitIntoChunks(content, CHUNK_COUNT);
+
+                        for (let i = 0; i < chunks.length; i++) {
+                            controller.enqueue(encoder.encode(JSON.stringify({
+                                model: modelName,
+                                created_at,
+                                message: { role: "assistant", content: chunks[i] },
+                                done: false,
+                            }) + "\n"));
+                            await new Promise(r => setTimeout(r, 20));
+                        }
+
+                        controller.enqueue(encoder.encode(JSON.stringify({
+                            model: modelName,
+                            created_at,
+                            message: { role: "assistant", content: "" },
+                            done: true,
+                            done_reason: "stop",
+                        }) + "\n"));
+                    } catch (e: any) {
+                        clearInterval(heartbeat);
+                        controller.enqueue(encoder.encode(JSON.stringify({
+                            model,
+                            created_at,
+                            message: { role: "assistant", content: `Error: ${e.message}` },
+                            done: true,
+                            done_reason: "error",
+                        }) + "\n"));
+                    }
+
+                    controller.close();
+                },
+            });
+
             return new Response(stream as any, {
                 headers: {
                     "Content-Type": "application/x-ndjson",
@@ -118,6 +104,8 @@ export const aiOllamaController = new AiOllamaRouterInstance(inject, {
             });
         }
 
+        const result = await AiService.chatCompletions(request, apiKey);
+        console.log(new Date(), "Chat completion result:", request.model);
         return new OllamaChatResponse({
             id: result.id || `chatcmpl-${Date.now()}`,
             model: result.model,
@@ -137,12 +125,64 @@ export const aiOllamaController = new AiOllamaRouterInstance(inject, {
         }
         OllamaGenerateRequest.self(request);
 
-        const result = await AiService.completions(request, apiKey);
-
         if (request.stream) {
-            const text = result.choices?.[0]?.text || "";
-            const model = result.model || request.model || "";
-            const stream = createGenerateStream(text, model);
+            const model = request.model || "";
+            const stream = new ReadableStream({
+                async start(controller) {
+                    const encoder = new TextEncoder();
+                    const created_at = new Date().toISOString();
+
+                    const heartbeat = setInterval(() => {
+                        try {
+                            controller.enqueue(encoder.encode(JSON.stringify({
+                                model,
+                                created_at,
+                                response: "",
+                                done: false,
+                            }) + "\n"));
+                        } catch (_) { }
+                    }, HEARTBEAT_INTERVAL_MS);
+
+                    try {
+                        const result = await AiService.completions(request, apiKey);
+                        clearInterval(heartbeat);
+
+                        const text = result.choices?.[0]?.text || "";
+                        const modelName = result.model || model;
+                        const chunks = splitIntoChunks(text, CHUNK_COUNT);
+
+                        for (let i = 0; i < chunks.length; i++) {
+                            controller.enqueue(encoder.encode(JSON.stringify({
+                                model: modelName,
+                                created_at,
+                                response: chunks[i],
+                                done: false,
+                            }) + "\n"));
+                            await new Promise(r => setTimeout(r, 20));
+                        }
+
+                        controller.enqueue(encoder.encode(JSON.stringify({
+                            model: modelName,
+                            created_at,
+                            response: "",
+                            done: true,
+                            done_reason: "stop",
+                        }) + "\n"));
+                    } catch (e: any) {
+                        clearInterval(heartbeat);
+                        controller.enqueue(encoder.encode(JSON.stringify({
+                            model,
+                            created_at,
+                            response: `Error: ${e.message}`,
+                            done: true,
+                            done_reason: "error",
+                        }) + "\n"));
+                    }
+
+                    controller.close();
+                },
+            });
+
             return new Response(stream as any, {
                 headers: {
                     "Content-Type": "application/x-ndjson",
@@ -155,6 +195,7 @@ export const aiOllamaController = new AiOllamaRouterInstance(inject, {
             });
         }
 
+        const result = await AiService.completions(request, apiKey);
         return new OllamaGenerateResponse({
             model: result.model,
             choices: result.choices?.map((c: any) => ({
