@@ -153,19 +153,21 @@ export interface OllamaModelEntry {
     };
 }
 
-export class OllamaTagsResponse implements BaseResponse<any> {
-    success: boolean;
-    object: string = "list";
-    data: Array<{
-        id: string;
-        object: string;
-        created: number;
-        owned_by: string;
+export class OllamaTagsResponse {
+    models: Array<{
+        name: string;
+        modified_at: string;
+        size: number;
+        digest: string;
+        details: {
+            format: string;
+            family: string;
+            parameter_size: string;
+            quantization_level: string;
+        };
     }>;
-    message?: string;
 
-    constructor(data: { data: Array<{ id: string; object: string; created: number; owned_by: string }> }) {
-        this.success = true;
-        this.data = data.data;
+    constructor(data: { models: OllamaModelEntry[] }) {
+        this.models = data.models;
     }
 }

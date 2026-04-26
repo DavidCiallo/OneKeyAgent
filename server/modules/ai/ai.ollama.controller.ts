@@ -210,6 +210,19 @@ export const aiOllamaController = new AiOllamaRouterInstance(inject, {
         OllamaTagsRequest.self(request);
 
         const data = await AiService.listModels();
-        return new OllamaTagsResponse(data);
+        return new OllamaTagsResponse({
+            models: (data.data || []).map((m: any) => ({
+                name: m.id || "",
+                modified_at: new Date((m.created || 0) * 1000).toISOString(),
+                size: 0,
+                digest: "",
+                details: {
+                    format: "gguf",
+                    family: (m.id || "").split(":")[0] || m.id || "",
+                    parameter_size: "",
+                    quantization_level: "",
+                },
+            })),
+        });
     },
 });

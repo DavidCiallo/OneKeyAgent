@@ -30,7 +30,7 @@ export async function mounthttp(req: Request, controllers: BaseRouterInstance[])
 
                     const response = new Response(JSON.stringify(result), {
                         headers: {
-                            "Content-Type": "application/grpc",
+                            "Content-Type": "application/json",
                             "Access-Control-Allow-Origin": "*",
                             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
                             "Access-Control-Allow-Headers": "Content-Type, token, Authorization",
