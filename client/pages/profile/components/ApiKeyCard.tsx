@@ -19,7 +19,7 @@ export default function ApiKeyCard({
     const maskedKey = (key: string) => {
         if (!key) return "—";
         if (showApiKey) return key;
-        return key.slice(0, 4) + "..." + key.slice(-4);
+        return key.slice(0, 6) + "******" + key.slice(-5);
     };
 
     const handleCopy = (text: string) => {
@@ -35,10 +35,10 @@ export default function ApiKeyCard({
                     <code className="flex-1 text-xs sm:text-sm bg-gray-100 px-3 py-2 rounded-lg font-mono truncate select-all">
                         {maskedKey(apiKey)}
                     </code>
-                    <Button size="sm" variant="flat" className="min-w-0 px-2 sm:px-3" onPress={() => setShowApiKey(!showApiKey)}>
+                    <Button size="sm" variant="flat" className="min-w-0 px-4 sm:px-3" onPress={() => setShowApiKey(!showApiKey)}>
                         {showApiKey ? locale.Hide : locale.Show}
                     </Button>
-                    <Button size="sm" variant="flat" className="min-w-0 px-2 sm:px-3" onPress={() => handleCopy(apiKey)}>
+                    <Button size="sm" variant="flat" className="min-w-0 px-4 sm:px-3" onPress={() => handleCopy(apiKey)}>
                         {locale.Copy}
                     </Button>
                 </div>
