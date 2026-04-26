@@ -4,7 +4,6 @@ import { Locale } from "../../../methods/locale";
 type Permission = { name: string; type: string };
 
 const PERMISSION_OPTIONS: Permission[] = [
-    { name: "chat", type: "menu" },
     { name: "profile", type: "menu" },
     { name: "model", type: "menu" },
     { name: "usage", type: "menu" },

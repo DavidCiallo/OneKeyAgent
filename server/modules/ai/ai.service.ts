@@ -14,11 +14,10 @@ async function chatHex(body: Record<string, any>, apiKey: string): Promise<any> 
     const models = await getModelsByAlias(requestedAlias);
     if (models.length === 0) throw new Error(`No models found for alias: ${requestedAlias}`);
 
-
     for (let count = 0; count < 100; count++) {
         await new Promise(resolve => setTimeout(resolve, 300));
-
         for (const model of models) {
+            console.log(`[AI] Trying model: ${model.model}`);
             const requestBody: Record<string, any> = {
                 ...body,
                 stream: false,
