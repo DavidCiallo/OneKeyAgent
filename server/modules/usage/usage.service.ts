@@ -77,4 +77,26 @@ export class UsageService {
             last7Days: buildPeriod(weekLogs, weekStart, nowTenMin),
         };
     }
+
+    static async myStats(apiKey: string): Promise<{ today: number; thisWeek: number; total: number }> {
+        const now = Date.now();
+        const DAY = 86400000;
+
+        const todayStart = dayStart(now);
+        const weekStart = todayStart - 7 * DAY;
+        const nowTenMin = tenMinStart(now);
+
+        const allLogs = await usageRepo.find({ apiKey });
+        const todayLogs = allLogs.filter(l => l.create_time >= todayStart && l.create_time <= nowTenMin);
+        const weekLogs = allLogs.filter(l => l.create_time >= weekStart && l.create_time <= nowTenMin);
+
+        const sum = (logs: UsageLogEntity[]) =>
+            Math.round(logs.reduce((acc, l) => acc + (l.inputTokens || 0) + (l.outputTokens || 0), 0) / 1000);
+
+        return {
+            today: sum(todayLogs),
+            thisWeek: sum(weekLogs),
+            total: sum(allLogs),
+        };
+    }
 }

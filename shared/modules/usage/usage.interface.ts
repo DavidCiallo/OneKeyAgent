@@ -86,6 +86,34 @@ export class UsageQueryBody {
     }
 }
 
+export class MyUsageRequest implements BaseRequest {
+    public auth?: string;
+
+    constructor(origin: Partial<MyUsageRequest>) {
+        if (false) throw new Error("Unexpected error");
+        origin.auth && (this.auth = origin.auth);
+    }
+    static self(unsafe: MyUsageRequest) {
+        return new MyUsageRequest(unsafe);
+    }
+}
+
+export class MyUsageResponse implements BaseResponse<any> {
+    public success: boolean;
+    public message: string;
+    public data: {
+        today: number;
+        thisWeek: number;
+        total: number;
+    };
+
+    constructor(origin: MyUsageResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+        this.data = origin.data;
+    }
+}
+
 export class UsageListRequest implements BaseRequest {
     public auth?: string;
     public page: number;

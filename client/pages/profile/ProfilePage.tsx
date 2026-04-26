@@ -1,9 +1,10 @@
 import { Header } from "../../components/header/Header";
 import { useEffect, useState, useCallback } from "react";
-import { AccountRouter, AiRouter } from "../../api/instance";
+import { AccountRouter, AiRouter, UsageRouter } from "../../api/instance";
 import { Locale } from "../../methods/locale";
 import { AccountProfileRequest, AccountRegenerateRequest } from "../../../shared/modules/account/account.interface";
 import { ModelsRequest } from "../../../shared/modules/ai/ai.interface";
+import { MyUsageRequest } from "../../../shared/modules/usage/usage.interface";
 import { Button, Card, CardBody, CardHeader, Divider, Chip, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from "@heroui/react";
 import { AccountDTO } from "../../../shared/modules/account/account.interface";
 
@@ -16,6 +17,7 @@ export default function ProfilePage() {
     const [showApiKey, setShowApiKey] = useState(false);
     const [models, setModels] = useState<string[]>([]);
     const [regenerating, setRegenerating] = useState(false);
+    const [usage, setUsage] = useState<{ today: number; thisWeek: number; total: number } | null>(null);
     const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onClose: onConfirmClose, onOpenChange: onConfirmChange } = useDisclosure();
 
     const fetchProfile = useCallback(async () => {
@@ -32,10 +34,18 @@ export default function ProfilePage() {
         }
     }, []);
 
+    const fetchUsage = useCallback(async () => {
+        const res = await UsageRouter.mystats(new MyUsageRequest({ auth: getToken() }));
+        if (res.success && res.data) {
+            setUsage(res.data);
+        }
+    }, []);
+
     useEffect(() => {
         fetchProfile();
         fetchModels();
-    }, [fetchProfile, fetchModels]);
+        fetchUsage();
+    }, [fetchProfile, fetchModels, fetchUsage]);
 
     const handleRegenerate = async () => {
         onConfirmClose();
@@ -61,6 +71,8 @@ export default function ProfilePage() {
         return key.slice(0, 8) + "******" + key.slice(-4);
     };
 
+    const toM = (val: number) => (val / 1000).toFixed(1);
+
     const endpoint = `${window.location.origin}/api`;
 
     if (!account) return null;
@@ -73,20 +85,55 @@ export default function ProfilePage() {
                     <Card>
                         <CardHeader className="px-6 py-4 font-semibold text-lg">{locale.AccountInfo}</CardHeader>
                         <Divider />
-                        <CardBody className="px-6 py-4 space-y-4">
-                            <div className="flex items-center gap-3">
-                                <span className="text-sm text-gray-500 w-20">{locale.Name}</span>
-                                <span className="text-sm font-medium">{account.name}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <span className="text-sm text-gray-500 w-20">{locale.Email}</span>
-                                <span className="text-sm font-medium">{account.email}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <span className="text-sm text-gray-500 w-20">{locale.Role}</span>
-                                <Chip size="sm" color={account.is_admin ? "warning" : "default"} variant="flat">
-                                    {account.is_admin ? locale.Admin : locale.User}
-                                </Chip>
+                        <CardBody className="px-6 py-4">
+                            <div className="flex flex-col md:flex-row gap-6">
+                                <div className="space-y-4 flex-1">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-sm text-gray-500 w-20">{locale.Name}</span>
+                                        <span className="text-sm font-medium">{account.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-sm text-gray-500 w-20">{locale.Email}</span>
+                                        <span className="text-sm font-medium">{account.email}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-sm text-gray-500 w-20">{locale.Role}</span>
+                                        <Chip size="sm" color={account.is_admin ? "warning" : "default"} variant="flat">
+                                            {account.is_admin ? locale.Admin : locale.User}
+                                        </Chip>
+                                    </div>
+                                </div>
+                                {usage && (
+                                    <div className="w-full md:w-56 space-y-3 md:pl-6">
+                                        <div>
+                                            <div className="flex justify-between text-xs mb-1">
+                                                <span className="text-gray-500">{locale.Today}</span>
+                                                <span className="font-semibold text-primary">{toM(usage.today)}M</span>
+                                            </div>
+                                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${Math.min((usage.today / 100000) * 50, 100)}%` }} />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="flex justify-between text-xs mb-1">
+                                                <span className="text-gray-500">{locale.ThisWeek}</span>
+                                                <span className="font-semibold text-success">{toM(usage.thisWeek)}M</span>
+                                            </div>
+                                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                <div className="h-full bg-success rounded-full transition-all" style={{ width: `${Math.min((usage.thisWeek / 100000) * 50, 100)}%` }} />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="flex justify-between text-xs mb-1">
+                                                <span className="text-gray-500">{locale.Total}</span>
+                                                <span className="font-semibold text-warning">{toM(usage.total)}M</span>
+                                            </div>
+                                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                <div className="h-full bg-warning rounded-full transition-all" style={{ width: `${Math.min((usage.total / Math.max(usage.total, 1)) * 100, 100)}%` }} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </CardBody>
                     </Card>
