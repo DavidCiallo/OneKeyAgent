@@ -99,7 +99,7 @@ const Component = () => {
             </header>
 
             {/* ===== Hero ===== */}
-            <section className="relative isolate overflow-hidden pt-54 pb-32 sm:pb-36">
+            <section className="relative isolate overflow-hidden pt-54 md:pt-68 pb-40 sm:pb-36">
                 <div className="mx-auto max-w-4xl px-6">
                     <div className="text-center">
                         <h1 className="text-6xl font-bold tracking-tight text-gray-900 sm:text-7xl lg:text-8xl">
@@ -120,8 +120,8 @@ const Component = () => {
 
             {/* ===== Stats ===== */}
             <section className="border-y border-gray-100">
-                <div className="mx-auto max-w-4xl px-6 py-16">
-                    <div className="grid grid-cols-3 gap-8 max-w-2xl mx-auto">
+                <div className="mx-auto max-w-4xl px-6 py-12">
+                    <div className="grid grid-cols-3 gap-4 max-w-3xl mx-auto">
                         {stats.map((stat) => (
                             <div key={stat.label} className="text-center">
                                 <div className="text-3xl font-bold text-gray-900">{stat.value}</div>
@@ -132,8 +132,7 @@ const Component = () => {
                 </div>
             </section>
 
-            {/* ===== Features ===== */}
-            <section className="py-28">
+            <section className="pt-36 pb-16">
                 <div className="mx-auto max-w-4xl px-6">
                     <h2 className="text-2xl font-bold text-center text-gray-900 mb-16">
                         {locale.FeatureTitle}
@@ -162,11 +161,8 @@ const Component = () => {
                 <div className="mx-auto max-w-4xl px-6">
                     <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
                         <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-400">© 2024 ehex.</span>
+                            <span className="text-sm text-gray-400">© 2023-{new Date().getFullYear()} ehex</span>
                         </div>
-                        <p className="text-xs text-gray-400 text-center max-w-md">
-                            {locale.FooterDesc}
-                        </p>
                     </div>
                 </div>
             </footer>
