@@ -72,10 +72,8 @@ export default function Component() {
     return (
         <div className="flex h-full w-full items-center justify-center">
             <div className="rounded-large flex w-full max-w-sm flex-col gap-4 px-8 pt-[20vh]">
-                <p className="pb-4 text-left text-3xl font-semibold">
-                    <span aria-label="emoji" className="mr-4" role="img">
-                        📖
-                    </span>
+                <p className="pb-4 text-left text-3xl font-semibold flex items-center gap-3">
+                    <span className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center text-base font-bold text-white">H</span>
                     {locale.Title}
                 </p>
                 {isRegister ? (

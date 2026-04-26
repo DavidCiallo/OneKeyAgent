@@ -58,7 +58,7 @@
     },
 
     "AuthPage": {
-        "Title": "OneKey",
+        "Title": "EHEX",
         "LoginSuccess": "登录成功",
         "LoginFailed": "登录失败",
         "EmailLabel": "邮箱",
@@ -82,9 +82,31 @@
         "RegisterFailed": "注册失败，邮箱可能已存在"
     },
     "HomePage": {
-        "MainText": "极简接口",
-        "Slogan": "小巧，精致，且快速。",
-        "ViewSource": "查看源代码"
+        "MainText": "HEX",
+        "Slogan": "高效、可靠、开箱即用。面向未来的 AI 模型，为开发者而生。",
+        "ViewSource": "查看源代码",
+        "StartFree": "开始使用",
+        "TryChat": "在线体验",
+        "FeatureTitle": "为什么选择 HEX",
+        "Feature1Title": "强大性能",
+        "Feature1Desc": "HEX 系列模型在多种基准测试中表现优异，兼顾推理速度与生成质量，为各类应用场景提供稳定支撑。",
+        "Feature2Title": "开放兼容",
+        "Feature2Desc": "原生兼容 OpenAI API 格式，无需额外适配即可接入现有工具链与平台，迁移成本趋近于零。",
+        "Feature3Title": "清晰透明",
+        "Feature3Desc": "详细的用量统计与性能指标，每一次调用都清晰可查，帮助您更好地理解和使用模型。",
+        "Feature4Title": "安全可控",
+        "Feature4Desc": "完善的权限管理与访问控制，支持多账户协作，确保您的数据与调用安全可控。",
+        "StatTokens": "日均词元输出",
+        "StatRegions": "覆盖地区",
+        "StatUptime": "服务可用性",
+        "StatTokensValue": "1.2B",
+        "StatRegionsValue": "5",
+        "StatUptimeValue": "99.3%",
+        "FooterDesc": "HEX — 面向未来的 AI 模型，为开发者而生。",
+        "FooterContact": "联系我们",
+        "FooterGithub": "GitHub",
+        "NavSignIn": "登录",
+        "NavConsole": "控制台"
     },
 
     "AccountPage": {

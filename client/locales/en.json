@@ -58,7 +58,7 @@
     },
 
     "AuthPage": {
-        "Title": "HEX.AI",
+        "Title": "EHEX",
         "LoginSuccess": "Login successful",
         "LoginFailed": "Login failed",
         "EmailLabel": "Email",
@@ -83,9 +83,31 @@
     },
 
     "HomePage": {
-        "MainText": "OneKey",
-        "Slogan": "Quick, light and beautiful",
-        "ViewSource": "View Source Code"
+        "MainText": "HEX",
+        "Slogan": "Powerful, reliable, ready out of the box. The future-ready AI model, built for developers.",
+        "ViewSource": "View Source Code",
+        "StartFree": "Get Started",
+        "TryChat": "Try Online",
+        "FeatureTitle": "Why HEX",
+        "Feature1Title": "Powerful Performance",
+        "Feature1Desc": "HEX series models deliver strong results across multiple benchmarks, balancing inference speed with generation quality for production workloads.",
+        "Feature2Title": "Open & Compatible",
+        "Feature2Desc": "Natively compatible with the OpenAI API format. Integrate seamlessly with your existing toolchain and platform with zero migration cost.",
+        "Feature3Title": "Clear & Transparent",
+        "Feature3Desc": "Detailed usage statistics and performance metrics. Every call is clearly auditable, helping you better understand and optimize model usage.",
+        "Feature4Title": "Secure & Controllable",
+        "Feature4Desc": "Comprehensive permission management and access control with multi-account support, keeping your data and usage secure.",
+        "StatTokens": "Daily Token Output",
+        "StatRegions": "Regions Covered",
+        "StatUptime": "Uptime",
+        "StatTokensValue": "1.2B",
+        "StatRegionsValue": "5",
+        "StatUptimeValue": "99.3%",
+        "FooterDesc": "HEX — The future-ready AI model, built for developers.",
+        "FooterContact": "Contact Us",
+        "FooterGithub": "GitHub",
+        "NavSignIn": "Sign in",
+        "NavConsole": "Console"
     },
 
     "AccountPage": {
