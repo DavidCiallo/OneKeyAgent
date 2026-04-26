@@ -22,6 +22,12 @@ export async function mounthttp(req: Request, controllers: BaseRouterInstance[])
                 }
                 try {
                     const result = handler && (await handler({ ...requestBody, auth }));
+
+                    // 如果 handler 直接返回了 Response 对象 (如 stream)，透传
+                    if (result instanceof Response || (result && result.constructor?.name === "Response")) {
+                        return result as any;
+                    }
+
                     const response = new Response(JSON.stringify(result), {
                         headers: {
                             "Content-Type": "application/grpc",
