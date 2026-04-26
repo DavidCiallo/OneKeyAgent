@@ -31,7 +31,6 @@ export async function registerUser(name: string, email: string, password: string
     if (!isAdmin) {
         await AccountRoleService.assignPermissions(account.id, [
             { name: "profile", type: "menu" },
-            { name: "chat", type: "menu" },
         ]);
     }
     return { account, apiKey };
