@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="15" cy="20" r="6" fill="#1f2937"/>
+  <circle cx="15" cy="50" r="6" fill="#1f2937"/>
+  <circle cx="15" cy="80" r="6" fill="#1f2937"/>
+  <circle cx="38" cy="15" r="6" fill="#1f2937"/>
+  <circle cx="38" cy="35" r="6" fill="#1f2937"/>
+  <circle cx="38" cy="55" r="6" fill="#1f2937"/>
+  <circle cx="38" cy="75" r="6" fill="#1f2937"/>
+  <circle cx="62" cy="25" r="6" fill="#1f2937"/>
+  <circle cx="62" cy="50" r="6" fill="#1f2937"/>
+  <circle cx="62" cy="75" r="6" fill="#1f2937"/>
+  <circle cx="85" cy="20" r="6" fill="#1f2937"/>
+  <circle cx="85" cy="50" r="6" fill="#1f2937"/>
+  <circle cx="85" cy="80" r="6" fill="#1f2937"/>
+  <path d="M19 20 L34 15 M19 20 L34 35 M19 50 L34 35 M19 50 L34 55 M19 50 L34 75 M19 80 L34 55 M19 80 L34 75" stroke="#1f2937" stroke-width="1.5" opacity="0.4"/>
+  <path d="M42 15 L58 25 M42 15 L58 50 M42 35 L58 25 M42 35 L58 50 M42 35 L58 75 M42 55 L58 25 M42 55 L58 50 M42 55 L58 75 M42 75 L58 50 M42 75 L58 75" stroke="#1f2937" stroke-width="1.5" opacity="0.4"/>
+  <path d="M66 25 L81 20 M66 25 L81 50 M66 50 L81 20 M66 50 L81 50 M66 50 L81 80 M66 75 L81 50 M66 75 L81 80" stroke="#1f2937" stroke-width="1.5" opacity="0.4"/>
+</svg>
