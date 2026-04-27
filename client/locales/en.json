@@ -84,7 +84,8 @@
 
     "HomePage": {
         "MainText": "HEX",
-        "Slogan": "Plain words, profound intelligence.",
+        "Slogan1": "Plain words,",
+        "Slogan2": "profound intelligence.",
         "ViewSource": "View Source Code",
         "StartFree": "Get Started",
         "TryChat": "Try Online",
