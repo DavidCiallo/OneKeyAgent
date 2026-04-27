@@ -83,7 +83,8 @@
     },
     "HomePage": {
         "MainText": "HEX",
-        "Slogan": "朴素的语言蕴含无穷力量，凝聚的智慧也应触手可及",
+        "Slogan1": "朴素的语言蕴含无穷力量",
+        "Slogan2": "凝聚的智慧也应触手可及",
         "ViewSource": "查看源代码",
         "StartFree": "开始使用",
         "TryChat": "在线体验",
