@@ -14,6 +14,7 @@ import { modelController } from "../modules/model/model.controller";
 import { usageController } from "../modules/usage/usage.controller";
 import { accountController } from "../modules/account/account.controller";
 import { roleController } from "../modules/role/role.controller";
+import { mcpController } from "../modules/mcp/mcp.controller";
 
 const PORT = parseInt(process.env.SERVER_PORT || "3300");
 initialize();
@@ -31,6 +32,7 @@ Bun.serve({
             usageController,
             accountController,
             roleController,
+            mcpController,
         ]);
         if (apiResponse) return apiResponse;
         const staticResponse = await mountstatic(staticPath, pathName);
