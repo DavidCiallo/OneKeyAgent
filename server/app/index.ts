@@ -1,9 +1,12 @@
 import { config } from "dotenv";
 import { fileURLToPath } from "url";
 import path from "path";
+import { runMigrations } from "../lib/migrate";
 import { initialize } from "./initialize";
 
 config();
+
+runMigrations();
 
 const staticPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../dist");
 
@@ -15,16 +18,24 @@ import { usageController } from "../modules/usage/usage.controller";
 import { accountController } from "../modules/account/account.controller";
 import { roleController } from "../modules/role/role.controller";
 import { mcpController } from "../modules/mcp/mcp.controller";
+import { handleMcpRequest } from "../modules/mcp/mcp-sse";
 
 const PORT = parseInt(process.env.SERVER_PORT || "3300");
 initialize();
 // @ts-ignore
 Bun.serve({
     port: PORT,
+    idleTimeout: 255,
     async fetch(req: Request) {
         const url = new URL(req.url);
         const pathName = url.pathname;
-        // API 路由处理
+        // MCP protocol (SSE transport) — handles standard MCP clients (e.g. Cline)
+        // The REST endpoints (POST /api/mcp/poll, /create, /update) are kept for backward compat
+        if (pathName === "/api/mcp") {
+            const mcpResponse = await handleMcpRequest(req);
+            if (mcpResponse) return mcpResponse;
+        }
+
         const apiResponse = await mounthttp(req, [
             authController,
             aiController,
