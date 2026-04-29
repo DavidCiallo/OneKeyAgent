@@ -1,22 +1,8 @@
 // @ts-nocheck
-import { Database } from "bun:sqlite";
-import path from "path";
-import { nanoid } from "nanoid";
-import fs from "fs";
-import { drizzle } from "drizzle-orm/bun-sqlite";
-import * as schema from "./schema";
 import { eq, and, isNull, sql, desc } from "drizzle-orm";
-
-const DB_DIR = "data";
-const DB_FILE = "onekey.db";
-
-if (!fs.existsSync(DB_DIR)) {
-    fs.mkdirSync(DB_DIR);
-}
-
-const sqlite = new Database(path.join(DB_DIR, DB_FILE));
-
-export const db = drizzle(sqlite, { schema });
+import { nanoid } from "nanoid";
+import { db } from "./migrate";
+import * as schema from "./schema";
 
 // Automatically map all tables from schema
 const tables: Record<string, any> = {};
