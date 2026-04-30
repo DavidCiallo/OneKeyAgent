@@ -8,10 +8,7 @@
         "dev": "rsbuild dev",
         "serve": "bun run server/app",
         "db:generate": "bun drizzle-kit generate",
-        "db:migrate": "bun run server/lib/migrate.ts",
-        "db:studio": "bun drizzle-kit studio",
-        "db:init": "bun run server/scripts/db-init.ts",
-        "db:reset": "rm -f data/onekey.db && bun drizzle-kit generate && bun run server/scripts/db-init.ts"
+        "db:studio": "bun drizzle-kit studio"
     },
     "dependencies": {
         "@heroui/react": "^2.8.0-beta.5",
