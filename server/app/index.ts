@@ -1,9 +1,12 @@
 import { config } from "dotenv";
 import { fileURLToPath } from "url";
 import path from "path";
+import { runMigrations } from "../lib/migrate";
 import { initialize } from "./initialize";
 
 config();
+
+runMigrations();
 
 const staticPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../dist");
 
@@ -14,17 +17,16 @@ import { modelController } from "../modules/model/model.controller";
 import { usageController } from "../modules/usage/usage.controller";
 import { accountController } from "../modules/account/account.controller";
 import { roleController } from "../modules/role/role.controller";
-import { mcpController } from "../modules/mcp/mcp.controller";
-
 const PORT = parseInt(process.env.SERVER_PORT || "3300");
 initialize();
 // @ts-ignore
 Bun.serve({
     port: PORT,
+    idleTimeout: 255,
     async fetch(req: Request) {
         const url = new URL(req.url);
         const pathName = url.pathname;
-        // API 路由处理
+
         const apiResponse = await mounthttp(req, [
             authController,
             aiController,
@@ -32,7 +34,6 @@ Bun.serve({
             usageController,
             accountController,
             roleController,
-            mcpController,
         ]);
         if (apiResponse) return apiResponse;
         const staticResponse = await mountstatic(staticPath, pathName);
