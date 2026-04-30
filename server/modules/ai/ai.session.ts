@@ -24,7 +24,7 @@ export async function logUsage(usage: {
 }
 
 export async function getAllModels(): Promise<ModelEntity[]> {
-    return await modelRepo.find();
+    return await modelRepo.find({ delete_time: null });
 }
 
 export async function getModelById(id: string): Promise<ModelEntity | null> {
