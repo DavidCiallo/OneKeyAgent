@@ -15,6 +15,7 @@
 
     "Menu": {
         "Model": "Model",
+        "Provider": "Provider",
         "Usage": "Usage",
         "Account": "Account",
         "Chat": "Chat",
@@ -26,12 +27,7 @@
     "ModelPage": {
         "Tier": "Tier",
         "TierPlaceholder": "Filter by tier",
-        "BaseURL": "BaseURL",
-        "BaseURLPlaceholder": "Filter by BaseURL",
-        "Model": "Model",
         "Alias": "Alias",
-        "ApiKey": "ApiKey",
-        "ProxyURL": "Proxy URL",
         "Actions": "Actions",
         "Edit": "Edit",
         "Delete": "Delete",
@@ -42,11 +38,32 @@
         "UsageCardTitle": "Usage Stats"
     },
 
-    "UsagePage": {
+    "ProviderPage": {
+        "ModelAlias": "Model Alias",
+        "ModelAliasPlaceholder": "Filter by model alias",
+        "Priority": "Priority",
+        "Name": "Name",
+        "BaseURL": "BaseURL",
+        "Model": "Model",
         "ApiKey": "ApiKey",
-        "ApiKeyPlaceholder": "Filter by ApiKey",
-        "ModelId": "ModelId",
-        "ModelIdPlaceholder": "Filter by ModelId",
+        "ProxyURL": "Proxy URL",
+        "Enabled": "Enabled",
+        "Actions": "Actions",
+        "Edit": "Edit",
+        "Delete": "Delete",
+        "CreateTitle": "Create Provider",
+        "EditTitle": "Edit Provider",
+        "NoData": "No data",
+        "Yes": "Yes",
+        "No": "No"
+    },
+
+    "UsagePage": {
+        "AccountId": "Account",
+        "AccountIdPlaceholder": "Filter by account",
+        "ModelAlias": "Model Alias",
+        "ModelAliasPlaceholder": "Filter by model alias",
+        "ProviderName": "Provider",
         "InputTokens": "Input Tokens",
         "OutputTokens": "Output Tokens",
         "Time": "Time",
