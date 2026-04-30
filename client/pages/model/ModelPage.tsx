@@ -1,7 +1,7 @@
 import { Header } from "../../components/header/Header";
 import { useEffect, useState, useCallback } from "react";
 import { ModelDTO } from "../../../shared/modules/model/model.entity";
-import { ModelRouter } from "../../api/instance";
+import { ModelRouter, UsageRouter } from "../../api/instance";
 import { Locale } from "../../methods/locale";
 import { useDisclosure } from "@heroui/react";
 import {
@@ -13,19 +13,15 @@ import {
     ModelDeleteRequest,
     ModelQueryBody,
 } from "../../../shared/modules/model/model.interface";
+import { UsageStatsRequest, UsageStatsPeriod, UsageAmountData } from "../../../shared/modules/usage/usage.interface";
 import { ModelFilter } from "./components/ModelFilter";
-import { ModelTable } from "./components/ModelTable";
+import { ModelCardGrid } from "./components/ModelCardGrid";
 import { ModelPagination } from "./components/ModelPagination";
 import { ModelFormModal } from "./components/ModelFormModal";
-import { ModelUsageCard } from "./components/ModelUsageCard";
 
 type ModelForm = {
     tier: number;
-    baseURL: string;
-    model: string;
     alias?: string;
-    apiKey?: string;
-    proxyURL?: string;
 };
 
 export default function ModelPage() {
@@ -37,32 +33,47 @@ export default function ModelPage() {
 
     // Filter
     const [filterTier, setFilterTier] = useState<string>("");
-    const [filterBaseURL, setFilterBaseURL] = useState("");
+
+    // Per-model usage stats
+    const [usageMap, setUsageMap] = useState<Record<string, { todayPeriod: UsageStatsPeriod; last24hPeriod: UsageStatsPeriod; weekPeriod: UsageStatsPeriod }>>({});
 
     // Form modal
     const { isOpen: isFormOpen, onOpen: onFormOpen, onClose: onFormClose, onOpenChange: onFormOpenChange } = useDisclosure();
     const [formMode, setFormMode] = useState<"create" | "edit">("create");
     const [editId, setEditId] = useState<string>("");
-    const [form, setForm] = useState<ModelForm>({ tier: 1, baseURL: "", model: "" });
+    const [form, setForm] = useState<ModelForm>({ tier: 1 });
 
-    // Usage modal
-    const { isOpen: isUsageOpen, onOpen: onUsageOpen, onClose: onUsageClose, onOpenChange: onUsageOpenChange } = useDisclosure();
-    const [usageModel, setUsageModel] = useState<ModelDTO | null>(null);
 
     const getToken = () => localStorage.getItem("access_token") || "";
 
     const fetchList = useCallback(async (p: number) => {
         const filter: Record<string, string | number> = {};
         if (filterTier) filter.tier = parseInt(filterTier);
-        if (filterBaseURL) filter.baseURL = filterBaseURL;
 
         const req = new ModelListRequest({ page: p, filter: new ModelQueryBody(filter), auth: getToken() });
         const res = await ModelRouter.list(req);
         if (res.success && res.data) {
             setList(res.data.list);
             setTotal(res.data.total);
+
+            // Fetch usage stats for each model
+            const map: Record<string, { todayPeriod: UsageStatsPeriod; last24hPeriod: UsageStatsPeriod; weekPeriod: UsageStatsPeriod }> = {};
+            await Promise.all(res.data.list.map(async (item) => {
+                try {
+                    const statsReq = new UsageStatsRequest({ modelAlias: item.alias, auth: getToken() });
+                    const statsRes = await UsageRouter.stats(statsReq);
+                    if (statsRes.success && statsRes.data) {
+                        map[item.id] = {
+                            todayPeriod: statsRes.data.today,
+                            last24hPeriod: statsRes.data.last24h,
+                            weekPeriod: statsRes.data.last7Days,
+                        };
+                    }
+                } catch {}
+            }));
+            setUsageMap(map);
         }
-    }, [filterTier, filterBaseURL]);
+    }, [filterTier]);
 
     useEffect(() => {
         fetchList(page);
@@ -70,7 +81,7 @@ export default function ModelPage() {
 
     const openCreate = () => {
         setFormMode("create");
-        setForm({ tier: 1, baseURL: "", model: "", alias: "" });
+        setForm({ tier: 1, alias: "" });
         onFormOpen();
     };
 
@@ -79,18 +90,9 @@ export default function ModelPage() {
         setEditId(item.id);
         setForm({
             tier: item.tier,
-            baseURL: item.baseURL,
-            model: item.model,
             alias: item.alias || "",
-            apiKey: item.apiKey || "",
-            proxyURL: item.proxyURL || "",
         });
         onFormOpen();
-    };
-
-    const openUsage = (item: ModelDTO) => {
-        setUsageModel(item);
-        onUsageOpen();
     };
 
     const handleFormConfirm = async () => {
@@ -98,11 +100,7 @@ export default function ModelPage() {
             const req = new ModelCreateRequest({
                 model: new ModelCreateBody({
                     tier: form.tier,
-                    baseURL: form.baseURL,
-                    model: form.model,
-                    alias: form.alias || undefined,
-                    apiKey: form.apiKey || undefined,
-                    proxyURL: form.proxyURL || undefined,
+                    alias: form.alias || "",
                 }),
                 auth: getToken(),
             });
@@ -117,11 +115,7 @@ export default function ModelPage() {
                 id: editId,
                 model: new ModelUpdateBody({
                     tier: form.tier,
-                    baseURL: form.baseURL,
-                    model: form.model,
                     alias: form.alias || undefined,
-                    apiKey: form.apiKey || undefined,
-                    proxyURL: form.proxyURL || undefined,
                 }),
                 auth: getToken(),
             });
@@ -147,17 +141,14 @@ export default function ModelPage() {
             <div className="p-8 flex flex-col gap-4 flex-1 overflow-hidden">
                 <ModelFilter
                     filterTier={filterTier}
-                    filterBaseURL={filterBaseURL}
                     onTierChange={v => { setFilterTier(v); setPage(1); }}
-                    onBaseURLChange={v => { setFilterBaseURL(v); setPage(1); }}
                     onAdd={openCreate}
                 />
 
-                <ModelTable
-                    list={list}
+                <ModelCardGrid
+                    list={list.map(item => ({ ...item, ...usageMap[item.id] }))}
                     onEdit={openEdit}
                     onDelete={handleDelete}
-                    onUsageClick={openUsage}
                 />
 
                 <ModelPagination page={page} total={total} onChange={setPage} />
@@ -172,11 +163,6 @@ export default function ModelPage() {
                 onConfirm={handleFormConfirm}
             />
 
-            <ModelUsageCard
-                isOpen={isUsageOpen}
-                onOpenChange={onUsageOpenChange}
-                model={usageModel}
-            />
         </div>
     );
 }

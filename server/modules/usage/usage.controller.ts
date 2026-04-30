@@ -22,11 +22,31 @@ async function list(request: UsageListRequest): Promise<UsageListResponse> {
     }
 
     const search: Partial<UsageLogEntity> = {};
-    if (filter?.apiKey) search.apiKey = filter.apiKey;
-    if (filter?.modelId) search.modelId = filter.modelId;
+    if (filter?.accountId) search.accountId = filter.accountId;
+    if (filter?.modelAlias) search.modelAlias = filter.modelAlias;
 
     const { list: data, total } = await UsageService.find(page, search);
-    const list = data.map(item => new UsageDTO(item));
+
+    // Resolve accountId to account name (email)
+    const accountIds = [...new Set(data.map(item => item.accountId))];
+    const accounts = await Promise.all(
+        accountIds.map(id => AccountService.findOne(id).then(a => ({ id, name: a ? `${a.name} (${a.email})` : id })))
+    );
+    const accountMap = new Map(accounts.map(a => [a.id, a.name]));
+
+    // Resolve providerId to provider name
+    const providerIds = [...new Set(data.map(item => item.providerId).filter(Boolean))] as string[];
+    const providerService = await import("../provider/provider.service").then(m => m.ProviderService);
+    const providers = await Promise.all(
+        providerIds.map(id => providerService.findOne(id).then(p => ({ id, name: p?.name || id })))
+    );
+    const providerMap = new Map(providers.map(p => [p.id, p.name]));
+
+    const list = data.map(item => new UsageDTO({
+        ...item,
+        accountName: accountMap.get(item.accountId) || item.accountId,
+        providerName: item.providerId ? providerMap.get(item.providerId) || item.providerId : undefined,
+    }));
 
     return new UsageListResponse({
         success: true,
@@ -37,11 +57,11 @@ async function list(request: UsageListRequest): Promise<UsageListResponse> {
 
 async function stats(request: UsageStatsRequest): Promise<UsageStatsResponse> {
     request = UsageStatsRequest.self(request);
-    const { auth, modelId } = request;
+    const { auth, modelAlias } = request;
     if (!auth || !getIdentifyByVerify(auth)) {
         throw "Authorization failed";
     }
-    const data = await UsageService.stats(modelId);
+    const data = await UsageService.stats(modelAlias);
     return new UsageStatsResponse({
         success: true,
         message: "success",
@@ -59,8 +79,7 @@ async function mystats(request: MyUsageRequest): Promise<MyUsageResponse> {
     const account = await AccountService.findByEmail(email);
     if (!account) throw "Account not found";
 
-    const apiKey = account.apiKey;
-    const data = await UsageService.myStats(apiKey);
+    const data = await UsageService.myStats(account.id);
 
     return new MyUsageResponse({
         success: true,

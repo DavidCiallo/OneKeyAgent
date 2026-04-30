@@ -15,6 +15,7 @@
 
     "Menu": {
         "Model": "模型管理",
+        "Provider": "供应管理",
         "Usage": "用量统计",
         "Account": "账号管理",
         "Chat": "在线对话",
@@ -26,12 +27,7 @@
     "ModelPage": {
         "Tier": "层级",
         "TierPlaceholder": "筛选层级",
-        "BaseURL": "BaseURL",
-        "BaseURLPlaceholder": "筛选 BaseURL",
-        "Model": "模型",
         "Alias": "别名",
-        "ApiKey": "ApiKey",
-        "ProxyURL": "代理URL",
         "Actions": "操作",
         "Edit": "编辑",
         "Delete": "删除",
@@ -39,14 +35,38 @@
         "EditTitle": "编辑模型",
         "NoData": "暂无数据",
         "Usage": "用量",
-        "UsageCardTitle": "用量统计"
+        "UsageCardTitle": "用量统计",
+        "Today": "今日",
+        "Last24h": "近24小时",
+        "Last7Days": "近7天"
+    },
+
+    "ProviderPage": {
+        "ModelAlias": "模型别名",
+        "ModelAliasPlaceholder": "筛选模型别名",
+        "Priority": "优先级",
+        "Name": "名称",
+        "BaseURL": "BaseURL",
+        "Model": "模型",
+        "ApiKey": "ApiKey",
+        "ProxyURL": "代理URL",
+        "Enabled": "启用",
+        "Actions": "操作",
+        "Edit": "编辑",
+        "Delete": "删除",
+        "CreateTitle": "新增供应商",
+        "EditTitle": "编辑供应商",
+        "NoData": "暂无数据",
+        "Yes": "是",
+        "No": "否"
     },
 
     "UsagePage": {
-        "ApiKey": "ApiKey",
-        "ApiKeyPlaceholder": "筛选 ApiKey",
-        "ModelId": "ModelId",
-        "ModelIdPlaceholder": "筛选 ModelId",
+        "AccountId": "账号",
+        "AccountIdPlaceholder": "筛选账号",
+        "ModelAlias": "模型别名",
+        "ModelAliasPlaceholder": "筛选模型别名",
+        "ProviderName": "供应商",
         "InputTokens": "输入 Token",
         "OutputTokens": "输出 Token",
         "Time": "时间",

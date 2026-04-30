@@ -17,6 +17,7 @@ import { modelController } from "../modules/model/model.controller";
 import { usageController } from "../modules/usage/usage.controller";
 import { accountController } from "../modules/account/account.controller";
 import { roleController } from "../modules/role/role.controller";
+import { providerController } from "../modules/provider/provider.controller";
 const PORT = parseInt(process.env.SERVER_PORT || "3300");
 initialize();
 // @ts-ignore
@@ -34,6 +35,7 @@ Bun.serve({
             usageController,
             accountController,
             roleController,
+            providerController,
         ]);
         if (apiResponse) return apiResponse;
         const staticResponse = await mountstatic(staticPath, pathName);
