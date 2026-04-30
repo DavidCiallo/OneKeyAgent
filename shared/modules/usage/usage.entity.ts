@@ -2,8 +2,9 @@ import { BaseEntity } from "../../lib/default/base.entity";
 
 export interface UsageLogEntity extends BaseEntity {
     id: string;
-    apiKey: string;
-    modelId: string;
+    accountId: string;
+    modelAlias: string;
+    providerId?: string;
     inputTokens: number;
     outputTokens: number;
     create_time: number;

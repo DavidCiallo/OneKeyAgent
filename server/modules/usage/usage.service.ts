@@ -6,20 +6,17 @@ const usageRepo = Repository.instance<UsageLogEntity>("UsageLog");
 
 const TEN_MIN = 10 * 60 * 1000;
 
-function tenMinStart(ts: number): number {
-    // Use local midnight offset so boundaries align with local day, not UTC day
-    const localDayStart = dayStart(ts);
+/** Get the local-timezone midnight timestamp (in ms since epoch) */
+function localDayStart(ts: number): number {
     const d = new Date(ts);
-    d.setHours(0, 0, 0, 0);
-    const localDayStartLocal = d.getTime();
-    const tzOffset = localDayStartLocal - localDayStart;
-    const localTs = ts + tzOffset;
-    const rounded = Math.floor(localTs / TEN_MIN) * TEN_MIN;
-    return rounded - tzOffset;
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
 
-function dayStart(ts: number): number {
-    return Math.floor(ts / 86400000) * 86400000;
+function tenMinStart(ts: number): number {
+    const localMidnight = localDayStart(ts);
+    const offset = ts - localMidnight; // ms since local midnight
+    const rounded = Math.floor(offset / TEN_MIN) * TEN_MIN;
+    return localMidnight + rounded;
 }
 
 function buildPeriod(logs: UsageLogEntity[], periodStart: number, periodEnd: number): UsageStatsPeriod {
@@ -54,41 +51,41 @@ export class UsageService {
         return { list, total };
     }
 
-    static async stats(modelId?: string): Promise<UsageStatsResult> {
+    static async stats(modelAlias?: string): Promise<UsageStatsResult> {
         const now = Date.now();
         const DAY = 86400000;
 
-        const todayStart = dayStart(now);
+        const todayStart = localDayStart(now); // local-timezone midnight
         const nowTenMin = tenMinStart(now);
         const last24hStart = nowTenMin - DAY;
         const weekStart = todayStart - 7 * DAY;
 
         const filter: Partial<UsageLogEntity> = {};
-        if (modelId) filter.modelId = modelId;
+        if (modelAlias) filter.modelAlias = modelAlias;
 
         const allLogs = await usageRepo.find(filter);
-        const todayLogs = allLogs.filter(l => l.create_time >= todayStart && l.create_time <= nowTenMin);
-        const last24hLogs = allLogs.filter(l => l.create_time >= last24hStart && l.create_time <= nowTenMin);
-        const weekLogs = allLogs.filter(l => l.create_time >= weekStart && l.create_time <= nowTenMin);
+        const todayLogs = allLogs.filter(l => l.create_time >= todayStart && l.create_time < nowTenMin + TEN_MIN);
+        const last24hLogs = allLogs.filter(l => l.create_time >= last24hStart && l.create_time < nowTenMin + TEN_MIN);
+        const weekLogs = allLogs.filter(l => l.create_time >= weekStart && l.create_time < nowTenMin + TEN_MIN);
 
         return {
-            today: buildPeriod(todayLogs, todayStart, nowTenMin),
-            last24h: buildPeriod(last24hLogs, last24hStart, nowTenMin),
-            last7Days: buildPeriod(weekLogs, weekStart, nowTenMin),
+            today: buildPeriod(todayLogs, todayStart, nowTenMin + TEN_MIN),
+            last24h: buildPeriod(last24hLogs, last24hStart, nowTenMin + TEN_MIN),
+            last7Days: buildPeriod(weekLogs, weekStart, nowTenMin + TEN_MIN),
         };
     }
 
-    static async myStats(apiKey: string): Promise<{ today: number; thisWeek: number; total: number }> {
+    static async myStats(accountId: string): Promise<{ today: number; thisWeek: number; total: number }> {
         const now = Date.now();
         const DAY = 86400000;
 
-        const todayStart = dayStart(now);
+        const todayStart = localDayStart(now);
         const weekStart = todayStart - 7 * DAY;
         const nowTenMin = tenMinStart(now);
 
-        const allLogs = await usageRepo.find({ apiKey });
-        const todayLogs = allLogs.filter(l => l.create_time >= todayStart && l.create_time <= nowTenMin);
-        const weekLogs = allLogs.filter(l => l.create_time >= weekStart && l.create_time <= nowTenMin);
+        const allLogs = await usageRepo.find({ accountId });
+        const todayLogs = allLogs.filter(l => l.create_time >= todayStart && l.create_time < nowTenMin + TEN_MIN);
+        const weekLogs = allLogs.filter(l => l.create_time >= weekStart && l.create_time < nowTenMin + TEN_MIN);
 
         const sum = (logs: UsageLogEntity[]) =>
             Math.round(logs.reduce((acc, l) => acc + (l.inputTokens || 0) + (l.outputTokens || 0), 0) / 1000);
@@ -98,5 +95,15 @@ export class UsageService {
             thisWeek: sum(weekLogs),
             total: sum(allLogs),
         };
+    }
+
+    /** Get total billed tokens for an account in the current month */
+    static async monthlyBilledTokens(accountId: string): Promise<number> {
+        const d = new Date();
+        const monthStartTs = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+
+        const allLogs = await usageRepo.find({ accountId });
+        const thisMonthLogs = allLogs.filter(l => l.create_time >= monthStartTs);
+        return thisMonthLogs.reduce((acc, l) => acc + (l.inputTokens || 0) + (l.outputTokens || 0), 0);
     }
 }

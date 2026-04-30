@@ -4,61 +4,132 @@ import {
     CompletionServiceResponse,
     ModelsServiceResponse,
 } from "../../../shared/modules/ai/ai.interface";
-import { getAllModels, getModelsByAlias, logUsage, } from "./ai.session";
+import { getAllModels, logUsage } from "./ai.session";
+import { ProviderService } from "../provider/provider.service";
+import { UsageService } from "../usage/usage.service";
+import { AccountEntity } from "../../../shared/modules/account/account.entity";
+import Repository from "../../lib/repository";
 
-async function chatHex(body: Record<string, any>, apiKey: string): Promise<any> {
-    const t0 = Date.now();
+const accountRepo = Repository.instance<AccountEntity>("Account");
 
-    const requestedAlias = body.model;
-    const models = await getModelsByAlias(requestedAlias);
-    if (models.length === 0) throw new Error(`No models found for alias: ${requestedAlias}`);
+const DEFAULT_MONTHLY_LIMIT = 10_000_000; // 10M tokens default
 
-    for (let count = 0; count < 100; count++) {
-        await new Promise(resolve => setTimeout(resolve, 300));
-        for (const model of models) {
-            const requestBody: Record<string, any> = {
-                ...body,
-                stream: false,
-                thinking: { type: "disabled" },
-                model: model.model,
-            };
+/** Apply throttle delay based on usage ratio */
+async function applyThrottle(accountId: string): Promise<void> {
+    const account = await accountRepo.findOne({ id: accountId });
+    if (!account) return;
 
-            let response: any;
-            try {
-                response = await fetch(`${model.baseURL}/chat/completions`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", 'Authorization': `Bearer ${model.apiKey}` },
-                    body: JSON.stringify(requestBody),
-                    dispatcher: model.proxyURL ? new ProxyAgent(model.proxyURL) : undefined,
-                });
-            } catch (e) {
-                continue;
-            }
-            if (!response.ok) continue;
+    const limit = (account as any).monthly_limit || DEFAULT_MONTHLY_LIMIT;
+    const billed = await UsageService.monthlyBilledTokens(accountId);
+    const ratio = limit > 0 ? billed / limit : 0;
 
-            const data = await response.json();
-            const ms = Date.now() - t0;
-
-            const { usage } = data;
-            await logUsage({
-                apiKey,
-                modelId: model.id,
-                inputTokens: usage?.prompt_tokens || 0,
-                outputTokens: usage?.completion_tokens || 0,
-            });
-
-            const tps = usage?.completion_tokens ? ((usage.completion_tokens / ms) * 1000).toFixed(1) : "-";
-            // console.log(`[AI] ${model.model} input: ${usage?.prompt_tokens}, output: ${usage?.completion_tokens}, ${tps} tok/s, ${ms}ms`);
-
-            if (model.alias) {
-                data.model = model.alias;
-            }
-
-            return data;
-        }
+    let delay = 0;
+    if (ratio > 1.0) {
+        delay = 5000; // >100% → +5s
+    } else if (ratio > 0.75) {
+        delay = 2000; // 75-100% → +2s
+    } else if (ratio > 0.5) {
+        delay = 500;  // 50-75% → +0.5s
     }
 
-    throw new Error("All models failed");
+    if (delay > 0) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+    }
+}
+
+/** Try to call upstream provider, returns response data or null */
+async function tryProvider(
+    baseURL: string,
+    model: string,
+    apiKey: string | undefined,
+    proxyURL: string | undefined,
+    body: Record<string, any>,
+): Promise<any> {
+    try {
+        const response = await fetch(`${baseURL}/chat/completions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", 'Authorization': `Bearer ${apiKey || ""}` },
+            body: JSON.stringify(body),
+            dispatcher: proxyURL ? new ProxyAgent(proxyURL) : undefined,
+            signal: AbortSignal.timeout(300_000),
+        });
+        if (!response.ok) return null;
+        return await response.json();
+    } catch {
+        return null;
+    }
+}
+
+/** Try to call upstream provider for streaming, returns the body stream or null */
+async function tryProviderStream(
+    baseURL: string,
+    model: string,
+    apiKey: string | undefined,
+    proxyURL: string | undefined,
+    body: Record<string, any>,
+): Promise<ReadableStream<Uint8Array> | null> {
+    try {
+        const response = await fetch(`${baseURL}/chat/completions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", 'Authorization': `Bearer ${apiKey || ""}` },
+            body: JSON.stringify(body),
+            dispatcher: proxyURL ? new ProxyAgent(proxyURL) : undefined,
+            signal: AbortSignal.timeout(300_000),
+        });
+        if (!response.ok) return null;
+        // @ts-ignore
+        return response.body;
+    } catch {
+        return null;
+    }
+}
+
+/** Get model tier for an alias, defaults to 1 */
+async function getModelTier(alias: string): Promise<number> {
+    const models = await getAllModels();
+    const match = models.find(m => m.alias === alias);
+    return match?.tier ?? 1;
+}
+
+async function chatHex(body: Record<string, any>, accountId: string): Promise<any> {
+    const t0 = Date.now();
+    const requestedAlias = body.model;
+
+    await applyThrottle(accountId);
+
+    const providers = await ProviderService.getProvidersByAlias(requestedAlias);
+    if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
+
+    for (const provider of providers) {
+        const requestBody: Record<string, any> = {
+            ...body,
+            stream: false,
+            thinking: { type: "disabled" },
+            model: provider.model,
+        };
+
+        const data = await tryProvider(provider.baseURL, provider.model, provider.apiKey, provider.proxyURL, requestBody);
+        if (!data) continue;
+
+        const ms = Date.now() - t0;
+        const tier = await getModelTier(requestedAlias);
+        const { usage } = data;
+        const rawInput = usage?.prompt_tokens || 0;
+        const rawOutput = usage?.completion_tokens || 0;
+
+        await logUsage({
+            accountId,
+            modelAlias: requestedAlias,
+            providerId: provider.id,
+            inputTokens: rawInput * tier,
+            outputTokens: rawOutput * tier,
+        });
+
+        data.model = requestedAlias;
+        return data;
+    }
+
+    throw new Error("All providers failed");
 }
 
 async function safePipe(reader: ReadableStreamDefaultReader<Uint8Array>, writer: WritableStreamDefaultWriter<Uint8Array>) {
@@ -73,196 +144,171 @@ async function safePipe(reader: ReadableStreamDefaultReader<Uint8Array>, writer:
     }
 }
 
-/**
- * 真流式 chat completions：将 stream: true 传给上游，原封不动转发 upstream 的 SSE chunk
- * 通过 tee() 分流 + 安全管道，杜绝 UND_ERR_SOCKET 传到客户端
- */
-async function chatHexStream(body: Record<string, any>, apiKey: string): Promise<ReadableStream<Uint8Array>> {
+async function chatHexStream(body: Record<string, any>, accountId: string): Promise<ReadableStream<Uint8Array>> {
     const requestedAlias = body.model;
-    const models = await getModelsByAlias(requestedAlias);
-    if (models.length === 0) throw new Error(`No models found for alias: ${requestedAlias}`);
 
-    for (let count = 0; count < 100; count++) {
-        await new Promise(resolve => setTimeout(resolve, 300));
-        for (const model of models) {
+    await applyThrottle(accountId);
+
+    const providers = await ProviderService.getProvidersByAlias(requestedAlias);
+    if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
+
+    for (const provider of providers) {
+        const requestBody: Record<string, any> = {
+            ...body,
+            stream: true,
+            thinking: { type: "disabled" },
+            model: provider.model,
+        };
+
+        const bodyStream = await tryProviderStream(provider.baseURL, provider.model, provider.apiKey, provider.proxyURL, requestBody);
+        if (!bodyStream) continue;
+
+        const t0 = Date.now();
+        const [upstreamForward, parseStream] = (bodyStream.tee() as [ReadableStream<Uint8Array>, ReadableStream<Uint8Array>]);
+
+        const ts = new TransformStream<Uint8Array, Uint8Array>();
+        const forwardStream = ts.readable;
+        safePipe(upstreamForward.getReader(), ts.writable.getWriter());
+
+        // Background parse usage
+        (async () => {
             try {
-                const requestBody: Record<string, any> = {
-                    ...body,
-                    stream: true,
-                    thinking: { type: "disabled" },
-                    model: model.model,
-                };
+                const reader = parseStream.getReader();
+                const decoder = new TextDecoder();
+                let usage: any = null;
 
-                const t0 = Date.now();
-                const response = await fetch(`${model.baseURL}/chat/completions`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", 'Authorization': `Bearer ${model.apiKey}` },
-                    body: JSON.stringify(requestBody),
-                    dispatcher: model.proxyURL ? new ProxyAgent(model.proxyURL) : undefined,
-                    signal: AbortSignal.timeout(300_000), // 5分钟超时
-                });
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
 
-                if (!response.ok) continue;
-
-                // tee 分流
-                const [upstreamForward, parseStream] = (response.body!.tee() as [ReadableStream<Uint8Array>, ReadableStream<Uint8Array>]);
-
-                // 用 TransformStream 包装，通过 safePipe 泵送
-                const ts = new TransformStream<Uint8Array, Uint8Array>();
-                const forwardStream = ts.readable;
-                safePipe(upstreamForward.getReader(), ts.writable.getWriter());
-
-                // 后台异步解析 usage
-                (async () => {
-                    try {
-                        const reader = parseStream.getReader();
-                        const decoder = new TextDecoder();
-                        let usage: any = null;
-
-                        while (true) {
-                            const { done, value } = await reader.read();
-                            if (done) break;
-
-                            const text = decoder.decode(value, { stream: true });
-                            const lines = text.split('\n');
-                            for (const line of lines) {
-                                if (line.startsWith('data: ') && !line.startsWith('data: [DONE]')) {
-                                    try {
-                                        const data = JSON.parse(line.slice(6));
-                                        if (data.usage) {
-                                            usage = data.usage;
-                                        }
-                                    } catch {}
+                    const text = decoder.decode(value, { stream: true });
+                    const lines = text.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ') && !line.startsWith('data: [DONE]')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                if (data.usage) {
+                                    usage = data.usage;
                                 }
-                            }
+                            } catch {}
                         }
-
-                        if (usage) {
-                            const ms = Date.now() - t0;
-                            const tps = usage.completion_tokens ? ((usage.completion_tokens / ms) * 1000).toFixed(1) : "-";
-                            // console.log(`[AI] ${model.model} stream - input: ${usage.prompt_tokens}, output: ${usage.completion_tokens}, ${tps} tok/s, ${ms}ms`);
-                            await logUsage({
-                                apiKey,
-                                modelId: model.id,
-                                inputTokens: usage.prompt_tokens || 0,
-                                outputTokens: usage.completion_tokens || 0,
-                            });
-                        }
-                    } catch (err) {
                     }
-                })();
+                }
 
-                return forwardStream;
-
-            } catch (e) {
-                continue;
+                if (usage) {
+                    const ms = Date.now() - t0;
+                    const tier = await getModelTier(requestedAlias);
+                    const rawInput = usage.prompt_tokens || 0;
+                    const rawOutput = usage.completion_tokens || 0;
+                    await logUsage({
+                        accountId,
+                        modelAlias: requestedAlias,
+                        providerId: provider.id,
+                        inputTokens: rawInput * tier,
+                        outputTokens: rawOutput * tier,
+                    });
+                }
+            } catch (err) {
             }
-        }
+        })();
+
+        return forwardStream;
     }
 
-    throw new Error("All models failed for streaming");
+    throw new Error("All providers failed for streaming");
 }
 
-async function completeHex(body: Record<string, any>, apiKey: string): Promise<any> {
+async function completeHex(body: Record<string, any>, accountId: string): Promise<any> {
     const t0 = Date.now();
-
     const requestedAlias = body.model;
-    const models = await getModelsByAlias(requestedAlias);
-    if (models.length === 0) throw new Error(`No models found for alias: ${requestedAlias}`);
 
-    for (let tier = models[0].tier; tier >= 1; tier--) {
-        for (const model of models) {
-            let response: any;
-            try {
-                response = await fetch(`${model.baseURL}/completions`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", 'Authorization': `Bearer ${model.apiKey}` },
-                    body: JSON.stringify({ ...body, stream: false, model: model.model }),
-                    dispatcher: model.proxyURL ? new ProxyAgent(model.proxyURL) : undefined,
-                });
-            } catch (e) {
-                console.log(`[AI] tier${tier} ${model.baseURL} failed: ${e}`);
-                continue;
-            }
+    await applyThrottle(accountId);
 
-            if (!response.ok) {
-                console.log(`[AI] tier${tier} ${model.baseURL} error: ${response.status}`);
-                continue;
-            }
+    const providers = await ProviderService.getProvidersByAlias(requestedAlias);
+    if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
 
-            const data = (await response.json()) as { usage: { prompt_tokens: number, completion_tokens: number } };
-            const ms = Date.now() - t0;
+    for (const provider of providers) {
+        let response: any;
+        try {
+            response = await fetch(`${provider.baseURL}/completions`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", 'Authorization': `Bearer ${provider.apiKey || ""}` },
+                body: JSON.stringify({ ...body, stream: false, model: provider.model }),
+                dispatcher: provider.proxyURL ? new ProxyAgent(provider.proxyURL) : undefined,
+            });
+        } catch (e) {
+            continue;
+        }
 
-            const { usage } = data;
-            await logUsage({
-                apiKey,
-                modelId: model.id,
-                inputTokens: usage?.prompt_tokens || 0,
-                outputTokens: usage?.completion_tokens || 0,
+        if (!response.ok) continue;
+
+        const data = (await response.json()) as { usage: { prompt_tokens: number, completion_tokens: number } };
+        const ms = Date.now() - t0;
+        const tier = await getModelTier(requestedAlias);
+        const rawInput = data.usage?.prompt_tokens || 0;
+        const rawOutput = data.usage?.completion_tokens || 0;
+
+        await logUsage({
+            accountId,
+            modelAlias: requestedAlias,
+            providerId: provider.id,
+            inputTokens: rawInput * tier,
+            outputTokens: rawOutput * tier,
+        });
+        return data;
+    }
+
+    throw new Error("All providers failed");
+}
+
+async function completeHexStream(body: Record<string, any>, accountId: string): Promise<ReadableStream<Uint8Array>> {
+    const requestedAlias = body.model;
+
+    await applyThrottle(accountId);
+
+    const providers = await ProviderService.getProvidersByAlias(requestedAlias);
+    if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
+
+    for (const provider of providers) {
+        try {
+            const response = await fetch(`${provider.baseURL}/completions`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", 'Authorization': `Bearer ${provider.apiKey || ""}` },
+                body: JSON.stringify({ ...body, stream: true, model: provider.model }),
+                dispatcher: provider.proxyURL ? new ProxyAgent(provider.proxyURL) : undefined,
+                signal: AbortSignal.timeout(300_000),
             });
 
-            const tps = usage?.completion_tokens ? ((usage.completion_tokens / ms) * 1000).toFixed(1) : "-";
-            console.log(`[AI] tier${tier} input: ${usage?.prompt_tokens}, output: ${usage?.completion_tokens}, ${tps} tok/s, ${ms}ms`);
-            return data;
+            if (!response.ok) continue;
+
+            const ts = new TransformStream<Uint8Array, Uint8Array>();
+            const forwardStream = ts.readable;
+            safePipe(response.body!.getReader(), ts.writable.getWriter());
+
+            return forwardStream;
+        } catch (e) {
+            continue;
         }
     }
 
-    throw new Error("All models failed");
-}
-
-/**
- * completions 流式转发（带安全管道）
- */
-async function completeHexStream(body: Record<string, any>, apiKey: string): Promise<ReadableStream<Uint8Array>> {
-    const requestedAlias = body.model;
-    const models = await getModelsByAlias(requestedAlias);
-    if (models.length === 0) throw new Error(`No models found for alias: ${requestedAlias}`);
-
-    for (let tier = models[0].tier; tier >= 1; tier--) {
-        for (const model of models) {
-            try {
-                const response = await fetch(`${model.baseURL}/completions`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", 'Authorization': `Bearer ${model.apiKey}` },
-                    body: JSON.stringify({ ...body, stream: true, model: model.model }),
-                    dispatcher: model.proxyURL ? new ProxyAgent(model.proxyURL) : undefined,
-                    signal: AbortSignal.timeout(300_000),
-                });
-
-                if (!response.ok) continue;
-
-                // 通过安全管道转发，吞掉 socket 断开错误
-                const ts = new TransformStream<Uint8Array, Uint8Array>();
-                const forwardStream = ts.readable;
-                safePipe(response.body!.getReader(), ts.writable.getWriter());
-
-                return forwardStream;
-
-            } catch (e) {
-                console.log(`[AI] tier${tier} ${model.baseURL} failed: ${e}`);
-                continue;
-            }
-        }
-    }
-
-    throw new Error("All models failed for streaming");
+    throw new Error("All providers failed for streaming");
 }
 
 export class AiService {
-    static async chatCompletions(data: Record<string, any>, apiKey: string = ""): Promise<ChatCompletionsServiceResponse> {
-        return await chatHex(data, apiKey) as any;
+    static async chatCompletions(data: Record<string, any>, accountId: string = ""): Promise<ChatCompletionsServiceResponse> {
+        return await chatHex(data, accountId) as any;
     }
 
-    static async chatCompletionsStream(data: Record<string, any>, apiKey: string = ""): Promise<ReadableStream<Uint8Array>> {
-        return await chatHexStream(data, apiKey);
+    static async chatCompletionsStream(data: Record<string, any>, accountId: string = ""): Promise<ReadableStream<Uint8Array>> {
+        return await chatHexStream(data, accountId);
     }
 
-    static async completions(data: Record<string, any>, apiKey: string = ""): Promise<CompletionServiceResponse> {
-        return await completeHex(data, apiKey);
+    static async completions(data: Record<string, any>, accountId: string = ""): Promise<CompletionServiceResponse> {
+        return await completeHex(data, accountId);
     }
 
-    static async completionsStream(data: Record<string, any>, apiKey: string = ""): Promise<ReadableStream<Uint8Array>> {
-        return await completeHexStream(data, apiKey);
+    static async completionsStream(data: Record<string, any>, accountId: string = ""): Promise<ReadableStream<Uint8Array>> {
+        return await completeHexStream(data, accountId);
     }
 
     static async listModels(): Promise<ModelsServiceResponse> {

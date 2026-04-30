@@ -1,22 +1,33 @@
 import Repository from "../../lib/repository";
 import { ModelEntity } from "../../../shared/modules/model/model.entity";
+import { ProviderEntity } from "../../../shared/modules/provider/provider.entity";
 import { UsageLogEntity } from "../../../shared/modules/usage/usage.entity";
 
 const modelRepo = Repository.instance<ModelEntity>("Model");
-[
-    { tier: 4, baseURL: "http://192.168.1.110:11434/v1", alias: "bin", model: "deepseek-v4-flash:cloud" },
-].forEach(async i => {
-    const exist = await modelRepo.findOne({ model: i.model, baseURL: i.baseURL });
-    if (!exist) {
-        modelRepo.insert(i);
-    }
-});
-
+const providerRepo = Repository.instance<ProviderEntity>("Provider");
 const usageRepo = Repository.instance<UsageLogEntity>("UsageLog");
 
+export async function seedDefaultModel() {
+    const existing = await modelRepo.find();
+    if (existing.length === 0) {
+        await modelRepo.insert({ alias: "bin", tier: 1 });
+        await providerRepo.insert({
+            modelAlias: "bin",
+            priority: 1,
+            name: "Ollama",
+            baseURL: "http://127.168.0.1:11434/v1",
+            model: "deepseek-v4-flash:cloud",
+            apiKey: "",
+            enabled: 0,
+        });
+        console.log("[Seed] Created default model 'bin' with provider");
+    }
+}
+
 export async function logUsage(usage: {
-    apiKey: string,
-    modelId: string,
+    accountId: string,
+    modelAlias: string,
+    providerId?: string,
     inputTokens: number,
     outputTokens: number
 }) {
@@ -33,9 +44,5 @@ export async function getModelById(id: string): Promise<ModelEntity | null> {
 
 export async function getModelsByAlias(name: string): Promise<ModelEntity[]> {
     const all = await getAllModels();
-    let matched = all.filter(m => m.alias === name);
-    if (matched.length === 0) {
-        matched = all.filter(m => m.model === name);
-    }
-    return matched.sort((a, b) => b.tier - a.tier);
+    return all.filter(m => m.alias === name).sort((a, b) => b.tier - a.tier);
 }

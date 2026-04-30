@@ -21,12 +21,12 @@ export interface UsageStatsResult {
 
 export class UsageStatsRequest implements BaseRequest {
     public auth?: string;
-    public modelId?: string;
+    public modelAlias?: string;
 
     constructor(origin: Partial<UsageStatsRequest>) {
         if (false) throw new Error("Unexpected error");
         origin.auth && (this.auth = origin.auth);
-        origin.modelId && (this.modelId = origin.modelId);
+        origin.modelAlias && (this.modelAlias = origin.modelAlias);
     }
     static self(unsafe: UsageStatsRequest) {
         return new UsageStatsRequest(unsafe);
@@ -51,18 +51,24 @@ export class UsageStatsResponse implements BaseResponse<UsageStatsPeriod> {
 
 export class UsageDTO {
     public id: string;
-    public apiKey: string;
-    public modelId: string;
+    public accountId: string;
+    public accountName?: string;
+    public modelAlias: string;
+    public providerId?: string;
+    public providerName?: string;
     public inputTokens: number;
     public outputTokens: number;
     public create_time: number;
 
     private isTypeSafe: symbol = Symbol();
 
-    constructor(origin: UsageLogEntity) {
+    constructor(origin: UsageLogEntity & { accountName?: string; providerName?: string }) {
         this.id = origin.id;
-        this.apiKey = origin.apiKey;
-        this.modelId = origin.modelId;
+        this.accountId = origin.accountId;
+        this.accountName = origin.accountName;
+        this.modelAlias = origin.modelAlias;
+        this.providerId = origin.providerId;
+        this.providerName = origin.providerName;
         this.inputTokens = origin.inputTokens;
         this.outputTokens = origin.outputTokens;
         this.create_time = origin.create_time;
@@ -70,15 +76,15 @@ export class UsageDTO {
 }
 
 export class UsageQueryBody {
-    public apiKey?: string;
-    public modelId?: string;
+    public accountId?: string;
+    public modelAlias?: string;
 
     private isTypeSafe: symbol = Symbol();
 
     constructor(origin: Partial<UsageLogEntity>) {
         if (false) throw new Error("Unexpected error");
-        origin.apiKey && (this.apiKey = origin.apiKey);
-        origin.modelId && (this.modelId = origin.modelId);
+        origin.accountId && (this.accountId = origin.accountId);
+        origin.modelAlias && (this.modelAlias = origin.modelAlias);
     }
 
     static self(unsafe: Partial<UsageLogEntity>) {

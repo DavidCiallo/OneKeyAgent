@@ -14,6 +14,12 @@ export async function verifyApiKeyInDb(key: string): Promise<boolean> {
     return !!account;
 }
 
+export async function getAccountIdByApiKey(key: string): Promise<string | null> {
+    if (!key) return null;
+    const account = await accountRepo.findOne({ apiKey: key });
+    return account?.id || null;
+}
+
 export function generateApiKey(): string {
     return "hex-" + crypto.randomUUID();
 }
