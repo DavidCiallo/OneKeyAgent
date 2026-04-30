@@ -1,8 +1,7 @@
 import { Header } from "../../components/header/Header";
 import { useEffect, useState, useCallback } from "react";
 import { UsageDTO } from "../../../shared/modules/usage/usage.interface";
-import { ModelDTO } from "../../../shared/modules/model/model.entity";
-import { UsageRouter, ModelRouter } from "../../api/instance";
+import { UsageRouter } from "../../api/instance";
 import { Locale } from "../../methods/locale";
 import {
     Table,
@@ -12,37 +11,20 @@ import {
     TableRow,
     TableCell,
     Pagination,
-    Input,
 } from "@heroui/react";
 import {
     UsageListRequest,
     UsageQueryBody,
 } from "../../../shared/modules/usage/usage.interface";
-import { ModelListRequest } from "../../../shared/modules/model/model.interface";
-import { useAuth } from "../../methods/auth-context";
 
 export default function UsagePage() {
     const locale = Locale("UsagePage");
-    const { hasPermission } = useAuth();
 
     const [list, setList] = useState<UsageDTO[]>([]);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
 
-    // Model name map
-    const [modelMap, setModelMap] = useState<Record<string, string>>({});
-
     const getToken = () => localStorage.getItem("access_token") || "";
-
-    const fetchModels = useCallback(async () => {
-        const req = new ModelListRequest({ page: 1, auth: getToken() });
-        const res = await ModelRouter.list(req);
-        if (res.success && res.data) {
-            const map: Record<string, string> = {};
-            res.data.list.forEach((m: ModelDTO) => { map[m.id] = m.model; });
-            setModelMap(map);
-        }
-    }, []);
 
     const fetchList = useCallback(async (p: number) => {
         const req = new UsageListRequest({ page: p, filter: new UsageQueryBody({}), auth: getToken() });
@@ -52,10 +34,6 @@ export default function UsagePage() {
             setTotal(res.data.total);
         }
     }, []);
-
-    useEffect(() => {
-        fetchModels();
-    }, [fetchModels]);
 
     useEffect(() => {
         fetchList(page);
@@ -70,8 +48,9 @@ export default function UsagePage() {
                 <div className="flex flex-row">
                     <Table aria-label="Usage list 1" className="flex-1 overflow-auto">
                         <TableHeader>
-                            <TableColumn>{locale.ApiKey}</TableColumn>
-                            <TableColumn align="center">{locale.ModelId}</TableColumn>
+                            <TableColumn>{locale.AccountId}</TableColumn>
+                            <TableColumn align="center">{locale.ModelAlias}</TableColumn>
+                            <TableColumn align="center">{locale.ProviderName}</TableColumn>
                             <TableColumn align="center">{locale.InputTokens}</TableColumn>
                             <TableColumn align="center">{locale.OutputTokens}</TableColumn>
                             <TableColumn align="center">{locale.Time}</TableColumn>
@@ -79,8 +58,9 @@ export default function UsagePage() {
                         <TableBody emptyContent={locale.NoData}>
                             {list.slice(0, 20).map(item => (
                                 <TableRow key={item.id}>
-                                    <TableCell className="max-w-xs truncate">{item.apiKey || "—"}</TableCell>
-                                    <TableCell>{item.modelId ? (modelMap[item.modelId] || item.modelId) : "—"}</TableCell>
+                                    <TableCell className="max-w-xs truncate">{item.accountName || item.accountId || "—"}</TableCell>
+                                    <TableCell>{item.modelAlias || "—"}</TableCell>
+                                    <TableCell>{item.providerName || "—"}</TableCell>
                                     <TableCell>{item.inputTokens}</TableCell>
                                     <TableCell>{item.outputTokens}</TableCell>
                                     <TableCell>{item.create_time ? new Date(item.create_time).toLocaleString() : "—"}</TableCell>
@@ -90,8 +70,9 @@ export default function UsagePage() {
                     </Table>
                     {list.length > 20 && <Table aria-label="Usage list 2" className="flex-1 overflow-auto">
                         <TableHeader>
-                            <TableColumn>{locale.ApiKey}</TableColumn>
-                            <TableColumn align="center">{locale.ModelId}</TableColumn>
+                            <TableColumn>{locale.AccountId}</TableColumn>
+                            <TableColumn align="center">{locale.ModelAlias}</TableColumn>
+                            <TableColumn align="center">{locale.ProviderName}</TableColumn>
                             <TableColumn align="center">{locale.InputTokens}</TableColumn>
                             <TableColumn align="center">{locale.OutputTokens}</TableColumn>
                             <TableColumn align="center">{locale.Time}</TableColumn>
@@ -99,8 +80,9 @@ export default function UsagePage() {
                         <TableBody emptyContent={locale.NoData}>
                             {list.slice(20).map(item => (
                                 <TableRow key={item.id}>
-                                    <TableCell className="max-w-xs truncate">{item.apiKey || "—"}</TableCell>
-                                    <TableCell>{item.modelId ? (modelMap[item.modelId] || item.modelId) : "—"}</TableCell>
+                                    <TableCell className="max-w-xs truncate">{item.accountName || item.accountId || "—"}</TableCell>
+                                    <TableCell>{item.modelAlias || "—"}</TableCell>
+                                    <TableCell>{item.providerName || "—"}</TableCell>
                                     <TableCell>{item.inputTokens}</TableCell>
                                     <TableCell>{item.outputTokens}</TableCell>
                                     <TableCell>{item.create_time ? new Date(item.create_time).toLocaleString() : "—"}</TableCell>

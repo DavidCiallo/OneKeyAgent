@@ -6,4 +6,5 @@ export interface AccountEntity extends BaseEntity {
     password: string;
     apiKey: string;
     is_admin: number; // 1 = admin, 0 = regular user
+    monthly_limit: number;
 }

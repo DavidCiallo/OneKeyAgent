@@ -2,8 +2,9 @@ import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 
 export const usageLogTable = sqliteTable("usage_log", {
     id: text("id").primaryKey(),
-    apiKey: text("api_key").notNull(),
-    modelId: text("model_id").notNull(),
+    accountId: text("account_id").notNull(),
+    modelAlias: text("model_alias").notNull(),
+    providerId: text("provider_id").default(""),
     inputTokens: integer("input_tokens").notNull(),
     outputTokens: integer("output_tokens").notNull(),
     create_time: integer("create_time"),
