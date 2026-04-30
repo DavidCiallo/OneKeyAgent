@@ -3,26 +3,18 @@ import { ModelEntity } from "./model.entity";
 
 export class ModelDTO {
     public id: string;
+    public alias: string;
     public tier: number;
-    public baseURL: string;
-    public model: string;
-    public alias?: string;
-    public apiKey?: string;
-    public proxyURL?: string;
     public create_time: number;
-    public update_time: number;
+    public update_time: number | null;
     public delete_time: number | null;
 
     private isTypeSafe: symbol = Symbol();
 
     constructor(origin: ModelEntity) {
         this.id = origin.id;
-        this.tier = origin.tier;
-        this.baseURL = origin.baseURL;
-        this.model = origin.model;
         this.alias = origin.alias;
-        this.apiKey = origin.apiKey;
-        this.proxyURL = origin.proxyURL;
+        this.tier = origin.tier;
         this.create_time = origin.create_time;
         this.update_time = origin.update_time;
         this.delete_time = origin.delete_time;
@@ -30,21 +22,15 @@ export class ModelDTO {
 }
 
 export class ModelQueryBody {
-    public id?: string;
-    public tier?: number;
-    public baseURL?: string;
-    public model?: string;
     public alias?: string;
+    public tier?: number;
 
     private isTypeSafe: symbol = Symbol();
 
     constructor(origin: Partial<ModelEntity>) {
         if (false) throw new Error("Unexpected error");
-        origin.id && (this.id = origin.id);
-        origin.tier && (this.tier = origin.tier);
-        origin.baseURL && (this.baseURL = origin.baseURL);
-        origin.model && (this.model = origin.model);
         origin.alias && (this.alias = origin.alias);
+        origin.tier !== undefined && (this.tier = origin.tier);
     }
 
     static self(unsafe: Partial<ModelEntity>) {
@@ -53,25 +39,17 @@ export class ModelQueryBody {
 }
 
 export class ModelCreateBody {
+    public alias: string;
     public tier: number;
-    public baseURL: string;
-    public model: string;
-    public alias?: string;
-    public apiKey?: string;
-    public proxyURL?: string;
 
     private isTypeSafe: symbol = Symbol();
 
-    constructor(origin: Pick<ModelEntity, "tier" | "baseURL" | "model"> & Partial<Pick<ModelEntity, "alias" | "apiKey" | "proxyURL">>) {
-        if (!origin.tier || !origin.baseURL || !origin.model) {
-            throw new Error("tier, baseURL and model are required");
+    constructor(origin: Pick<ModelEntity, "alias"> & Partial<Pick<ModelEntity, "tier">>) {
+        if (!origin.alias) {
+            throw new Error("alias is required");
         }
-        this.tier = origin.tier;
-        this.baseURL = origin.baseURL;
-        this.model = origin.model;
         this.alias = origin.alias;
-        this.apiKey = origin.apiKey;
-        this.proxyURL = origin.proxyURL;
+        this.tier = origin.tier ?? 1;
     }
 
     static self(unsafe: ModelCreateBody) {
@@ -80,25 +58,17 @@ export class ModelCreateBody {
 }
 
 export class ModelUpdateBody {
-    public tier?: number;
-    public baseURL?: string;
-    public model?: string;
     public alias?: string;
-    public apiKey?: string;
-    public proxyURL?: string;
+    public tier?: number;
 
     private isTypeSafe: symbol = Symbol();
 
     constructor(origin: Partial<ModelEntity> = {}) {
-        if (!origin.tier && !origin.baseURL && !origin.model && !origin.alias && !origin.apiKey && !origin.proxyURL) {
+        if (!origin.alias && origin.tier === undefined) {
             throw new Error("At least one field is required");
         }
+        origin.alias && (this.alias = origin.alias);
         origin.tier !== undefined && (this.tier = origin.tier);
-        origin.baseURL && (this.baseURL = origin.baseURL);
-        origin.model && (this.model = origin.model);
-        origin.alias !== undefined && (this.alias = origin.alias);
-        origin.apiKey !== undefined && (this.apiKey = origin.apiKey);
-        origin.proxyURL !== undefined && (this.proxyURL = origin.proxyURL);
     }
 
     static self(unsafe: ModelUpdateBody) {

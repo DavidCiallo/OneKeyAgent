@@ -1,14 +1,9 @@
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
-import { ModelDTO } from "../../../../shared/modules/model/model.entity";
 
 type ModelForm = {
     tier: number;
-    baseURL: string;
-    model: string;
     alias?: string;
-    apiKey?: string;
-    proxyURL?: string;
 };
 
 type Props = {
@@ -42,31 +37,10 @@ export function ModelFormModal({ isOpen, onOpenChange, mode, form, onFormChange,
                             <SelectItem key="5">5</SelectItem>
                         </Select>
                         <Input
-                            label={locale.BaseURL}
-                            value={form.baseURL}
-                            onChange={e => onFormChange({ ...form, baseURL: e.target.value })}
-                            isRequired
-                        />
-                        <Input
-                            label={locale.Model}
-                            value={form.model}
-                            onChange={e => onFormChange({ ...form, model: e.target.value })}
-                            isRequired
-                        />
-                        <Input
                             label={locale.Alias}
                             value={form.alias || ""}
                             onChange={e => onFormChange({ ...form, alias: e.target.value })}
-                        />
-                        <Input
-                            label={locale.ApiKey}
-                            value={form.apiKey || ""}
-                            onChange={e => onFormChange({ ...form, apiKey: e.target.value })}
-                        />
-                        <Input
-                            label={locale.ProxyURL}
-                            value={form.proxyURL || ""}
-                            onChange={e => onFormChange({ ...form, proxyURL: e.target.value })}
+                            isRequired
                         />
                     </div>
                 </ModalBody>
