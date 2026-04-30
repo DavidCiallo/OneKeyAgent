@@ -16,7 +16,6 @@ async function chatHex(body: Record<string, any>, apiKey: string): Promise<any> 
     for (let count = 0; count < 100; count++) {
         await new Promise(resolve => setTimeout(resolve, 300));
         for (const model of models) {
-            console.log(`[AI] Trying model: ${model.model}`);
             const requestBody: Record<string, any> = {
                 ...body,
                 stream: false,
@@ -41,7 +40,6 @@ async function chatHex(body: Record<string, any>, apiKey: string): Promise<any> 
             const ms = Date.now() - t0;
 
             const { usage } = data;
-            console.log(`[AI] Raw usage data:`, JSON.stringify(usage));
             await logUsage({
                 apiKey,
                 modelId: model.id,
@@ -50,7 +48,7 @@ async function chatHex(body: Record<string, any>, apiKey: string): Promise<any> 
             });
 
             const tps = usage?.completion_tokens ? ((usage.completion_tokens / ms) * 1000).toFixed(1) : "-";
-            console.log(`[AI] ${model.model} input: ${usage?.prompt_tokens}, output: ${usage?.completion_tokens}, ${tps} tok/s, ${ms}ms`);
+            // console.log(`[AI] ${model.model} input: ${usage?.prompt_tokens}, output: ${usage?.completion_tokens}, ${tps} tok/s, ${ms}ms`);
 
             if (model.alias) {
                 data.model = model.alias;
@@ -72,7 +70,6 @@ async function safePipe(reader: ReadableStreamDefaultReader<Uint8Array>, writer:
         }
         await writer.close();
     } catch (err) {
-        console.log(`[AI] stream closed: ${(err as Error)?.message || 'unknown'}`);
     }
 }
 
@@ -143,7 +140,7 @@ async function chatHexStream(body: Record<string, any>, apiKey: string): Promise
                         if (usage) {
                             const ms = Date.now() - t0;
                             const tps = usage.completion_tokens ? ((usage.completion_tokens / ms) * 1000).toFixed(1) : "-";
-                            console.log(`[AI] ${model.model} stream - input: ${usage.prompt_tokens}, output: ${usage.completion_tokens}, ${tps} tok/s, ${ms}ms`);
+                            // console.log(`[AI] ${model.model} stream - input: ${usage.prompt_tokens}, output: ${usage.completion_tokens}, ${tps} tok/s, ${ms}ms`);
                             await logUsage({
                                 apiKey,
                                 modelId: model.id,
@@ -152,7 +149,6 @@ async function chatHexStream(body: Record<string, any>, apiKey: string): Promise
                             });
                         }
                     } catch (err) {
-                        console.log(`[AI] parse stream closed: ${(err as Error)?.message || 'unknown'}`);
                     }
                 })();
 
