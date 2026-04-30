@@ -23,13 +23,11 @@ async function list(request: ModelListRequest): Promise<ModelListResponse> {
         throw "Authorization failed";
     }
 
-    const search: Partial<typeof filter> = {};
-    if (filter?.tier !== undefined) search.tier = filter.tier;
-    if (filter?.baseURL) search.baseURL = filter.baseURL;
-    if (filter?.model) search.model = filter.model;
+    const search: Partial<Record<string, any>> = {};
     if (filter?.alias) search.alias = filter.alias;
+    if (filter?.tier !== undefined) search.tier = filter.tier;
 
-    const { list: data, total } = await ModelService.find(page, search);
+    const { list: data, total } = await ModelService.find(page, search as any);
     const list = data.map(item => new ModelDTO(item));
 
     return new ModelListResponse({
@@ -66,7 +64,7 @@ async function create(request: ModelCreateRequest): Promise<ModelCreateResponse>
     if (!auth || !getIdentifyByVerify(auth)) {
         throw "Authorization failed";
     }
-    const data = await ModelService.create(request.model);
+    const data = await ModelService.create(request.model as any);
     const model = new ModelDTO(data);
     return new ModelCreateResponse({
         success: true,
@@ -84,7 +82,7 @@ async function update(request: ModelUpdateRequest): Promise<ModelUpdateResponse>
     if (!request.id || !request.model) {
         throw "miss params";
     }
-    const data = await ModelService.update(request.id, request.model);
+    const data = await ModelService.update(request.id, request.model as any);
     if (!data) {
         throw "update failed";
     }
