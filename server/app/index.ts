@@ -17,8 +17,6 @@ import { modelController } from "../modules/model/model.controller";
 import { usageController } from "../modules/usage/usage.controller";
 import { accountController } from "../modules/account/account.controller";
 import { roleController } from "../modules/role/role.controller";
-import { handleMcpRequest } from "../modules/mcp/mcp-sse";
-
 const PORT = parseInt(process.env.SERVER_PORT || "3300");
 initialize();
 // @ts-ignore
@@ -28,12 +26,6 @@ Bun.serve({
     async fetch(req: Request) {
         const url = new URL(req.url);
         const pathName = url.pathname;
-        // MCP protocol (SSE transport) — handles standard MCP clients (e.g. Cline)
-        // The REST endpoints (POST /api/mcp/poll, /create, /update) are kept for backward compat
-        if (pathName === "/api/mcp") {
-            const mcpResponse = await handleMcpRequest(req);
-            if (mcpResponse) return mcpResponse;
-        }
 
         const apiResponse = await mounthttp(req, [
             authController,
