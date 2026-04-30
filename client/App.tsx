@@ -6,6 +6,7 @@ import AuthPage from "./pages/auth/AuthPage";
 import HomePage from "./pages/home/HomePage";
 import { AuthStatus, clearAuthData, getAuthStatus, setUserInfo } from "./methods/auth";
 import ModelPage from "./pages/model/ModelPage";
+import ProviderPage from "./pages/provider/ProviderPage";
 import UsagePage from "./pages/usage/UsagePage";
 import AccountPage from "./pages/account/AccountPage";
 import ProfilePage from "./pages/profile/ProfilePage";
@@ -49,6 +50,7 @@ const TITLE_MAP: Record<string, string> = {
     "/home": "Home",
     "/auth": "Login",
     "/model": "Model",
+    "/provider": "Provider",
     "/usage": "Usage",
     "/account": "Account",
     "/profile": "Profile",
@@ -72,6 +74,7 @@ const AppRoutes = () => {
             <Route element={<PrivateRoute />}>
                 <Route path="/nocontent" element={<NoContentPage />} />
                 <Route path="/model" element={<ProtectedRoute name="model"><ModelPage /></ProtectedRoute>} />
+                <Route path="/provider" element={<ProtectedRoute name="provider"><ProviderPage /></ProtectedRoute>} />
                 <Route path="/usage" element={<ProtectedRoute name="usage"><UsagePage /></ProtectedRoute>} />
                 <Route path="/account" element={<ProtectedRoute name="account"><AccountPage /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute name="profile"><ProfilePage /></ProtectedRoute>} />
