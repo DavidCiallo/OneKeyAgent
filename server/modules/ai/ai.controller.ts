@@ -7,7 +7,7 @@ import {
 import { AiRouterInstance } from "../../../shared/modules/ai/ai.router";
 import { inject } from "../../lib/inject";
 import { AiService } from "./ai.service";
-import { validateApiKey, verifyApiKeyInDb } from "./ai.auth";
+import { validateApiKey, verifyApiKeyInDb, getAccountIdByApiKey } from "./ai.auth";
 
 export const aiController = new AiRouterInstance(inject, {
     async chatcompletions(request): Promise<any> {
@@ -15,11 +15,12 @@ export const aiController = new AiRouterInstance(inject, {
         if (!validateApiKey(apiKey) || !(await verifyApiKeyInDb(apiKey))) {
             throw new Error("Invalid API Key");
         }
+        const accountId = await getAccountIdByApiKey(apiKey);
+        if (!accountId) throw new Error("Invalid API Key");
         const req = ChatCompletionsRequest.self(request);
 
         if (request.stream) {
-            // 真流式：直接原封不动转发 upstream 的 SSE chunk
-            const stream = await AiService.chatCompletionsStream(request, apiKey);
+            const stream = await AiService.chatCompletionsStream(request, accountId);
             return new Response(stream as any, {
                 headers: {
                     "Content-Type": "text/event-stream",
@@ -32,7 +33,7 @@ export const aiController = new AiRouterInstance(inject, {
             });
         }
 
-        const result = await AiService.chatCompletions(request, apiKey);
+        const result = await AiService.chatCompletions(request, accountId);
         return result;
     },
 
@@ -41,11 +42,12 @@ export const aiController = new AiRouterInstance(inject, {
         if (!validateApiKey(apiKey) || !(await verifyApiKeyInDb(apiKey))) {
             throw new Error("Invalid API Key");
         }
+        const accountId = await getAccountIdByApiKey(apiKey);
+        if (!accountId) throw new Error("Invalid API Key");
         const req = CompletionRequest.self(request);
 
         if (request.stream) {
-            // 真流式：直接原封不动转发 upstream 的 SSE chunk
-            const stream = await AiService.completionsStream(request, apiKey);
+            const stream = await AiService.completionsStream(request, accountId);
             return new Response(stream as any, {
                 headers: {
                     "Content-Type": "text/event-stream",
@@ -58,7 +60,7 @@ export const aiController = new AiRouterInstance(inject, {
             });
         }
 
-        const result = await AiService.completions(request, apiKey);
+        const result = await AiService.completions(request, accountId);
         return result;
     },
 
