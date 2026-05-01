@@ -3,3 +3,4 @@ export * from "../../shared/modules/model/model.schema";
 export * from "../../shared/modules/usage/usage.schema";
 export * from "../../shared/modules/role/role.schema";
 export * from "../../shared/modules/provider/provider.schema";
+export * from "../../shared/modules/task/task.schema";
