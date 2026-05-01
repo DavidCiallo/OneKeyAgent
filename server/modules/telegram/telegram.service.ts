@@ -1,3 +1,5 @@
+import { config } from "dotenv";
+config();
 import Repository from "../../lib/repository";
 import { AccountEntity } from "../../../shared/modules/account/account.entity";
 import { TaskEntity } from "../../../shared/modules/task/task.entity";
@@ -121,8 +123,11 @@ export class TelegramService {
     }
 
     static async sendMessage(chat_id: string, text: string): Promise<void> {
-        const baseUrl = `https://api.telegram.org/bot`;
-        console.log(`发送消息到聊天ID ${chat_id}: ${text}`);
+        const baseUrl = process.env.TG_BOT_API_BASE_URL;
+        if (!baseUrl) {
+            console.error("TG_BOT_API_BASE_URL 未配置");
+            return;
+        }
         await fetch(baseUrl + '/sendMessage', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

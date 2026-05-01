@@ -13,7 +13,6 @@ import { TaskService } from "./task.service";
 import { getAccountIdByApiKey } from "../ai/ai.auth";
 import Repository from "../../lib/repository";
 import { AccountEntity } from "../../../shared/modules/account/account.entity";
-import { TelegramService } from "../telegram/telegram.service";
 
 const accountRepo = Repository.instance<AccountEntity>("Account");
 
