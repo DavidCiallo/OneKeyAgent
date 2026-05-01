@@ -11,14 +11,14 @@ export class TaskService {
     static async pollByAccount(accountId: string): Promise<TaskEntity | null> {
         const existProcessing = await taskRepository.findOne({ account_id: accountId, status: "processing" });
         if (existProcessing) {
-            await new Promise(resolve => setTimeout(resolve, 25 * 1000));
+            await new Promise(resolve => setTimeout(resolve, 15 * 1000));
             return existProcessing;
         }
         let count = 0;
-        while (count++ < 12) {
+        while (count++ < 50) {
             const task = await taskRepository.findOne({ account_id: accountId, status: "pending" });
             if (!task) {
-                await new Promise(resolve => setTimeout(resolve, 2 * 1000));
+                await new Promise(resolve => setTimeout(resolve, 1 * 1000));
                 continue;
             }
             await taskRepository.update({ id: task.id }, { status: "processing" });
