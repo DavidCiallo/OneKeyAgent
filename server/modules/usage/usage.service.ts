@@ -88,7 +88,7 @@ export class UsageService {
         const weekLogs = allLogs.filter(l => l.create_time >= weekStart && l.create_time < nowTenMin + TEN_MIN);
 
         const sum = (logs: UsageLogEntity[]) =>
-            Math.round(logs.reduce((acc, l) => acc + (l.inputTokens || 0) + (l.outputTokens || 0), 0) / 1000);
+            logs.reduce((acc, l) => acc + (l.inputTokens || 0) + (l.outputTokens || 0), 0);
 
         return {
             today: sum(todayLogs),
@@ -105,5 +105,14 @@ export class UsageService {
         const allLogs = await usageRepo.find({ accountId });
         const thisMonthLogs = allLogs.filter(l => l.create_time >= monthStartTs);
         return thisMonthLogs.reduce((acc, l) => acc + (l.inputTokens || 0) + (l.outputTokens || 0), 0);
+    }
+
+    /** Get total billed tokens for an account in the current week */
+    static async weeklyBilledTokens(accountId: string): Promise<number> {
+        const weekStart = localDayStart(Date.now()) - 7 * 86400000;
+
+        const allLogs = await usageRepo.find({ accountId });
+        const thisWeekLogs = allLogs.filter(l => l.create_time >= weekStart);
+        return thisWeekLogs.reduce((acc, l) => acc + (l.inputTokens || 0) + (l.outputTokens || 0), 0);
     }
 }
