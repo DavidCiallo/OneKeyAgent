@@ -11,14 +11,14 @@ export class TaskService {
     static async pollByAccount(accountId: string): Promise<TaskEntity | null> {
         const existProcessing = await taskRepository.findOne({ account_id: accountId, status: "processing" });
         if (existProcessing) {
-            await new Promise(resolve => setTimeout(resolve, 15 * 1000));
+            await new Promise(resolve => setTimeout(resolve, 5 * 1000));
             return existProcessing;
         }
         let count = 0;
-        while (count++ < 50) {
+        while (count++ < 100) {
             const task = await taskRepository.findOne({ account_id: accountId, status: "pending" });
             if (!task) {
-                await new Promise(resolve => setTimeout(resolve, 1 * 1000));
+                await new Promise(resolve => setTimeout(resolve, 500));
                 continue;
             }
             await taskRepository.update({ id: task.id }, { status: "processing" });
@@ -32,12 +32,12 @@ export class TaskService {
     }
 
     static async complete(id: string, status: string, result?: string): Promise<TaskEntity | null> {
+        console.log(new Date().toISOString(), "complete", result?.slice(0, 50));
         const targetTask = await taskRepository.findOne({ id });
         if (!targetTask) return null;
         const account = await accountRepository.findOne({ id: targetTask.account_id });
-        if (!account) return null;
-        if (result && account.tg_chat_id) {
-            await TelegramService.sendMessage(account.tg_chat_id, result);
+        if (account?.tg_chat_id) {
+            await TelegramService.sendMessage(account.tg_chat_id, result || "No reply and ask again maybe...");
         }
         const updateData = { status };
         await taskRepository.update({ id }, updateData);
