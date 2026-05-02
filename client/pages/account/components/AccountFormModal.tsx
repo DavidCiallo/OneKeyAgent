@@ -21,6 +21,7 @@ type AccountForm = {
     email: string;
     password: string;
     is_admin: number;
+    monthly_limit: string;
     permissions: string[]; // "menu:model" format for checkbox values
 };
 
@@ -73,6 +74,12 @@ export function AccountFormModal({ isOpen, onOpenChange, mode, form, onFormChang
                                 isRequired
                             />
                         )}
+                        <Input
+                            label="Monthly Limit (tokens)"
+                            value={form.monthly_limit}
+                            onChange={e => onFormChange({ ...form, monthly_limit: e.target.value })}
+                            description="Default: 100000000 (100M tokens)"
+                        />
                         {mode === "edit" && form.is_admin ? (
                             <p className="text-sm text-gray-500">{locale.AdminAllPermissions}</p>
                         ) : (

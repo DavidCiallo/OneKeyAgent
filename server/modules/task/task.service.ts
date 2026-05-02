@@ -15,10 +15,10 @@ export class TaskService {
             return existProcessing;
         }
         let count = 0;
-        while (count++ < 100) {
+        while (count++ < 50) {
             const task = await taskRepository.findOne({ account_id: accountId, status: "pending" });
             if (!task) {
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise(resolve => setTimeout(resolve, 1000));
                 continue;
             }
             await taskRepository.update({ id: task.id }, { status: "processing" });
