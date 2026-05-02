@@ -59,7 +59,6 @@ async function receive(request: TaskReceiveRequest): Promise<TaskReceiveResponse
 }
 
 async function complete(request: TaskCompleteRequest): Promise<TaskCompleteResponse> {
-    console.log("complete", request);
     request = TaskCompleteRequest.self(request);
     const data = await TaskService.complete(request.id, request.task.status, request.task.result);
     if (!data) throw "task not found";
