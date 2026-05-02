@@ -17,6 +17,9 @@ COPY . .
 # Build frontend
 RUN bun run build
 
+# Generate Drizzle migrations from schema
+RUN bun run db:generate
+
 # Create data directory for SQLite
 RUN mkdir -p data
 

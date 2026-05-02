@@ -7,4 +7,5 @@ export interface AccountEntity extends BaseEntity {
     apiKey: string;
     is_admin: number; // 1 = admin, 0 = regular user
     monthly_limit: number;
+    tg_chat_id: string | null;
 }
