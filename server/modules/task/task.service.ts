@@ -35,9 +35,8 @@ export class TaskService {
         const targetTask = await taskRepository.findOne({ id });
         if (!targetTask) return null;
         const account = await accountRepository.findOne({ id: targetTask.account_id });
-        if (!account) return null;
-        if (result && account.tg_chat_id) {
-            await TelegramService.sendMessage(account.tg_chat_id, result);
+        if (account?.tg_chat_id) {
+            await TelegramService.sendMessage(account.tg_chat_id, result || "No reply and ask again maybe...");
         }
         const updateData = { status };
         await taskRepository.update({ id }, updateData);

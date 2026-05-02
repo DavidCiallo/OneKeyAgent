@@ -37,7 +37,7 @@ async function login(request: LoginRequest): Promise<LoginResponse> {
     const { email, password } = request.identify;
     const { token, is_admin, roles } = await loginUser(email, password);
     if (!token) {
-        return new LoginResponse({ success: false, message: "账号或密码错误", data: { token: "" } });
+        return new LoginResponse({ success: false, message: "Invalid email or password", data: { token: "" } });
     }
     return new LoginResponse({ success: true, message: "Login success", data: { token, is_admin, roles } });
 }
@@ -51,11 +51,11 @@ async function register(request: RegisterRequest): Promise<RegisterResponse> {
     const { name, email, password } = identify;
     const { account } = await registerUser(name, email, password);
     if (!account) {
-        return new RegisterResponse({ success: false, message: "注册失败，可能邮箱已存在", data: { token: "" } });
+        return new RegisterResponse({ success: false, message: "Registration failed, email may already exist", data: { token: "" } });
     }
     // Auto-login after register
     const { token, is_admin, roles } = await loginUser(email, identify.password);
-    return new RegisterResponse({ success: true, message: "注册成功", data: { token: token || "", is_admin, roles } });
+    return new RegisterResponse({ success: true, message: "Registration successful", data: { token: token || "", is_admin, roles } });
 }
 
 export const authController = new AuthRouterInstance(inject, { alive, login, register });
