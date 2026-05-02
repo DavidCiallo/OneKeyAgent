@@ -3,7 +3,6 @@ import path from "path";
 
 export async function mounthttp(req: Request, controllers: BaseRouterInstance[]): Promise<Response | null> {
     const url = new URL(req.url);
-    console.log(`Received request: ${req.method} ${url.pathname}`);
     const pathName = url.pathname;
     const method = req.method.toLowerCase();
     for (const controller of controllers) {

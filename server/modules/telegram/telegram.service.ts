@@ -15,7 +15,7 @@ function isJSON(str: string) {
 
 const waitDelMessage: Array<{
     chat_id: string;
-    message_id: number;
+    message_id: string;
 }> = [];
 
 const accountRepo = Repository.instance<AccountEntity>("Account");
@@ -163,7 +163,7 @@ export class TelegramService {
     static async sendMessage(chat_id: string, text: string): Promise<string | null> {
         const baseUrl = process.env.TG_BOT_API_BASE_URL;
         if (!baseUrl) {
-            console.error("TG_BOT_API_BASE_URL not configured");
+            console.error(new Date().toISOString(), "TG_BOT_API_BASE_URL not configured");
             return null;
         }
         const body: any = { chat_id, text, parse_mode: "HTML" };
@@ -172,24 +172,28 @@ export class TelegramService {
             body.text = "<pre>Parsed</pre>";
             body.reply_markup = { inline_keyboard: json };
         }
-        const result = await fetch(baseUrl + '/sendMessage', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        });
-        if (isJSON(text)) {
-            waitDelMessage.filter(item => item.chat_id === chat_id).forEach(item => {
-                this.deleteMessage(chat_id, item.message_id);
+        let message_id: string | null = null;
+        for (let i = 0; i < 5; i++) {
+            const result = await fetch(baseUrl + '/sendMessage', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
             });
+            message_id = (await result.json())?.result?.message_id || null;
+            if (message_id) break;
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
-        const message_id = (await result.json())?.result?.message_id || null;
+
+        waitDelMessage.filter(item => item.chat_id === chat_id).forEach(item => {
+            this.deleteMessage(chat_id, item.message_id);
+        });
         if (isJSON(text) && message_id) {
             waitDelMessage.push({ chat_id, message_id });
         }
         return message_id;
     }
 
-    static async deleteMessage(chat_id: string, message_id: number): Promise<void> {
+    static async deleteMessage(chat_id: string, message_id: string): Promise<void> {
         const baseUrl = process.env.TG_BOT_API_BASE_URL;
         if (!baseUrl) return;
         await fetch(baseUrl + '/deleteMessage', {
