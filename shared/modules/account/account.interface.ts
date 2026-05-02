@@ -13,6 +13,7 @@ export class AccountDTO {
     public email: string;
     public apiKey: string;
     public is_admin: number;
+    public tg_chat_id: string | null;
 
     private isTypeSafe: symbol = Symbol();
 
@@ -22,6 +23,7 @@ export class AccountDTO {
         this.email = origin.email;
         this.apiKey = origin.apiKey || "";
         this.is_admin = origin.is_admin;
+        this.tg_chat_id = origin.tg_chat_id || null;
     }
 }
 
