@@ -16,7 +16,7 @@ export default function EndpointCard({
         <Card>
             <CardHeader className="px-6 py-4 font-semibold text-lg">{locale.EndpointSection}</CardHeader>
             <Divider />
-            <CardBody className="px-6 py-4 space-y-4 ">
+            <CardBody className="px-6 py-4 space-y-4">
                 <div>
                     <span className="text-sm text-gray-500 block mb-2">{locale.Endpoint}</span>
                     <div className="flex items-center gap-2">
@@ -33,6 +33,9 @@ export default function EndpointCard({
                     {models.map((model, index) => (
                         <Chip key={index} color="primary" variant="flat">{model}</Chip>
                     ))}
+                </div>
+                <div className="pt-2">
+                    <a href="/terms" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">{locale.TermsLink}</a>
                 </div>
             </CardBody>
         </Card>
