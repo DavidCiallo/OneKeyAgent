@@ -12,16 +12,17 @@ import Repository from "../../lib/repository";
 
 const accountRepo = Repository.instance<AccountEntity>("Account");
 
-const DEFAULT_MONTHLY_LIMIT = 10_000_000; // 10M tokens default
+const DEFAULT_MONTHLY_LIMIT = 100_000_000; // 100M tokens default
 
-/** Apply throttle delay based on usage ratio */
+/** Apply throttle delay based on usage ratio (weekly) */
 async function applyThrottle(accountId: string): Promise<void> {
     const account = await accountRepo.findOne({ id: accountId });
     if (!account) return;
 
     const limit = (account as any).monthly_limit || DEFAULT_MONTHLY_LIMIT;
-    const billed = await UsageService.monthlyBilledTokens(accountId);
-    const ratio = limit > 0 ? billed / limit : 0;
+    const weekLimit = limit / 4;
+    const billed = await UsageService.weeklyBilledTokens(accountId);
+    const ratio = weekLimit > 0 ? billed / weekLimit : 0;
 
     let delay = 0;
     if (ratio > 1.0) {

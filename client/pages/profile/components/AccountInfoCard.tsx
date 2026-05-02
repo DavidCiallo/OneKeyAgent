@@ -11,12 +11,13 @@ export default function AccountInfoCard({
     account,
     usage,
 }: {
-    account: { name: string; email: string; is_admin: number };
+    account: { name: string; email: string; is_admin: number; monthly_limit: number };
     usage: UsageData | null;
 }) {
     const locale = Locale("ProfilePage");
 
-    const toM = (val: number) => (val / 1000).toFixed(1);
+    const toM = (val: number) => (val / 1_000_000).toFixed(1);
+    const monthLimit = account.monthly_limit || 100_000_000;
 
     return (
         <Card>
@@ -48,7 +49,7 @@ export default function AccountInfoCard({
                                     <span className="font-semibold text-primary">{toM(usage.today)}M</span>
                                 </div>
                                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                    <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${Math.min((usage.today / 100000) * 50, 100)}%` }} />
+                                    <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${Math.min((usage.today / (monthLimit / 8)) * 100, 100)}%` }} />
                                 </div>
                             </div>
                             <div>
@@ -57,7 +58,7 @@ export default function AccountInfoCard({
                                     <span className="font-semibold text-success">{toM(usage.thisWeek)}M</span>
                                 </div>
                                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                    <div className="h-full bg-success rounded-full transition-all" style={{ width: `${Math.min((usage.thisWeek / 100000) * 50, 100)}%` }} />
+                                    <div className="h-full bg-success rounded-full transition-all" style={{ width: `${Math.min((usage.thisWeek / (monthLimit / 4)) * 100, 100)}%` }} />
                                 </div>
                             </div>
                             <div>
