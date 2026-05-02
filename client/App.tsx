@@ -10,6 +10,7 @@ import ProviderPage from "./pages/provider/ProviderPage";
 import UsagePage from "./pages/usage/UsagePage";
 import AccountPage from "./pages/account/AccountPage";
 import ProfilePage from "./pages/profile/ProfilePage";
+import TermsPage from "./pages/terms/TermsPage";
 import NoContentPage from "./pages/nocontent/NoContentPage";
 import { AuthRouter } from "./api/instance";
 import { AliveRequest } from "../shared/modules/auth/auth.interface";
@@ -55,6 +56,7 @@ const TITLE_MAP: Record<string, string> = {
     "/account": "Account",
     "/profile": "Profile",
     "/nocontent": "No Content",
+    "/terms": "Terms",
 };
 
 const TitleUpdater = () => {
@@ -71,6 +73,7 @@ const AppRoutes = () => {
         <Routes>
             <Route path="/home" element={<HomePage />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/terms" element={<TermsPage />} />
             <Route element={<PrivateRoute />}>
                 <Route path="/nocontent" element={<NoContentPage />} />
                 <Route path="/model" element={<ProtectedRoute name="model"><ModelPage /></ProtectedRoute>} />
