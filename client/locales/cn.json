@@ -54,6 +54,7 @@
         "Actions": "操作",
         "Edit": "编辑",
         "Delete": "删除",
+        "Copy": "复制",
         "CreateTitle": "新增供应商",
         "EditTitle": "编辑供应商",
         "NoData": "暂无数据",

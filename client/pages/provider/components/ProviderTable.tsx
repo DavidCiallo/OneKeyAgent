@@ -5,10 +5,13 @@ import { Locale } from "../../../methods/locale";
 type Props = {
     list: ProviderDTO[];
     onEdit: (item: ProviderDTO) => void;
+    onCopy: (item: ProviderDTO) => void;
     onDelete: (id: string) => void;
+    onMoveUp: (item: ProviderDTO, prev: ProviderDTO | undefined) => void;
+    onMoveDown: (item: ProviderDTO, next: ProviderDTO | undefined) => void;
 };
 
-export function ProviderTable({ list, onEdit, onDelete }: Props) {
+export function ProviderTable({ list, onEdit, onCopy, onDelete, onMoveUp, onMoveDown }: Props) {
     const locale = Locale("ProviderPage");
 
     return (
@@ -25,34 +28,54 @@ export function ProviderTable({ list, onEdit, onDelete }: Props) {
                 <TableColumn>{locale.Actions}</TableColumn>
             </TableHeader>
             <TableBody emptyContent={locale.NoData}>
-                {list.map(item => (
-                    <TableRow key={item.id}>
-                        <TableCell>{item.modelAlias}</TableCell>
-                        <TableCell>{item.priority}</TableCell>
-                        <TableCell className="max-w-xs truncate">{item.name}</TableCell>
-                        <TableCell className="max-w-xs truncate">{item.baseURL}</TableCell>
-                        <TableCell>{item.model}</TableCell>
-                        <TableCell className="max-w-xs truncate">
-                            {item.apiKey ? item.apiKey.slice(0, 12) + '...' + item.apiKey.slice(-8) : "—"}
-                        </TableCell>
-                        <TableCell className="max-w-xs truncate">{item.proxyURL || "—"}</TableCell>
-                        <TableCell>
-                            <Chip color={item.enabled ? "success" : "default"} size="sm" variant="flat">
-                                {item.enabled ? locale.Yes : locale.No}
-                            </Chip>
-                        </TableCell>
-                        <TableCell>
-                            <div className="flex flex-row gap-2">
-                                <Button size="sm" variant="flat" onPress={() => onEdit(item)}>
-                                    {locale.Edit}
-                                </Button>
-                                <Button size="sm" variant="flat" color="danger" onPress={() => onDelete(item.id)}>
-                                    {locale.Delete}
-                                </Button>
-                            </div>
-                        </TableCell>
-                    </TableRow>
-                ))}
+                {list.map((item, i) => {
+                    const prev = i > 0 ? list[i - 1] : undefined;
+                    const next = i < list.length - 1 ? list[i + 1] : undefined;
+
+                    return (
+                        <TableRow key={item.id}>
+                            <TableCell>{item.modelAlias}</TableCell>
+                            <TableCell>{item.priority}</TableCell>
+                            <TableCell className="max-w-xs truncate">{item.name}</TableCell>
+                            <TableCell className="max-w-xs truncate">{item.baseURL}</TableCell>
+                            <TableCell>{item.model}</TableCell>
+                            <TableCell className="max-w-xs truncate">
+                                {item.apiKey ? item.apiKey.slice(0, 12) + '...' + item.apiKey.slice(-8) : "—"}
+                            </TableCell>
+                            <TableCell className="max-w-xs truncate">{item.proxyURL || "—"}</TableCell>
+                            <TableCell>
+                                <Chip color={item.enabled ? "success" : "default"} size="sm" variant="flat">
+                                    {item.enabled ? locale.Yes : locale.No}
+                                </Chip>
+                            </TableCell>
+                            <TableCell>
+                                <div className="flex flex-row gap-3">
+                                    <div className="flex flex-row gap-1 items-center">
+                                        <button
+                                            className="text-xl text-gray-400 hover:text-gray-700 disabled:opacity-30 leading-none"
+                                            disabled={!prev}
+                                            onClick={() => onMoveUp(item, prev)}
+                                        >▲</button>
+                                        <button
+                                            className="text-xl text-gray-400 hover:text-gray-700 disabled:opacity-30 leading-none"
+                                            disabled={!next}
+                                            onClick={() => onMoveDown(item, next)}
+                                        >▼</button>
+                                    </div>
+                                    <Button size="sm" variant="flat" onPress={() => onCopy(item)}>
+                                        {locale.Copy}
+                                    </Button>
+                                    <Button size="sm" variant="flat" onPress={() => onEdit(item)}>
+                                        {locale.Edit}
+                                    </Button>
+                                    <Button size="sm" variant="flat" color="danger" onPress={() => onDelete(item.id)}>
+                                        {locale.Delete}
+                                    </Button>
+                                </div>
+                            </TableCell>
+                        </TableRow>
+                    );
+                })}
             </TableBody>
         </Table>
     );
