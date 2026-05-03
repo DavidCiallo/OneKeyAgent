@@ -51,6 +51,7 @@
         "Actions": "Actions",
         "Edit": "Edit",
         "Delete": "Delete",
+        "Copy": "Copy",
         "CreateTitle": "Create Provider",
         "EditTitle": "Edit Provider",
         "NoData": "No data",
