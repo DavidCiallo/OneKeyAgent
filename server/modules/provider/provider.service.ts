@@ -30,7 +30,7 @@ export class ProviderService {
     /** Get all enabled providers for a given model alias, ordered by priority */
     static async getProvidersByAlias(alias: string): Promise<ProviderEntity[]> {
         const all = await providerRepository.find({ modelAlias: alias, enabled: 1 });
-        return all.sort((a, b) => a.name.localeCompare(b.name) || a.priority - b.priority);
+        return all.sort((a, b) => a.name.localeCompare(b.name) || a.priority - b.priority || Math.random() - 0.5);
     }
 
     /** Swap priority between two providers */
