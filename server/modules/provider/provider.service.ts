@@ -40,7 +40,7 @@ export class ProviderService {
             providerRepository.findOne({ id: id2 }),
         ]);
         if (!p1 || !p2) throw "Provider not found";
-        if (p1.name !== p2.name) throw "Cannot swap priority between providers with different names";
+        if (p1.modelAlias !== p2.modelAlias) throw "Cannot swap priority between providers with different model aliases";
 
         await providerRepository.update({ id: id1 }, { priority: p2.priority } as any);
         await providerRepository.update({ id: id2 }, { priority: p1.priority } as any);
