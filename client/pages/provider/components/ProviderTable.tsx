@@ -52,15 +52,23 @@ export function ProviderTable({ list, onEdit, onCopy, onDelete, onMoveUp, onMove
                                 <div className="flex flex-row gap-3">
                                     <div className="flex flex-row gap-1 items-center">
                                         <button
-                                            className="text-xl text-gray-400 hover:text-gray-700 disabled:opacity-30 leading-none"
+                                            className="text-gray-400 hover:text-gray-700 disabled:opacity-30 p-0.5"
                                             disabled={!prev}
                                             onClick={() => onMoveUp(item, prev)}
-                                        >▲</button>
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M18 15l-6-6-6 6"/>
+                                            </svg>
+                                        </button>
                                         <button
-                                            className="text-xl text-gray-400 hover:text-gray-700 disabled:opacity-30 leading-none"
+                                            className="text-gray-400 hover:text-gray-700 disabled:opacity-30 p-0.5"
                                             disabled={!next}
                                             onClick={() => onMoveDown(item, next)}
-                                        >▼</button>
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M6 9l6 6 6-6"/>
+                                            </svg>
+                                        </button>
                                     </div>
                                     <Button size="sm" variant="flat" onPress={() => onCopy(item)}>
                                         {locale.Copy}

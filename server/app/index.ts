@@ -19,7 +19,7 @@ import { accountController } from "../modules/account/account.controller";
 import { roleController } from "../modules/role/role.controller";
 import { providerController } from "../modules/provider/provider.controller";
 import { taskController } from "../modules/task/task.controller";
-import { handleTelegramWebhook } from "../modules/telegram/telegram.controller";
+import { telegramController } from "../modules/telegram/telegram.controller";
 const PORT = parseInt(process.env.SERVER_PORT || "3300");
 initialize();
 // @ts-ignore
@@ -30,11 +30,6 @@ Bun.serve({
         const url = new URL(req.url);
         const pathName = url.pathname;
 
-        // TG webhook — 独立处理，不经过 mounthttp
-        if (pathName === "/api/tg/webhook" && req.method === "POST") {
-            return await handleTelegramWebhook(req);
-        }
-
         const apiResponse = await mounthttp(req, [
             authController,
             aiController,
@@ -44,6 +39,7 @@ Bun.serve({
             roleController,
             providerController,
             taskController,
+            telegramController,
         ]);
         if (apiResponse) return apiResponse;
         const staticResponse = await mountstatic(staticPath, pathName);
