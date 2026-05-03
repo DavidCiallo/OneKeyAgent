@@ -63,9 +63,9 @@ export default function ProviderPage() {
         fetchList(page);
     }, [page, fetchList]);
 
-    // Sort by name ASC first, then by priority ASC
+    // Sort by modelAlias ASC first, then by priority ASC
     const sortedList = useMemo(() => {
-        return [...list].sort((a, b) => a.name.localeCompare(b.name) || a.priority - b.priority);
+        return [...list].sort((a, b) => a.modelAlias.localeCompare(b.modelAlias) || a.priority - b.priority);
     }, [list]);
 
     const handleSwap = async (id1: string, id2: string, alias1: string, alias2: string, samePriority: boolean) => {
