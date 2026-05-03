@@ -219,6 +219,32 @@ export class ProviderUpdateResponse implements BaseResponse<ProviderDTO> {
     }
 }
 
+export class ProviderSwapPriorityRequest implements BaseRequest {
+    public auth?: string;
+    public id1: string;
+    public id2: string;
+
+    constructor(origin: Partial<ProviderSwapPriorityRequest>) {
+        if (!origin.id1 || !origin.id2) throw new Error("id1 and id2 are required");
+        origin.auth && (this.auth = origin.auth);
+        this.id1 = origin.id1;
+        this.id2 = origin.id2;
+    }
+    static self(unsafe: ProviderSwapPriorityRequest) {
+        return new ProviderSwapPriorityRequest(unsafe);
+    }
+}
+
+export class ProviderSwapPriorityResponse implements BaseResponse<null> {
+    public success: boolean;
+    public message: string;
+
+    constructor(origin: ProviderSwapPriorityResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+    }
+}
+
 export class ProviderDeleteRequest implements BaseRequest {
     public auth?: string;
     public id: string;
