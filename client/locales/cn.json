@@ -77,7 +77,8 @@
         "Last7Days": "近一周",
         "Total": "总用量",
         "Loading": "加载中...",
-        "UserUsage": "用户用量"
+        "UserUsage": "用户用量",
+        "History": "历史记录"
     },
 
     "AuthPage": {
