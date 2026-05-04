@@ -75,7 +75,10 @@
         "Today": "今日",
         "Last24h": "近一天",
         "Last7Days": "近一周",
-        "Total": "总用量"
+        "Total": "总用量",
+        "Loading": "加载中...",
+        "UserUsage": "用户用量",
+        "History": "历史记录"
     },
 
     "AuthPage": {

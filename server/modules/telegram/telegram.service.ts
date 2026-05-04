@@ -181,6 +181,7 @@ export class TelegramService {
             });
             message_id = (await result.json())?.result?.message_id || null;
             if (message_id) break;
+            console.error(new Date().toISOString(), "sendMessage wrong", message_id);
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
 

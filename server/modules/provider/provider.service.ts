@@ -43,6 +43,11 @@ export class ProviderService {
         return await providerRepository.findOne({ id });
     }
 
+    /** Find a provider ignoring soft-delete — used for resolving historical usage names */
+    static async findOneIgnoreDelete(id: string): Promise<ProviderEntity | null> {
+        return await providerRepository.findIgnoreDelete({ id });
+    }
+
     static async create(data: Partial<ProviderEntity>): Promise<ProviderEntity> {
         return await providerRepository.insert(data);
     }
