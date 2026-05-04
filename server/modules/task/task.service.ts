@@ -32,18 +32,12 @@ export class TaskService {
     }
 
     static async complete(id: string, status: string, result?: string): Promise<TaskEntity | null> {
-        console.log(new Date().toISOString(), "complete", result?.slice(0, 50));
         const targetTask = await taskRepository.findOne({ id });
         if (!targetTask) return null;
         const account = await accountRepository.findOne({ id: targetTask.account_id });
-        console.log(new Date().toISOString(), "complete task", targetTask.id, "for account", targetTask.account_id);
         if (account?.tg_chat_id) {
-            const safeResult = (result || "No reply and ask again maybe...")
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;');
-            await TelegramService.sendMessage(account.tg_chat_id, safeResult);
+            const text = result || "No reply and ask again maybe...";
+            await TelegramService.sendMessage(account.tg_chat_id, text);
         }
         const updateData = { status };
         await taskRepository.update({ id }, updateData);
