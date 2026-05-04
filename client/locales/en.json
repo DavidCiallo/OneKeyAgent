@@ -74,7 +74,8 @@
         "Last7Days": "Last 7 Days",
         "Total": "Total",
         "Loading": "Loading...",
-        "UserUsage": "User Usage"
+        "UserUsage": "User Usage",
+        "History": "History"
     },
 
     "AuthPage": {
