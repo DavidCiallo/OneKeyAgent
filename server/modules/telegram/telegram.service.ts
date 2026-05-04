@@ -173,7 +173,7 @@ export class TelegramService {
             body.reply_markup = { inline_keyboard: json };
         }
         let message_id: string | null = null;
-        for (let i = 0; i < 30; i++) {
+        for (let i = 0; i < 3; i++) {
             const result = await fetch(baseUrl + '/sendMessage', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -183,6 +183,26 @@ export class TelegramService {
             if (message_id) break;
             console.error(new Date().toISOString(), "sendMessage wrong", message_id);
             await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        if (!message_id && body.parse_mode === "HTML") {
+            console.warn(new Date().toISOString(), "sendMessage falling back to plain text");
+            delete body.parse_mode;
+            for (let i = 0; i < 3; i++) {
+                const result = await fetch(baseUrl + '/sendMessage', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                })
+                    .then(async res => await res.json())
+                    .catch(e => {
+                        console.error(new Date().toISOString(), "sendMessage fallback error", e);
+                        return { result: { message_id: null } };
+                    });
+                message_id = result?.result?.message_id || null;
+                if (message_id) break;
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
         }
 
         waitDelMessage.filter(item => item.chat_id === chat_id).forEach(item => {

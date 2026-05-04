@@ -38,7 +38,12 @@ export class TaskService {
         const account = await accountRepository.findOne({ id: targetTask.account_id });
         console.log(new Date().toISOString(), "complete task", targetTask.id, "for account", targetTask.account_id);
         if (account?.tg_chat_id) {
-            await TelegramService.sendMessage(account.tg_chat_id, result || "No reply and ask again maybe...");
+            const safeResult = (result || "No reply and ask again maybe...")
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+            await TelegramService.sendMessage(account.tg_chat_id, safeResult);
         }
         const updateData = { status };
         await taskRepository.update({ id }, updateData);
