@@ -6,6 +6,8 @@ import {
     TaskReceiveResponse,
     TaskCompleteRequest,
     TaskCompleteResponse,
+    TaskSendMessageRequest,
+    TaskSendMessageResponse,
 } from "../../../shared/modules/task/task.interface";
 import { TaskRouterInstance } from "../../../shared/modules/task/task.router"
 import { inject } from "../../lib/inject";
@@ -70,4 +72,14 @@ async function complete(request: TaskCompleteRequest): Promise<TaskCompleteRespo
     });
 }
 
-export const taskController = new TaskRouterInstance(inject, { poll, receive, complete });
+async function message(request: TaskSendMessageRequest): Promise<TaskSendMessageResponse> {
+    request = TaskSendMessageRequest.self(request);
+    const ok = await TaskService.sendMessageByTaskId(request.id, request.text);
+    if (!ok) throw "task not found or no tg bound";
+    return new TaskSendMessageResponse({
+        success: true,
+        message: "success",
+    });
+}
+
+export const taskController = new TaskRouterInstance(inject, { poll, receive, complete, message });

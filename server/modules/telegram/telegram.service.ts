@@ -37,7 +37,7 @@ export class TelegramService {
         if (text.startsWith("/")) {
             return await this.handleCommand(account, text, messageId);
         }
-        return await this.handleTaskCreate(account, text);
+        return await this.handleTaskCreate(account, text, messageId);
     }
 
     static async handleAuthCommand(chatId: string, text: string): Promise<void> {
@@ -136,7 +136,7 @@ export class TelegramService {
         }
     }
 
-    static async handleTaskCreate(account: AccountEntity, text: string): Promise<void> {
+    static async handleTaskCreate(account: AccountEntity, text: string, messageId?: number): Promise<void> {
         const latestTask = await taskRepo.find({ account_id: account.id });
         latestTask.sort((a, b) => b.create_time - a.create_time);
         let folder: string | null = null;
@@ -155,8 +155,8 @@ export class TelegramService {
             folder,
             status: "pending",
         });
-        if (account.tg_chat_id) {
-            await this.sendMessage(account.tg_chat_id, `Msg received: <code>=>${text.slice(0, 12) + (text.length > 12 ? "..." : "")}</code>`);
+        if (account.tg_chat_id && messageId) {
+            await this.setReaction(account.tg_chat_id, messageId.toString(), "🎉");
         }
     }
 
@@ -188,12 +188,10 @@ export class TelegramService {
             });
             message_id = (await result.json())?.result?.message_id || null;
             if (message_id) break;
-            console.error(new Date().toISOString(), "sendMessage wrong", message_id);
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
         if (!message_id && body.parse_mode === "HTML") {
-            console.warn(new Date().toISOString(), "SendMessage falling back to plain text");
             delete body.parse_mode;
             for (let i = 0; i < 3; i++) {
                 const result = await fetch(baseUrl + '/sendMessage', {
@@ -207,7 +205,6 @@ export class TelegramService {
             }
         }
         if (!message_id) {
-            console.error(new Date().toISOString(), "sendMessage failed");
             for (let i = 0; i < 3; i++) {
                 const result = await fetch(baseUrl + '/sendMessage', {
                     method: 'POST',
@@ -226,6 +223,16 @@ export class TelegramService {
             waitDelMessage.push({ chat_id, message_id });
         }
         return message_id;
+    }
+
+    static async setReaction(chat_id: string, message_id: string, emoji: string): Promise<void> {
+        const baseUrl = process.env.TG_BOT_API_BASE_URL;
+        if (!baseUrl) return;
+        await fetch(baseUrl + '/setMessageReaction', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id, message_id, reaction: [{ type: "emoji", emoji }] }),
+        });
     }
 
     static async deleteMessage(chat_id: string, message_id: string): Promise<void> {

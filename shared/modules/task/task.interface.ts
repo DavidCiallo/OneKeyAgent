@@ -146,3 +146,30 @@ export class TaskCompleteResponse implements BaseResponse<TaskDTO> {
         this.data = origin.data;
     }
 }
+
+// SendMessage: 客户端根据 task_id 发送消息到 TG
+export class TaskSendMessageRequest implements BaseRequest {
+    public auth?: string;
+    public id: string;
+    public text: string;
+
+    constructor(origin: Partial<TaskSendMessageRequest>) {
+        if (!origin.id || !origin.text) throw new Error("Unexpected error");
+        origin.auth && (this.auth = origin.auth);
+        this.id = origin.id;
+        this.text = origin.text;
+    }
+    static self(unsafe: TaskSendMessageRequest) {
+        return new TaskSendMessageRequest(unsafe);
+    }
+}
+
+export class TaskSendMessageResponse implements BaseResponse<null> {
+    public success: boolean;
+    public message: string;
+
+    constructor(origin: TaskSendMessageResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+    }
+}
