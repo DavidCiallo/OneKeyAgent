@@ -30,6 +30,19 @@ export class ProviderService {
     /** Get all enabled providers for a given model alias, ordered by priority */
     static async getProvidersByAlias(alias: string): Promise<ProviderEntity[]> {
         const all = await providerRepository.find({ modelAlias: alias, enabled: 1 });
-        return all.sort((a, b) => a.priority - b.priority);
+        return all.sort((a, b) => a.name.localeCompare(b.name) || a.priority - b.priority || Math.random() - 0.5);
+    }
+
+    /** Swap priority between two providers */
+    static async swapPriority(id1: string, id2: string): Promise<void> {
+        const [p1, p2] = await Promise.all([
+            providerRepository.findOne({ id: id1 }),
+            providerRepository.findOne({ id: id2 }),
+        ]);
+        if (!p1 || !p2) throw "Provider not found";
+        if (p1.modelAlias !== p2.modelAlias) throw "Cannot swap priority between providers with different model aliases";
+
+        await providerRepository.update({ id: id1 }, { priority: p2.priority } as any);
+        await providerRepository.update({ id: id2 }, { priority: p1.priority } as any);
     }
 }

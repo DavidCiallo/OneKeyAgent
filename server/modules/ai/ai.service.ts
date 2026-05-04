@@ -1,4 +1,6 @@
-import { fetch, ProxyAgent } from "undici";
+import { HttpsProxyAgent } from "https-proxy-agent";
+import https from "https";
+import http from "http";
 import {
     ChatCompletionsServiceResponse,
     CompletionServiceResponse,
@@ -46,19 +48,38 @@ async function tryProvider(
     proxyURL: string | undefined,
     body: Record<string, any>,
 ): Promise<any> {
-    try {
-        const response = await fetch(`${baseURL}/chat/completions`, {
+    const url = new URL(`${baseURL}/chat/completions`);
+    const postBody = JSON.stringify(body);
+    const agent = proxyURL ? new HttpsProxyAgent(proxyURL) : undefined;
+
+    return new Promise((resolve) => {
+        const lib = url.protocol === "https:" ? https : http;
+        const opts: http.RequestOptions = {
+            hostname: url.hostname,
+            port: url.port || (url.protocol === "https:" ? 443 : 80),
+            path: url.pathname + url.search,
             method: "POST",
-            headers: { "Content-Type": "application/json", 'Authorization': `Bearer ${apiKey || ""}` },
-            body: JSON.stringify(body),
-            dispatcher: proxyURL ? new ProxyAgent(proxyURL) : undefined,
-            signal: AbortSignal.timeout(300_000),
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey || ""}`,
+                "Content-Length": Buffer.byteLength(postBody).toString(),
+            },
+            agent,
+            timeout: 300_000,
+        };
+        const req = lib.request(opts, (res) => {
+            let data = "";
+            res.on("data", (chunk) => data += chunk);
+            res.on("end", () => {
+                if (res.statusCode !== 200) return resolve(null);
+                try { resolve(JSON.parse(data)); } catch { resolve(null); }
+            });
         });
-        if (!response.ok) return null;
-        return await response.json();
-    } catch {
-        return null;
-    }
+        req.on("error", () => resolve(null));
+        req.on("timeout", () => { req.destroy(); resolve(null); });
+        req.write(postBody);
+        req.end();
+    });
 }
 
 /** Try to call upstream provider for streaming, returns the body stream or null */
@@ -69,20 +90,43 @@ async function tryProviderStream(
     proxyURL: string | undefined,
     body: Record<string, any>,
 ): Promise<ReadableStream<Uint8Array> | null> {
-    try {
-        const response = await fetch(`${baseURL}/chat/completions`, {
+    const url = new URL(`${baseURL}/chat/completions`);
+    const postBody = JSON.stringify(body);
+    const agent = proxyURL ? new HttpsProxyAgent(proxyURL) : undefined;
+
+    return new Promise((resolve) => {
+        const lib = url.protocol === "https:" ? https : http;
+        const opts: http.RequestOptions = {
+            hostname: url.hostname,
+            port: url.port || (url.protocol === "https:" ? 443 : 80),
+            path: url.pathname + url.search,
             method: "POST",
-            headers: { "Content-Type": "application/json", 'Authorization': `Bearer ${apiKey || ""}` },
-            body: JSON.stringify(body),
-            dispatcher: proxyURL ? new ProxyAgent(proxyURL) : undefined,
-            signal: AbortSignal.timeout(300_000),
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey || ""}`,
+                "Content-Length": Buffer.byteLength(postBody).toString(),
+            },
+            agent,
+            timeout: 300_000,
+        };
+        const req = lib.request(opts, (res) => {
+            if (res.statusCode !== 200) {
+                res.resume();
+                return resolve(null);
+            }
+            // Convert Node.js stream to Web ReadableStream
+            const ts = new TransformStream<Uint8Array, Uint8Array>();
+            const writer = ts.writable.getWriter();
+            res.on("data", (chunk: Buffer) => writer.write(chunk));
+            res.on("end", () => writer.close());
+            res.on("error", () => writer.close());
+            resolve(ts.readable);
         });
-        if (!response.ok) return null;
-        // @ts-ignore
-        return response.body;
-    } catch {
-        return null;
-    }
+        req.on("error", () => resolve(null));
+        req.on("timeout", () => { req.destroy(); resolve(null); });
+        req.write(postBody);
+        req.end();
+    });
 }
 
 /** Get model tier for an alias, defaults to 1 */
@@ -191,7 +235,7 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
                                 if (data.usage) {
                                     usage = data.usage;
                                 }
-                            } catch {}
+                            } catch { }
                         }
                     }
                 }
@@ -219,6 +263,39 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
     throw new Error("All providers failed for streaming");
 }
 
+function requestJson(urlStr: string, apiKey: string | undefined, postBody: string, proxyURL: string | undefined): Promise<any> {
+    const url = new URL(urlStr);
+    const agent = proxyURL ? new HttpsProxyAgent(proxyURL) : undefined;
+    return new Promise((resolve) => {
+        const lib = url.protocol === "https:" ? https : http;
+        const opts: http.RequestOptions = {
+            hostname: url.hostname,
+            port: url.port || (url.protocol === "https:" ? 443 : 80),
+            path: url.pathname + url.search,
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey || ""}`,
+                "Content-Length": Buffer.byteLength(postBody).toString(),
+            },
+            agent,
+            timeout: 300_000,
+        };
+        const req = lib.request(opts, (res) => {
+            let data = "";
+            res.on("data", (chunk) => data += chunk);
+            res.on("end", () => {
+                if (res.statusCode !== 200) return resolve(null);
+                try { resolve(JSON.parse(data)); } catch { resolve(null); }
+            });
+        });
+        req.on("error", () => resolve(null));
+        req.on("timeout", () => { req.destroy(); resolve(null); });
+        req.write(postBody);
+        req.end();
+    });
+}
+
 async function completeHex(body: Record<string, any>, accountId: string): Promise<any> {
     const t0 = Date.now();
     const requestedAlias = body.model;
@@ -229,21 +306,8 @@ async function completeHex(body: Record<string, any>, accountId: string): Promis
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
 
     for (const provider of providers) {
-        let response: any;
-        try {
-            response = await fetch(`${provider.baseURL}/completions`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", 'Authorization': `Bearer ${provider.apiKey || ""}` },
-                body: JSON.stringify({ ...body, stream: false, model: provider.model }),
-                dispatcher: provider.proxyURL ? new ProxyAgent(provider.proxyURL) : undefined,
-            });
-        } catch (e) {
-            continue;
-        }
-
-        if (!response.ok) continue;
-
-        const data = (await response.json()) as { usage: { prompt_tokens: number, completion_tokens: number } };
+        const data = await requestJson(`${provider.baseURL}/completions`, provider.apiKey, JSON.stringify({ ...body, stream: false, model: provider.model }), provider.proxyURL);
+        if (!data) continue;
         const ms = Date.now() - t0;
         const tier = await getModelTier(requestedAlias);
         const rawInput = data.usage?.prompt_tokens || 0;
@@ -262,6 +326,43 @@ async function completeHex(body: Record<string, any>, accountId: string): Promis
     throw new Error("All providers failed");
 }
 
+function requestStream(urlStr: string, apiKey: string | undefined, postBody: string, proxyURL: string | undefined): Promise<ReadableStream<Uint8Array> | null> {
+    const url = new URL(urlStr);
+    const agent = proxyURL ? new HttpsProxyAgent(proxyURL) : undefined;
+    return new Promise((resolve) => {
+        const lib = url.protocol === "https:" ? https : http;
+        const opts: http.RequestOptions = {
+            hostname: url.hostname,
+            port: url.port || (url.protocol === "https:" ? 443 : 80),
+            path: url.pathname + url.search,
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey || ""}`,
+                "Content-Length": Buffer.byteLength(postBody).toString(),
+            },
+            agent,
+            timeout: 300_000,
+        };
+        const req = lib.request(opts, (res) => {
+            if (res.statusCode !== 200) {
+                res.resume();
+                return resolve(null);
+            }
+            const ts = new TransformStream<Uint8Array, Uint8Array>();
+            const writer = ts.writable.getWriter();
+            res.on("data", (chunk: Buffer) => writer.write(chunk));
+            res.on("end", () => writer.close());
+            res.on("error", () => writer.close());
+            resolve(ts.readable);
+        });
+        req.on("error", () => resolve(null));
+        req.on("timeout", () => { req.destroy(); resolve(null); });
+        req.write(postBody);
+        req.end();
+    });
+}
+
 async function completeHexStream(body: Record<string, any>, accountId: string): Promise<ReadableStream<Uint8Array>> {
     const requestedAlias = body.model;
 
@@ -271,25 +372,14 @@ async function completeHexStream(body: Record<string, any>, accountId: string): 
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
 
     for (const provider of providers) {
-        try {
-            const response = await fetch(`${provider.baseURL}/completions`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", 'Authorization': `Bearer ${provider.apiKey || ""}` },
-                body: JSON.stringify({ ...body, stream: true, model: provider.model }),
-                dispatcher: provider.proxyURL ? new ProxyAgent(provider.proxyURL) : undefined,
-                signal: AbortSignal.timeout(300_000),
-            });
+        const bodyStream = await requestStream(`${provider.baseURL}/completions`, provider.apiKey, JSON.stringify({ ...body, stream: true, model: provider.model }), provider.proxyURL);
+        if (!bodyStream) continue;
 
-            if (!response.ok) continue;
+        const ts = new TransformStream<Uint8Array, Uint8Array>();
+        const forwardStream = ts.readable;
+        safePipe(bodyStream.getReader(), ts.writable.getWriter());
 
-            const ts = new TransformStream<Uint8Array, Uint8Array>();
-            const forwardStream = ts.readable;
-            safePipe(response.body!.getReader(), ts.writable.getWriter());
-
-            return forwardStream;
-        } catch (e) {
-            continue;
-        }
+        return forwardStream;
     }
 
     throw new Error("All providers failed for streaming");
