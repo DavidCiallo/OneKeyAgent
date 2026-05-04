@@ -1,9 +1,10 @@
 import { Header } from "../../components/header/Header";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { ProviderDTO } from "../../../shared/modules/provider/provider.interface";
 import { ProviderRouter } from "../../api/instance";
 import { Locale } from "../../methods/locale";
 import { useDisclosure } from "@heroui/react";
+import { toast } from "../../methods/notify";
 import {
     ProviderListRequest,
     ProviderCreateRequest,
@@ -12,6 +13,7 @@ import {
     ProviderUpdateBody,
     ProviderDeleteRequest,
     ProviderQueryBody,
+    ProviderSwapPriorityRequest,
 } from "../../../shared/modules/provider/provider.interface";
 import { ProviderFilter } from "./components/ProviderFilter";
 import { ProviderTable } from "./components/ProviderTable";
@@ -61,10 +63,51 @@ export default function ProviderPage() {
         fetchList(page);
     }, [page, fetchList]);
 
+    // Sort by modelAlias ASC first, then by priority ASC
+    const sortedList = useMemo(() => {
+        return [...list].sort((a, b) => a.modelAlias.localeCompare(b.modelAlias) || a.priority - b.priority);
+    }, [list]);
+
+    const handleSwap = async (id1: string, id2: string, alias1: string, alias2: string, samePriority: boolean) => {
+        if (samePriority) {
+            toast({ color: "warning", title: "相同优先级，无需交换" });
+            return;
+        }
+        if (alias1 !== alias2) {
+            toast({ color: "warning", title: "不同模型别名的 Provider 不能交换优先级" });
+            return;
+        }
+        const req = new ProviderSwapPriorityRequest({ id1, id2, auth: getToken() });
+        const res = await ProviderRouter.swappriority(req);
+        if (res.success) {
+            fetchList(page);
+        }
+    };
+
     const openCreate = () => {
         setFormMode("create");
         setForm({ modelAlias: "", priority: 1, name: "", baseURL: "", model: "", enabled: 1 });
         onFormOpen();
+    };
+
+    const handleCopy = async (item: ProviderDTO) => {
+        const req = new ProviderCreateRequest({
+            provider: new ProviderCreateBody({
+                modelAlias: item.modelAlias,
+                priority: item.priority,
+                name: item.name,
+                baseURL: item.baseURL,
+                model: item.model,
+                apiKey: item.apiKey || undefined,
+                proxyURL: item.proxyURL || undefined,
+                enabled: item.enabled,
+            }),
+            auth: getToken(),
+        });
+        const res = await ProviderRouter.create(req);
+        if (res.success) {
+            fetchList(page);
+        }
     };
 
     const openEdit = (item: ProviderDTO) => {
@@ -146,9 +189,18 @@ export default function ProviderPage() {
                 />
 
                 <ProviderTable
-                    list={list}
+                    list={sortedList}
                     onEdit={openEdit}
+                    onCopy={handleCopy}
                     onDelete={handleDelete}
+                    onMoveUp={(item, prev) => {
+                        if (!prev) return;
+                        handleSwap(item.id, prev.id, item.modelAlias, prev.modelAlias, item.priority === prev.priority);
+                    }}
+                    onMoveDown={(item, next) => {
+                        if (!next) return;
+                        handleSwap(item.id, next.id, item.modelAlias, next.modelAlias, item.priority === next.priority);
+                    }}
                 />
 
                 <ProviderPagination page={page} total={total} onChange={setPage} />

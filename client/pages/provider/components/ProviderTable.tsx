@@ -5,10 +5,13 @@ import { Locale } from "../../../methods/locale";
 type Props = {
     list: ProviderDTO[];
     onEdit: (item: ProviderDTO) => void;
+    onCopy: (item: ProviderDTO) => void;
     onDelete: (id: string) => void;
+    onMoveUp: (item: ProviderDTO, prev: ProviderDTO | undefined) => void;
+    onMoveDown: (item: ProviderDTO, next: ProviderDTO | undefined) => void;
 };
 
-export function ProviderTable({ list, onEdit, onDelete }: Props) {
+export function ProviderTable({ list, onEdit, onCopy, onDelete, onMoveUp, onMoveDown }: Props) {
     const locale = Locale("ProviderPage");
 
     return (
@@ -25,34 +28,62 @@ export function ProviderTable({ list, onEdit, onDelete }: Props) {
                 <TableColumn>{locale.Actions}</TableColumn>
             </TableHeader>
             <TableBody emptyContent={locale.NoData}>
-                {list.map(item => (
-                    <TableRow key={item.id}>
-                        <TableCell>{item.modelAlias}</TableCell>
-                        <TableCell>{item.priority}</TableCell>
-                        <TableCell className="max-w-xs truncate">{item.name}</TableCell>
-                        <TableCell className="max-w-xs truncate">{item.baseURL}</TableCell>
-                        <TableCell>{item.model}</TableCell>
-                        <TableCell className="max-w-xs truncate">
-                            {item.apiKey ? item.apiKey.slice(0, 12) + '...' + item.apiKey.slice(-8) : "—"}
-                        </TableCell>
-                        <TableCell className="max-w-xs truncate">{item.proxyURL || "—"}</TableCell>
-                        <TableCell>
-                            <Chip color={item.enabled ? "success" : "default"} size="sm" variant="flat">
-                                {item.enabled ? locale.Yes : locale.No}
-                            </Chip>
-                        </TableCell>
-                        <TableCell>
-                            <div className="flex flex-row gap-2">
-                                <Button size="sm" variant="flat" onPress={() => onEdit(item)}>
-                                    {locale.Edit}
-                                </Button>
-                                <Button size="sm" variant="flat" color="danger" onPress={() => onDelete(item.id)}>
-                                    {locale.Delete}
-                                </Button>
-                            </div>
-                        </TableCell>
-                    </TableRow>
-                ))}
+                {list.map((item, i) => {
+                    const prev = i > 0 ? list[i - 1] : undefined;
+                    const next = i < list.length - 1 ? list[i + 1] : undefined;
+
+                    return (
+                        <TableRow key={item.id}>
+                            <TableCell>{item.modelAlias}</TableCell>
+                            <TableCell>{item.priority}</TableCell>
+                            <TableCell className="max-w-xs truncate">{item.name}</TableCell>
+                            <TableCell className="max-w-xs truncate">{item.baseURL}</TableCell>
+                            <TableCell>{item.model}</TableCell>
+                            <TableCell className="max-w-xs truncate">
+                                {item.apiKey ? item.apiKey.slice(0, 12) + '...' + item.apiKey.slice(-8) : "—"}
+                            </TableCell>
+                            <TableCell className="max-w-xs truncate">{item.proxyURL || "—"}</TableCell>
+                            <TableCell>
+                                <Chip color={item.enabled ? "success" : "default"} size="sm" variant="flat">
+                                    {item.enabled ? locale.Yes : locale.No}
+                                </Chip>
+                            </TableCell>
+                            <TableCell>
+                                <div className="flex flex-row gap-3">
+                                    <div className="flex flex-row gap-1 items-center">
+                                        <button
+                                            className="text-gray-400 hover:text-gray-700 disabled:opacity-30 p-0.5"
+                                            disabled={!prev}
+                                            onClick={() => onMoveUp(item, prev)}
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M18 15l-6-6-6 6"/>
+                                            </svg>
+                                        </button>
+                                        <button
+                                            className="text-gray-400 hover:text-gray-700 disabled:opacity-30 p-0.5"
+                                            disabled={!next}
+                                            onClick={() => onMoveDown(item, next)}
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M6 9l6 6 6-6"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <Button size="sm" variant="flat" onPress={() => onCopy(item)}>
+                                        {locale.Copy}
+                                    </Button>
+                                    <Button size="sm" variant="flat" onPress={() => onEdit(item)}>
+                                        {locale.Edit}
+                                    </Button>
+                                    <Button size="sm" variant="flat" color="danger" onPress={() => onDelete(item.id)}>
+                                        {locale.Delete}
+                                    </Button>
+                                </div>
+                            </TableCell>
+                        </TableRow>
+                    );
+                })}
             </TableBody>
         </Table>
     );

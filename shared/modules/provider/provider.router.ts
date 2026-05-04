@@ -4,6 +4,7 @@ import {
     ProviderDetailRequest, ProviderDetailResponse,
     ProviderCreateRequest, ProviderCreateResponse,
     ProviderUpdateRequest, ProviderUpdateResponse,
+    ProviderSwapPriorityRequest, ProviderSwapPriorityResponse,
     ProviderDeleteRequest, ProviderDeleteResponse,
 } from "./provider.interface";
 
@@ -15,6 +16,7 @@ export class ProviderRouterInstance extends BaseRouterInstance {
         { path: "/detail", handler: Function },
         { path: "/create", handler: Function },
         { path: "/update", handler: Function },
+        { path: "/swappriority", handler: Function },
         { path: "/delete", handler: Function },
     ];
 
@@ -22,6 +24,7 @@ export class ProviderRouterInstance extends BaseRouterInstance {
     detail!: (query: ProviderDetailRequest) => Promise<ProviderDetailResponse>;
     create!: (body: ProviderCreateRequest) => Promise<ProviderCreateResponse>;
     update!: (body: ProviderUpdateRequest) => Promise<ProviderUpdateResponse>;
+    swappriority!: (body: ProviderSwapPriorityRequest) => Promise<ProviderSwapPriorityResponse>;
     delete!: (body: ProviderDeleteRequest) => Promise<ProviderDeleteResponse>;
 
     constructor(inject: Function, functions?: {
@@ -29,6 +32,7 @@ export class ProviderRouterInstance extends BaseRouterInstance {
         detail: (query: ProviderDetailRequest) => Promise<ProviderDetailResponse>,
         create: (body: ProviderCreateRequest) => Promise<ProviderCreateResponse>,
         update: (body: ProviderUpdateRequest) => Promise<ProviderUpdateResponse>,
+        swappriority: (body: ProviderSwapPriorityRequest) => Promise<ProviderSwapPriorityResponse>,
         delete: (body: ProviderDeleteRequest) => Promise<ProviderDeleteResponse>
     }) {
         super();
