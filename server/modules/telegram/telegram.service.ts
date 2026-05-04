@@ -156,7 +156,7 @@ export class TelegramService {
             status: "pending",
         });
         if (account.tg_chat_id) {
-            await this.sendMessage(account.tg_chat_id, `Task received:\n <code>${text.slice(0, 10) + (text.length > 10 ? "..." : "")}</code>`);
+            await this.sendMessage(account.tg_chat_id, `Msg received: <code>=>${text.slice(0, 12) + (text.length > 12 ? "..." : "")}</code>`);
         }
     }
 
@@ -166,8 +166,15 @@ export class TelegramService {
             console.error(new Date().toISOString(), "TG_BOT_API_BASE_URL not configured");
             return null;
         }
-        const body: any = { chat_id, text, parse_mode: "HTML" };
-        if (isJSON(text) && Array.isArray(JSON.parse(text))) {
+        // Skip HTML escaping for JSON payloads (inline_keyboard), escape otherwise
+        const isJsonPayload = isJSON(text) && Array.isArray(JSON.parse(text));
+        const safeText = isJsonPayload ? text : text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        const body: any = { chat_id, text: safeText, parse_mode: "HTML" };
+        if (isJsonPayload) {
             const json = JSON.parse(text);
             body.text = "<pre>Parsed</pre>";
             body.reply_markup = { inline_keyboard: json };
@@ -186,29 +193,36 @@ export class TelegramService {
         }
 
         if (!message_id && body.parse_mode === "HTML") {
-            console.warn(new Date().toISOString(), "sendMessage falling back to plain text");
+            console.warn(new Date().toISOString(), "SendMessage falling back to plain text");
             delete body.parse_mode;
             for (let i = 0; i < 3; i++) {
                 const result = await fetch(baseUrl + '/sendMessage', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body),
-                })
-                    .then(async res => await res.json())
-                    .catch(e => {
-                        console.error(new Date().toISOString(), "sendMessage fallback error", e);
-                        return { result: { message_id: null } };
-                    });
-                message_id = result?.result?.message_id || null;
+                });
+                message_id = (await result.json())?.result?.message_id || null;
                 if (message_id) break;
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
         }
-
+        if (!message_id) {
+            console.error(new Date().toISOString(), "sendMessage failed");
+            for (let i = 0; i < 3; i++) {
+                const result = await fetch(baseUrl + '/sendMessage', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id, text: "Completed task but failed to send message" }),
+                });
+                message_id = (await result.json())?.result?.message_id || null;
+                if (message_id) break;
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
         waitDelMessage.filter(item => item.chat_id === chat_id).forEach(item => {
             this.deleteMessage(chat_id, item.message_id);
         });
-        if (isJSON(text) && message_id) {
+        if (isJsonPayload && message_id) {
             waitDelMessage.push({ chat_id, message_id });
         }
         return message_id;
