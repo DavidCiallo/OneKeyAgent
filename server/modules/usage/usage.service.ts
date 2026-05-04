@@ -1,6 +1,6 @@
 import Repository from "../../lib/repository";
 import { UsageLogEntity } from "../../../shared/modules/usage/usage.entity";
-import { UsageStatsPeriod, UsageStatsResult, UsageAmountData } from "../../../shared/modules/usage/usage.interface";
+import { UsageStatsPeriod, UsageStatsResult, UsageAmountData, UserSession, UserSessionGroup, ProviderUsage } from "../../../shared/modules/usage/usage.interface";
 
 const usageRepo = Repository.instance<UsageLogEntity>("UsageLog");
 
@@ -42,6 +42,34 @@ function buildPeriod(logs: UsageLogEntity[], periodStart: number, periodEnd: num
 
     const total = amounts.length > 0 ? amounts[amounts.length - 1].amount : 0;
     return { total, amounts };
+}
+
+/** Build a UserSession from a list of consecutive usage logs (same modelAlias, gap < 15 min) */
+function buildSession(logs: UsageLogEntity[]): UserSession {
+    let inputTokens = 0;
+    let outputTokens = 0;
+    const providerMap = new Map<string, ProviderUsage>();
+
+    for (const log of logs) {
+        inputTokens += log.inputTokens || 0;
+        outputTokens += log.outputTokens || 0;
+        const key = log.providerId || "unknown";
+        if (!providerMap.has(key)) {
+            providerMap.set(key, { providerName: key, inputTokens: 0, outputTokens: 0 });
+        }
+        const p = providerMap.get(key)!;
+        p.inputTokens += log.inputTokens || 0;
+        p.outputTokens += log.outputTokens || 0;
+    }
+
+    return {
+        startTime: logs[0].create_time,
+        endTime: logs[logs.length - 1].create_time,
+        modelAlias: logs[0].modelAlias,
+        inputTokens,
+        outputTokens,
+        providerUsage: Array.from(providerMap.values()),
+    };
 }
 
 export class UsageService {
@@ -114,5 +142,53 @@ export class UsageService {
         const allLogs = await usageRepo.find({ accountId });
         const thisWeekLogs = allLogs.filter(l => l.create_time >= weekStart);
         return thisWeekLogs.reduce((acc, l) => acc + (l.inputTokens || 0) + (l.outputTokens || 0), 0);
+    }
+
+    /** Get usage grouped by user with continuous sessions (same modelAlias, gap < 15 min) */
+    static async getUserSessions(): Promise<UserSessionGroup[]> {
+        const allLogs = await usageRepo.find({});
+        const SESSION_GAP = 15 * 60 * 1000; // 15 minutes
+
+        // Group by accountId
+        const byAccount = new Map<string, UsageLogEntity[]>();
+        for (const log of allLogs) {
+            if (!byAccount.has(log.accountId)) byAccount.set(log.accountId, []);
+            byAccount.get(log.accountId)!.push(log);
+        }
+
+        const groups: UserSessionGroup[] = [];
+
+        for (const [accountId, logs] of byAccount) {
+            // Sort by time ASC
+            logs.sort((a, b) => a.create_time - b.create_time);
+
+            const sessions: UserSession[] = [];
+            let currentSession: UsageLogEntity[] = [logs[0]];
+
+            for (let i = 1; i < logs.length; i++) {
+                const prev = logs[i - 1];
+                const curr = logs[i];
+                const gap = curr.create_time - prev.create_time;
+
+                if (gap < SESSION_GAP && curr.modelAlias === prev.modelAlias) {
+                    currentSession.push(curr);
+                } else {
+                    sessions.push(buildSession(currentSession));
+                    currentSession = [curr];
+                }
+            }
+            if (currentSession.length > 0) {
+                sessions.push(buildSession(currentSession));
+            }
+
+            const totalTokens = sessions.reduce((sum, s) => sum + s.inputTokens + s.outputTokens, 0);
+
+            groups.push({ accountId, accountName: accountId, sessions, totalTokens });
+        }
+
+        // Sort by totalTokens DESC
+        groups.sort((a, b) => b.totalTokens - a.totalTokens);
+
+        return groups;
     }
 }

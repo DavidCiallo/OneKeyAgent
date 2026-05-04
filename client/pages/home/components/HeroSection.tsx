@@ -9,7 +9,7 @@ export default function HeroSection({
     locale: { [key: string]: string };
 }) {
     return (
-        <section className="relative isolate overflow-hidden md:pt-44 pt-60 md:pb-44 pb-60">
+        <section className="relative isolate overflow-hidden md:pt-44 pt-28 md:pb-44 pb-60">
             <div className="mx-auto max-w-4xl px-6">
                 <div className="text-center">
                     <div className="relative flex justify-center">
