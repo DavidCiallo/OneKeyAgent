@@ -154,7 +154,12 @@ async function chatHex(body: Record<string, any>, accountId: string): Promise<an
         };
 
         const data = await tryProvider(provider.baseURL, provider.model, provider.apiKey, provider.proxyURL, requestBody);
-        if (!data) continue;
+        if (!data) {
+            ProviderService.recordFail(provider.id);
+            continue;
+        }
+
+        ProviderService.recordSuccess(provider.id);
 
         const ms = Date.now() - t0;
         const tier = await getModelTier(requestedAlias);
@@ -206,7 +211,12 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
         };
 
         const bodyStream = await tryProviderStream(provider.baseURL, provider.model, provider.apiKey, provider.proxyURL, requestBody);
-        if (!bodyStream) continue;
+        if (!bodyStream) {
+            ProviderService.recordFail(provider.id);
+            continue;
+        }
+
+        ProviderService.recordSuccess(provider.id);
 
         const t0 = Date.now();
         const [upstreamForward, parseStream] = (bodyStream.tee() as [ReadableStream<Uint8Array>, ReadableStream<Uint8Array>]);
@@ -307,7 +317,12 @@ async function completeHex(body: Record<string, any>, accountId: string): Promis
 
     for (const provider of providers) {
         const data = await requestJson(`${provider.baseURL}/completions`, provider.apiKey, JSON.stringify({ ...body, stream: false, model: provider.model }), provider.proxyURL);
-        if (!data) continue;
+        if (!data) {
+            ProviderService.recordFail(provider.id);
+            continue;
+        }
+
+        ProviderService.recordSuccess(provider.id);
         const ms = Date.now() - t0;
         const tier = await getModelTier(requestedAlias);
         const rawInput = data.usage?.prompt_tokens || 0;
@@ -373,7 +388,12 @@ async function completeHexStream(body: Record<string, any>, accountId: string): 
 
     for (const provider of providers) {
         const bodyStream = await requestStream(`${provider.baseURL}/completions`, provider.apiKey, JSON.stringify({ ...body, stream: true, model: provider.model }), provider.proxyURL);
-        if (!bodyStream) continue;
+        if (!bodyStream) {
+            ProviderService.recordFail(provider.id);
+            continue;
+        }
+
+        ProviderService.recordSuccess(provider.id);
 
         const ts = new TransformStream<Uint8Array, Uint8Array>();
         const forwardStream = ts.readable;
