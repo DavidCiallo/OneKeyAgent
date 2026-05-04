@@ -173,7 +173,7 @@ export class TelegramService {
             body.reply_markup = { inline_keyboard: json };
         }
         let message_id: string | null = null;
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 30; i++) {
             const result = await fetch(baseUrl + '/sendMessage', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
