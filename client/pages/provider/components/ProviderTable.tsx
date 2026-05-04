@@ -40,9 +40,11 @@ export function ProviderTable({ list, onEdit, onCopy, onDelete, onMoveUp, onMove
                             <TableCell className="max-w-xs truncate">{item.baseURL}</TableCell>
                             <TableCell>{item.model}</TableCell>
                             <TableCell className="max-w-xs truncate">
-                                {item.apiKey ? item.apiKey.slice(0, 12) + '...' + item.apiKey.slice(-8) : "—"}
+                                {item.apiKey ? item.apiKey.slice(0, 8) + '...' + item.apiKey.slice(-8) : "—"}
                             </TableCell>
-                            <TableCell className="max-w-xs truncate">{item.proxyURL || "—"}</TableCell>
+                            <TableCell className="max-w-xs truncate">
+                                {item.proxyURL ? item.proxyURL.slice(0, 12) + '...' + item.proxyURL.slice(-8) : "—"}
+                            </TableCell>
                             <TableCell>
                                 <Chip color={item.enabled ? "success" : "default"} size="sm" variant="flat">
                                     {item.enabled ? locale.Yes : locale.No}

@@ -72,7 +72,9 @@
         "Today": "Today",
         "Last24h": "Last 24h",
         "Last7Days": "Last 7 Days",
-        "Total": "Total"
+        "Total": "Total",
+        "Loading": "Loading...",
+        "UserUsage": "User Usage"
     },
 
     "AuthPage": {

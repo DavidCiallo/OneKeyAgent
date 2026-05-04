@@ -150,3 +150,51 @@ export class UsageListResponse implements BaseResponse<UsageDTO> {
         this.data = origin.data;
     }
 }
+
+// --- Session view types ---
+
+export interface ProviderUsage {
+    providerName: string;
+    inputTokens: number;
+    outputTokens: number;
+}
+
+export interface UserSession {
+    startTime: number;
+    endTime: number;
+    modelAlias: string;
+    inputTokens: number;
+    outputTokens: number;
+    providerUsage: ProviderUsage[];
+}
+
+export interface UserSessionGroup {
+    accountId: string;
+    accountName: string;
+    sessions: UserSession[];
+    totalTokens: number;
+}
+
+export class UsageSessionsRequest implements BaseRequest {
+    public auth?: string;
+
+    constructor(origin: Partial<UsageSessionsRequest>) {
+        if (false) throw new Error("Unexpected error");
+        origin.auth && (this.auth = origin.auth);
+    }
+    static self(unsafe: UsageSessionsRequest) {
+        return new UsageSessionsRequest(unsafe);
+    }
+}
+
+export class UsageSessionsResponse implements BaseResponse<UserSessionGroup> {
+    public success: boolean;
+    public message: string;
+    public data: UserSessionGroup[];
+
+    constructor(origin: UsageSessionsResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+        this.data = origin.data;
+    }
+}
