@@ -43,4 +43,13 @@ export class TaskService {
         await taskRepository.update({ id }, updateData);
         return await taskRepository.findOne({ id });
     }
+
+    static async sendMessageByTaskId(id: string, text: string): Promise<boolean> {
+        const targetTask = await taskRepository.findOne({ id });
+        if (!targetTask) return false;
+        const account = await accountRepository.findOne({ id: targetTask.account_id });
+        if (!account?.tg_chat_id) return false;
+        const messageId = await TelegramService.sendMessage(account.tg_chat_id, text);
+        return messageId !== null;
+    }
 }
