@@ -171,18 +171,15 @@ export function runMigrations() {
         }
 
         console.log("Database migration completed successfully.");
-        return;
-    }
-
-    // Normal path: use Drizzle's built-in migrator for incremental migrations
-    // Only run if the __drizzle_migrations table doesn't already track all migrations
-    try {
-        migrate(db, { migrationsFolder });
-        console.log("Database migrations applied successfully.");
-    } catch (err) {
-        console.error("Migration error:", err);
-        throw err;
+    } else {
+        // Normal path: use Drizzle's built-in migrator for incremental migrations
+        try {
+            migrate(db, { migrationsFolder });
+            console.log("Database migrations applied successfully.");
+        } catch (err) {
+            console.error("Migration error:", err);
+            throw err;
+        }
     }
 }
-
 export { sqlite, db };

@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { eq, and, isNull, sql, desc } from "drizzle-orm";
+import { eq, and, isNull, sql, desc, gte, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { db } from "./migrate";
 import * as schema from "./schema";
@@ -44,8 +44,11 @@ class Repository<
         return Repository.instances.get(key);
     }
 
-    async find(where?: Partial<T>, config?: { limit?: number; offset?: number }): Promise<T[]> {
+    async find(where?: Partial<T>, config?: { limit?: number; offset?: number; since?: number }): Promise<T[]> {
         const filters: any[] = [isNull(this.table.delete_time)];
+        if (config?.since) {
+            filters.push(gte(this.table.create_time, config.since));
+        }
         if (where) {
             Object.entries(where).forEach(([key, val]) => {
                 if (val !== undefined && val !== null && val !== "" && this.table[key]) {
@@ -152,8 +155,21 @@ class Repository<
         return true;
     }
 
-    async count(where?: Partial<T>): Promise<number> {
+    async findByIds(ids: string[]): Promise<T[]> {
+        if (ids.length === 0) return [];
+        const result = await db
+            .select()
+            .from(this.table)
+            .where(and(isNull(this.table.delete_time), inArray(this.table.id, ids)))
+            .execute();
+        return result as T[];
+    }
+
+    async count(where?: Partial<T>, since?: number): Promise<number> {
         const filters: any[] = [isNull(this.table.delete_time)];
+        if (since) {
+            filters.push(gte(this.table.create_time, since));
+        }
         if (where) {
             Object.entries(where).forEach(([key, val]) => {
                 if (val !== undefined && val !== null && val !== "" && this.table[key]) {

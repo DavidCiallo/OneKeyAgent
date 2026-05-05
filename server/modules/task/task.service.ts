@@ -9,14 +9,12 @@ const accountRepository: Repository<AccountEntity> = Repository.instance("Accoun
 export class TaskService {
     // Long polling design for rolling task
     static async pollByAccount(accountId: string): Promise<TaskEntity | null> {
-        const existProcessing = await taskRepository.findOne({ account_id: accountId, status: "processing" });
-        if (existProcessing) {
-            await new Promise(resolve => setTimeout(resolve, 5 * 1000));
-            return existProcessing;
-        }
         let count = 0;
         while (count++ < 50) {
-            const task = await taskRepository.findOne({ account_id: accountId, status: "pending" });
+            const task = (
+                await taskRepository.findOne({ account_id: accountId, status: "pending" }) ||
+                await taskRepository.findOne({ account_id: accountId, status: "processing" })
+            );
             if (!task) {
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 continue;
@@ -28,20 +26,28 @@ export class TaskService {
     }
 
     static async create(data: Partial<TaskEntity>): Promise<TaskEntity> {
-        return await taskRepository.insert(data);
+        return await taskRepository.insert({ ...data, status: "pending" });
     }
 
     static async complete(id: string, status: string, result?: string): Promise<TaskEntity | null> {
-        console.log(new Date().toISOString(), "complete", result?.slice(0, 50));
         const targetTask = await taskRepository.findOne({ id });
         if (!targetTask) return null;
         const account = await accountRepository.findOne({ id: targetTask.account_id });
-        console.log(new Date().toISOString(), "complete task", targetTask.id, "for account", targetTask.account_id);
         if (account?.tg_chat_id) {
-            await TelegramService.sendMessage(account.tg_chat_id, result || "No reply and ask again maybe...");
+            const text = result || "No reply and ask again maybe...";
+            await TelegramService.sendMessage(account.tg_chat_id, text);
         }
         const updateData = { status };
         await taskRepository.update({ id }, updateData);
         return await taskRepository.findOne({ id });
+    }
+
+    static async sendMessageByTaskId(id: string, text: string): Promise<boolean> {
+        const targetTask = await taskRepository.findOne({ id });
+        if (!targetTask) return false;
+        const account = await accountRepository.findOne({ id: targetTask.account_id });
+        if (!account?.tg_chat_id) return false;
+        const messageId = await TelegramService.sendMessage(account.tg_chat_id, text);
+        return messageId !== null;
     }
 }

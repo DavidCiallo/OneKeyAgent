@@ -7,20 +7,13 @@ const modelRepo = Repository.instance<ModelEntity>("Model");
 const providerRepo = Repository.instance<ProviderEntity>("Provider");
 const usageRepo = Repository.instance<UsageLogEntity>("UsageLog");
 
+/** Ensure the 'hex' model exists in the database */
 export async function seedDefaultModel() {
-    const existing = await modelRepo.find();
-    if (existing.length === 0) {
-        await modelRepo.insert({ alias: "bin", tier: 1 });
-        await providerRepo.insert({
-            modelAlias: "bin",
-            priority: 1,
-            name: "Ollama",
-            baseURL: "http://127.168.0.1:11434/v1",
-            model: "deepseek-v4-flash:cloud",
-            apiKey: "",
-            enabled: 0,
-        });
-        console.log("[Seed] Created default model 'bin' with provider");
+    const models = await modelRepo.find();
+    const hasHex = models.some(m => m.alias === "hex");
+    if (!hasHex) {
+        await modelRepo.insert({ alias: "hex", tier: 1 });
+        console.log("[Seed] Created default model 'hex'");
     }
 }
 

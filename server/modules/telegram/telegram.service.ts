@@ -30,21 +30,21 @@ export class TelegramService {
             if (text.startsWith("/auth")) {
                 return await this.handleAuthCommand(chatId, text);
             }
-            await this.sendMessage(chatId, 'Please use <code>/auth &lt;apiKey&gt;</code> first');
+            await this.sendMessage(chatId, 'Please use /auth &lt;apiKey&gt;</code> first');
             return;
         }
 
         if (text.startsWith("/")) {
             return await this.handleCommand(account, text, messageId);
         }
-        return await this.handleTaskCreate(account, text);
+        return await this.handleTaskCreate(account, text, messageId);
     }
 
     static async handleAuthCommand(chatId: string, text: string): Promise<void> {
         const parts = text.trim().split(/\s+/);
         const apiKey = parts.slice(1).join(" ");
         if (!apiKey) {
-            await this.sendMessage(chatId, 'Usage: <code>/auth &lt;apiKey&gt;</code>');
+            await this.sendMessage(chatId, 'Usage: /auth &lt;apiKey&gt;</code>');
             return;
         }
         const account = await accountRepo.findOne({ apiKey });
@@ -54,7 +54,7 @@ export class TelegramService {
         }
 
         await accountRepo.update({ id: account.id }, { tg_chat_id: chatId });
-        await this.sendMessage(chatId, `Bound successfully!\nAccount: <code>${account.name}</code>\nYou can set a working directory and start publishing tasks`);
+        await this.sendMessage(chatId, `Bound successfully!\nAccount: ${account.name}</code>\nYou can set a working directory and start publishing tasks`);
         return;
     }
 
@@ -70,9 +70,9 @@ export class TelegramService {
             case "/help": {
                 await this.sendMessage(account.tg_chat_id, [
                     "Available commands:",
-                    "<code>/status</code> - Show current account, folder and task status",
-                    "<code>/ls</code> - List contents of the system target folder",
-                    "<code>/help</code> - Show this help message",
+                    "/status</code> - Show current account, folder and task status",
+                    "/ls</code> - List contents of the system target folder",
+                    "/help</code> - Show this help message",
                 ].join("\n"));
                 return;
             }
@@ -95,9 +95,9 @@ export class TelegramService {
                     }
                 }
                 let result = "";
-                result += `Account: <code>${account.name}</code>\n`;
-                result += `Folder: <code>${status.folder || "none"}</code>\n`;
-                result += `Task: <code>${status.currentTask || "none"}</code>\n`;
+                result += `Account: ${account.name}</code>\n`;
+                result += `Folder: ${status.folder || "none"}</code>\n`;
+                result += `Task: ${status.currentTask || "none"}</code>\n`;
                 await this.sendMessage(account.tg_chat_id, result);
                 return;
             }
@@ -117,7 +117,7 @@ export class TelegramService {
                 if (!args) {
                     await this.sendMessage(
                         account.tg_chat_id,
-                        'Usage: Please use <code>/ls</code> to set a directory'
+                        'Usage: Please use /ls</code> to set a directory'
                     );
                     return;
                 }
@@ -127,7 +127,7 @@ export class TelegramService {
                     folder: args,
                     status: "pending",
                 });
-                await this.sendMessage(account.tg_chat_id, `Switch directory task created\nID: <code>${task.id}</code>\nTarget: <code>${args}</code>`);
+                await this.sendMessage(account.tg_chat_id, `Switch directory task created\nID: ${task.id}</code>\nTarget: ${args}</code>`);
                 return;
             }
             default:
@@ -136,7 +136,7 @@ export class TelegramService {
         }
     }
 
-    static async handleTaskCreate(account: AccountEntity, text: string): Promise<void> {
+    static async handleTaskCreate(account: AccountEntity, text: string, messageId?: number): Promise<void> {
         const latestTask = await taskRepo.find({ account_id: account.id });
         latestTask.sort((a, b) => b.create_time - a.create_time);
         let folder: string | null = null;
@@ -145,7 +145,7 @@ export class TelegramService {
         }
         if (!folder) {
             if (account.tg_chat_id) {
-                await this.sendMessage(account.tg_chat_id, 'Please use <code>/ls</code> to set a directory');
+                await this.sendMessage(account.tg_chat_id, 'Please use /ls</code> to set a directory');
                 return;
             }
         }
@@ -155,8 +155,8 @@ export class TelegramService {
             folder,
             status: "pending",
         });
-        if (account.tg_chat_id) {
-            await this.sendMessage(account.tg_chat_id, `Task received:\n <code>${text.slice(0, 10) + (text.length > 10 ? "..." : "")}</code>`);
+        if (account.tg_chat_id && messageId) {
+            await this.setReaction(account.tg_chat_id, messageId.toString(), "👀");
         }
     }
 
@@ -166,14 +166,21 @@ export class TelegramService {
             console.error(new Date().toISOString(), "TG_BOT_API_BASE_URL not configured");
             return null;
         }
-        const body: any = { chat_id, text, parse_mode: "HTML" };
-        if (isJSON(text) && Array.isArray(JSON.parse(text))) {
+        // Skip HTML escaping for JSON payloads (inline_keyboard), escape otherwise
+        const isJsonPayload = isJSON(text) && Array.isArray(JSON.parse(text));
+        const safeText = isJsonPayload ? text : text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        const body: any = { chat_id, text: safeText, parse_mode: "HTML" };
+        if (isJsonPayload) {
             const json = JSON.parse(text);
             body.text = "<pre>Parsed</pre>";
             body.reply_markup = { inline_keyboard: json };
         }
         let message_id: string | null = null;
-        for (let i = 0; i < 30; i++) {
+        for (let i = 0; i < 3; i++) {
             const result = await fetch(baseUrl + '/sendMessage', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -181,17 +188,51 @@ export class TelegramService {
             });
             message_id = (await result.json())?.result?.message_id || null;
             if (message_id) break;
-            console.error(new Date().toISOString(), "sendMessage wrong", message_id);
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
+        if (!message_id && body.parse_mode === "HTML") {
+            delete body.parse_mode;
+            for (let i = 0; i < 3; i++) {
+                const result = await fetch(baseUrl + '/sendMessage', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                message_id = (await result.json())?.result?.message_id || null;
+                if (message_id) break;
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+        if (!message_id) {
+            for (let i = 0; i < 3; i++) {
+                const result = await fetch(baseUrl + '/sendMessage', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id, text: "Completed task but failed to send message" }),
+                });
+                message_id = (await result.json())?.result?.message_id || null;
+                if (message_id) break;
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
         waitDelMessage.filter(item => item.chat_id === chat_id).forEach(item => {
             this.deleteMessage(chat_id, item.message_id);
         });
-        if (isJSON(text) && message_id) {
+        if (isJsonPayload && message_id) {
             waitDelMessage.push({ chat_id, message_id });
         }
         return message_id;
+    }
+
+    static async setReaction(chat_id: string, message_id: string, emoji: string): Promise<void> {
+        const baseUrl = process.env.TG_BOT_API_BASE_URL;
+        if (!baseUrl) return;
+        await fetch(baseUrl + '/setMessageReaction', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id, message_id, reaction: [{ type: "emoji", emoji }] }),
+        });
     }
 
     static async deleteMessage(chat_id: string, message_id: string): Promise<void> {

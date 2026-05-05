@@ -8,6 +8,8 @@ import { AiRouterInstance } from "../../../shared/modules/ai/ai.router";
 import { inject } from "../../lib/inject";
 import { AiService } from "./ai.service";
 import { validateApiKey, verifyApiKeyInDb, getAccountIdByApiKey } from "./ai.auth";
+import { getIdentifyByVerify } from "../auth/auth.service";
+import { AccountService } from "../account/account.service";
 
 export const aiController = new AiRouterInstance(inject, {
     async chatcompletions(request): Promise<any> {
@@ -65,8 +67,24 @@ export const aiController = new AiRouterInstance(inject, {
     },
 
     async models(request): Promise<ModelsResponse> {
-        ModelsRequest.self(request);
-        const data = await AiService.listModels();
+        const auth = request.auth || "";
+        let accountId = "";
+
+        if (auth) {
+            // Try API key auth first
+            if (validateApiKey(auth)) {
+                accountId = (await getAccountIdByApiKey(auth)) || "";
+            } else {
+                // Try JWT token auth (used by frontend ProfilePage)
+                const email = getIdentifyByVerify(auth);
+                if (email) {
+                    const account = await AccountService.findByEmail(email);
+                    if (account) accountId = account.id;
+                }
+            }
+        }
+
+        const data = await AiService.listModels(accountId);
         return new ModelsResponse(data);
     },
 });

@@ -13,7 +13,7 @@ export function ProviderBar({ session }: { session: { inputTokens: number; outpu
     if (total === 0) return null;
 
     return (
-        <div className="flex items-center gap-1 mt-2">
+        <div className="flex items-center gap-[1px] mr-2">
             {session.providerUsage.map((pu) => {
                 const pct = ((pu.inputTokens + pu.outputTokens) / total) * 100;
                 return (
