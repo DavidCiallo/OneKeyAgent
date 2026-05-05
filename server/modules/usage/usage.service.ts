@@ -147,7 +147,7 @@ export class UsageService {
     /** Get usage grouped by user with continuous sessions (same modelAlias, gap < 15 min) */
     static async getUserSessions(): Promise<UserSessionGroup[]> {
         const allLogs = await usageRepo.find({}, { since: Date.now() - MONTH });
-        const SESSION_GAP = 15 * 60 * 1000; // 15 minutes
+        const SESSION_GAP = 30 * 60 * 1000; // 30 minutes
 
         // Group by accountId
         const byAccount = new Map<string, UsageLogEntity[]>();

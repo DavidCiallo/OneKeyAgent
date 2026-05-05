@@ -31,10 +31,9 @@ export function UsageSessions({ groups }: Props) {
                             </Chip>
                         </div>
                     }
-                    className="mb-2"
                 >
                     <Accordion variant="splitted" selectionMode="multiple" className="mb-4">
-                        {group.sessions.map((session, idx) => (
+                        {group.sessions.reverse().map((session, idx) => (
                             <AccordionItem
                                 key={`${session.startTime}-${idx}`}
                                 title={
@@ -42,7 +41,7 @@ export function UsageSessions({ groups }: Props) {
                                         <span className="whitespace-nowrap font-mono md:text-base text-sm">
                                             {format24Time(session.startTime)} — {format24Time(session.endTime)}
                                         </span>
-                                        <span className="font-semibold md:text-lg text-base truncate">
+                                        <span className="font-semibold text-xl truncate">
                                             {session.modelAlias}
                                         </span>
                                         <span className="text-default-500 text-xs sm:ml-auto whitespace-nowrap">
@@ -53,7 +52,7 @@ export function UsageSessions({ groups }: Props) {
                                 textValue={`${format24Time(session.startTime)} ${session.modelAlias}`}
                             >
                                 <ProviderBar session={session} />
-                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                <div className="flex flex-wrap gap-1.5 mt-2 mb-3">
                                     {session.providerUsage.map((pu) => (
                                         <ProviderChip key={pu.providerName} pu={pu} />
                                     ))}
