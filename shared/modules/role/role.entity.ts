@@ -1,6 +1,6 @@
 import { BaseEntity } from "../../lib/default/base.entity";
 
-export type RoleType = "menu" | "page" | "api";
+export type RoleType = "menu" | "page" | "api" | "model";
 
 export interface RoleEntity extends BaseEntity {
     name: string;

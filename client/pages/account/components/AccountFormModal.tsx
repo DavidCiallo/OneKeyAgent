@@ -1,5 +1,8 @@
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Checkbox, CheckboxGroup, Input } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
+import { useEffect, useState } from "react";
+import { AiRouter } from "../../../api/instance";
+import { ModelsRequest } from "../../../../shared/modules/ai/ai.interface";
 
 type Permission = { name: string; type: string };
 
@@ -14,6 +17,7 @@ const TYPE_LABEL: Record<string, string> = {
     menu: "菜单",
     page: "页面",
     api: "接口",
+    model: "模型",
 };
 
 type AccountForm = {
@@ -46,9 +50,24 @@ function keyToPerm(key: string): Permission {
 export function AccountFormModal({ isOpen, onOpenChange, mode, form, onFormChange, onConfirm }: Props) {
     const locale = Locale("AccountPage");
     const common = Locale("Common");
+    const [allModels, setAllModels] = useState<string[]>([]);
+
+    // Fetch all model aliases when modal opens in edit mode
+    useEffect(() => {
+        if (isOpen && mode === "edit") {
+            (async () => {
+                try {
+                    const res = await AiRouter.models(new ModelsRequest({ auth: "" }));
+                    if (res.success && res.data) {
+                        setAllModels(res.data.map((m: any) => m.id));
+                    }
+                } catch { /* ignore */ }
+            })();
+        }
+    }, [isOpen, mode]);
 
     return (
-        <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+        <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="lg">
             <ModalContent>
                 <ModalHeader>{mode === "create" ? locale.CreateTitle : locale.EditTitle}</ModalHeader>
                 <ModalBody>
@@ -78,8 +97,9 @@ export function AccountFormModal({ isOpen, onOpenChange, mode, form, onFormChang
                             label="Monthly Limit (tokens)"
                             value={form.monthly_limit}
                             onChange={e => onFormChange({ ...form, monthly_limit: e.target.value })}
-                            description="Default: 100000000 (100M tokens)"
+                            description="Default: 120000000 (120M tokens)"
                         />
+
                         {mode === "edit" && form.is_admin ? (
                             <p className="text-sm text-gray-500">{locale.AdminAllPermissions}</p>
                         ) : (
@@ -92,6 +112,22 @@ export function AccountFormModal({ isOpen, onOpenChange, mode, form, onFormChang
                                     {PERMISSION_OPTIONS.map(p => (
                                         <Checkbox key={permToKey(p)} value={permToKey(p)}>
                                             {p.name} ({TYPE_LABEL[p.type] || p.type})
+                                        </Checkbox>
+                                    ))}
+                                </div>
+                            </CheckboxGroup>
+                        )}
+
+                        {mode === "edit" && !form.is_admin && allModels.length > 0 && (
+                            <CheckboxGroup
+                                label="可调用模型"
+                                value={form.permissions}
+                                onChange={val => onFormChange({ ...form, permissions: val as string[] })}
+                            >
+                                <div className="flex flex-wrap gap-2">
+                                    {allModels.map(model => (
+                                        <Checkbox key={`model:${model}`} value={`model:${model}`}>
+                                            {model}
                                         </Checkbox>
                                     ))}
                                 </div>

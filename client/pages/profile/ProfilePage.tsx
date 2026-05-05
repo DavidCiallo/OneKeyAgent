@@ -32,7 +32,8 @@ export default function ProfilePage() {
     const fetchModels = useCallback(async () => {
         const res = await AiRouter.models(new ModelsRequest({ auth: getToken() }));
         if (res.success && res.data) {
-            setModels(res.data.map((m: any) => m.id));
+            const allIds = res.data.map((m: any) => m.id);
+            setModels(allIds);
         }
     }, []);
 
