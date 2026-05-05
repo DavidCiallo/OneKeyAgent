@@ -9,6 +9,7 @@ export const providerTable = sqliteTable("provider", {
     model: text("model").notNull(),
     apiKey: text("api_key"),
     authType: text("auth_type").default("bearer"),
+    apiType: text("api_type").default("openai"),
     proxyURL: text("proxy_url"),
     enabled: integer("enabled").notNull().default(1),
     create_time: integer("create_time").notNull(),

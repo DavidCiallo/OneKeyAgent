@@ -9,6 +9,7 @@ type ProviderForm = {
     model: string;
     apiKey?: string;
     authType: string;
+    apiType: string;
     proxyURL?: string;
     enabled: number;
 };
@@ -79,6 +80,14 @@ export function ProviderFormModal({ isOpen, onOpenChange, mode, form, onFormChan
                         >
                             <SelectItem key="bearer">Bearer</SelectItem>
                             <SelectItem key="custom">Custom</SelectItem>
+                        </Select>
+                        <Select
+                            label={locale.ApiType}
+                            selectedKeys={[form.apiType]}
+                            onChange={e => onFormChange({ ...form, apiType: e.target.value })}
+                        >
+                            <SelectItem key="openai">OpenAI</SelectItem>
+                            <SelectItem key="anthropic">Anthropic</SelectItem>
                         </Select>
                         <Input
                             label={locale.ProxyURL}

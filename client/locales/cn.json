@@ -51,6 +51,7 @@
         "ApiKey": "ApiKey",
         "ProxyURL": "代理URL",
         "AuthType": "认证类型",
+        "ApiType": "接口协议",
         "Enabled": "启用",
         "Actions": "操作",
         "Edit": "编辑",
