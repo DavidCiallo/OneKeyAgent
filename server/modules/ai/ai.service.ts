@@ -9,34 +9,21 @@ import {
 import { getAllModels, logUsage } from "./ai.session";
 import { ProviderService } from "../provider/provider.service";
 import { UsageService } from "../usage/usage.service";
-import { AccountEntity } from "../../../shared/modules/account/account.entity";
-import Repository from "../../lib/repository";
+import { AccountService } from "../account/account.service";
+import { AccountRoleService } from "../role/role.service";
 
-const accountRepo = Repository.instance<AccountEntity>("Account");
+const DEFAULT_MONTHLY_LIMIT = 120_000_000; // 120M tokens default
 
-const DEFAULT_MONTHLY_LIMIT = 100_000_000; // 100M tokens default
-
-/** Apply throttle delay based on usage ratio (weekly) */
-async function applyThrottle(accountId: string): Promise<void> {
-    const account = await accountRepo.findOne({ id: accountId });
+/** Check monthly usage limit, throw 429 if exceeded */
+async function checkUsageLimit(accountId: string): Promise<void> {
+    const account = await AccountService.findOne(accountId);
     if (!account) return;
 
-    const limit = (account as any).monthly_limit || DEFAULT_MONTHLY_LIMIT;
-    const weekLimit = limit / 4;
-    const billed = await UsageService.weeklyBilledTokens(accountId);
-    const ratio = weekLimit > 0 ? billed / weekLimit : 0;
+    const limit = account.monthly_limit || DEFAULT_MONTHLY_LIMIT;
+    const billed = await UsageService.monthlyBilledTokens(accountId);
 
-    let delay = 0;
-    if (ratio > 1.0) {
-        delay = 5000; // >100% → +5s
-    } else if (ratio > 0.75) {
-        delay = 2000; // 75-100% → +2s
-    } else if (ratio > 0.5) {
-        delay = 500;  // 50-75% → +0.5s
-    }
-
-    if (delay > 0) {
-        await new Promise(resolve => setTimeout(resolve, delay));
+    if (billed >= limit) {
+        throw new Error("429 Too Many Requests. Monthly usage limit exceeded");
     }
 }
 
@@ -146,9 +133,9 @@ async function tryProvider(
             agent,
             timeout: 300_000,
         };
-        const req = lib.request(opts, (res) => {
+        const req = lib.request(opts, (res: any) => {
             let data = "";
-            res.on("data", (chunk) => data += chunk);
+            res.on("data", (chunk: Buffer) => data += chunk);
             res.on("end", () => {
                 if (res.statusCode !== 200) return resolve(null);
                 try {
@@ -192,7 +179,7 @@ async function tryProviderStream(
             agent,
             timeout: 300_000,
         };
-        const req = lib.request(opts, (res) => {
+        const req = lib.request(opts, (res: any) => {
             if (res.statusCode !== 200) {
                 res.resume();
                 return resolve(null);
@@ -219,11 +206,31 @@ async function getModelTier(alias: string): Promise<number> {
     return match?.tier ?? 1;
 }
 
+/** Get allowed model aliases for a non-admin account, null means no restriction */
+async function getAllowedModelAliases(accountId: string): Promise<string[] | null> {
+    const account = await AccountService.findOne(accountId);
+    if (!account || account.is_admin) return null; // admin — no restriction
+
+    const roles = await AccountRoleService.findByAccount(accountId);
+    const modelRoles = roles.filter(r => r.type === "model");
+    return modelRoles.map(r => r.name);
+}
+
+/** Check if the requested model alias is allowed for this account */
+async function requireModelAccess(accountId: string, alias: string): Promise<void> {
+    const allowed = await getAllowedModelAliases(accountId);
+    if (allowed === null) return; // admin or no account — unrestricted
+    if (!allowed.includes(alias)) {
+        throw new Error(`Model "${alias}" is not authorized for this account`);
+    }
+}
+
 async function chatHex(body: Record<string, any>, accountId: string): Promise<any> {
     const t0 = Date.now();
     const requestedAlias = body.model;
 
-    await applyThrottle(accountId);
+    await requireModelAccess(accountId, requestedAlias);
+    await checkUsageLimit(accountId);
 
     const providers = await ProviderService.getProvidersByAlias(requestedAlias);
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
@@ -280,7 +287,8 @@ async function safePipe(reader: ReadableStreamDefaultReader<Uint8Array>, writer:
 async function chatHexStream(body: Record<string, any>, accountId: string): Promise<ReadableStream<Uint8Array>> {
     const requestedAlias = body.model;
 
-    await applyThrottle(accountId);
+    await requireModelAccess(accountId, requestedAlias);
+    await checkUsageLimit(accountId);
 
     const providers = await ProviderService.getProvidersByAlias(requestedAlias);
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
@@ -388,7 +396,7 @@ function requestJson(urlStr: string, apiKey: string | undefined, postBody: strin
         };
         const req = lib.request(opts, (res) => {
             let data = "";
-            res.on("data", (chunk) => data += chunk);
+            res.on("data", (chunk: Buffer) => data += chunk);
             res.on("end", () => {
                 if (res.statusCode !== 200) return resolve(null);
                 try { resolve(JSON.parse(data)); } catch { resolve(null); }
@@ -405,7 +413,8 @@ async function completeHex(body: Record<string, any>, accountId: string): Promis
     const t0 = Date.now();
     const requestedAlias = body.model;
 
-    await applyThrottle(accountId);
+    await requireModelAccess(accountId, requestedAlias);
+    await checkUsageLimit(accountId);
 
     const providers = await ProviderService.getProvidersByAlias(requestedAlias);
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
@@ -476,7 +485,8 @@ function requestStream(urlStr: string, apiKey: string | undefined, postBody: str
 async function completeHexStream(body: Record<string, any>, accountId: string): Promise<ReadableStream<Uint8Array>> {
     const requestedAlias = body.model;
 
-    await applyThrottle(accountId);
+    await requireModelAccess(accountId, requestedAlias);
+    await checkUsageLimit(accountId);
 
     const providers = await ProviderService.getProvidersByAlias(requestedAlias);
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
@@ -517,21 +527,24 @@ export class AiService {
         return await completeHexStream(data, accountId);
     }
 
-    static async listModels(): Promise<ModelsServiceResponse> {
+    static async listModels(accountId: string = ""): Promise<ModelsServiceResponse> {
         const models = await getAllModels();
+        const allowed = accountId ? await getAllowedModelAliases(accountId) : null;
+
         const seen = new Set<string>();
         const data = [];
         for (const m of models) {
             const name = m.alias || "";
-            if (name && !seen.has(name)) {
-                seen.add(name);
-                data.push({
-                    id: name,
-                    object: "model",
-                    created: m.create_time,
-                    owned_by: "onekey",
-                });
-            }
+            if (!name || seen.has(name)) continue;
+            if (allowed !== null && !allowed.includes(name)) continue; // filter by permission
+            seen.add(name);
+            data.push({
+                id: name,
+                object: "model",
+                created: m.create_time,
+                owned_by: "onekey",
+                tier: m.tier,
+            });
         }
         return { data };
     }

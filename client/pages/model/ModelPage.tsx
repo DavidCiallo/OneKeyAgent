@@ -14,7 +14,6 @@ import {
     ModelQueryBody,
 } from "../../../shared/modules/model/model.interface";
 import { UsageStatsRequest, UsageStatsPeriod, UsageAmountData } from "../../../shared/modules/usage/usage.interface";
-import { ModelFilter } from "./components/ModelFilter";
 import { ModelCardGrid } from "./components/ModelCardGrid";
 import { ModelPagination } from "./components/ModelPagination";
 import { ModelFormModal } from "./components/ModelFormModal";
@@ -139,12 +138,6 @@ export default function ModelPage() {
         <div className="max-w-screen flex flex-col h-screen">
             <Header name={Locale("Menu").Model} />
             <div className="p-8 flex flex-col gap-4 flex-1 overflow-hidden">
-                <ModelFilter
-                    filterTier={filterTier}
-                    onTierChange={v => { setFilterTier(v); setPage(1); }}
-                    onAdd={openCreate}
-                />
-
                 <ModelCardGrid
                     list={list.map(item => ({ ...item, ...usageMap[item.id] }))}
                     onEdit={openEdit}

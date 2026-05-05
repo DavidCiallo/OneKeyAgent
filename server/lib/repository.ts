@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { eq, and, isNull, sql, desc, gte } from "drizzle-orm";
+import { eq, and, isNull, sql, desc, gte, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { db } from "./migrate";
 import * as schema from "./schema";
@@ -153,6 +153,16 @@ class Repository<
             .execute();
 
         return true;
+    }
+
+    async findByIds(ids: string[]): Promise<T[]> {
+        if (ids.length === 0) return [];
+        const result = await db
+            .select()
+            .from(this.table)
+            .where(and(isNull(this.table.delete_time), inArray(this.table.id, ids)))
+            .execute();
+        return result as T[];
     }
 
     async count(where?: Partial<T>, since?: number): Promise<number> {

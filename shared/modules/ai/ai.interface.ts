@@ -176,6 +176,7 @@ export class ModelsResponse implements BaseResponse<any> {
         object: string;
         created: number;
         owned_by: string;
+        tier?: number;
     }>;
     message?: string;
 

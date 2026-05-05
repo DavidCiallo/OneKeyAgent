@@ -46,16 +46,23 @@ export default function AccountInfoCard({
                             <div>
                                 <div className="flex justify-between text-xs mb-1">
                                     <span className="text-gray-500">{locale.Today}</span>
-                                    <span className="font-semibold text-primary">{toM(usage.today)}M</span>
+                                    <span className="font-semibold text-primary">
+                                        {toM(usage.today)}M/{toM(monthLimit / 12)}M
+                                    </span>
                                 </div>
                                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                    <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${Math.min((usage.today / (monthLimit / 8)) * 100, 100)}%` }} />
+                                    <div
+                                        className="h-full bg-primary rounded-full transition-all"
+                                        style={{ width: `${Math.min((usage.today / (monthLimit / 12)) * 100, 100)}%` }}
+                                    />
                                 </div>
                             </div>
                             <div>
                                 <div className="flex justify-between text-xs mb-1">
                                     <span className="text-gray-500">{locale.ThisWeek}</span>
-                                    <span className="font-semibold text-success">{toM(usage.thisWeek)}M</span>
+                                    <span className="font-semibold text-danger">
+                                        {toM(usage.today)}M/{toM(monthLimit / 4)}M
+                                    </span>
                                 </div>
                                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                                     <div className="h-full bg-success rounded-full transition-all" style={{ width: `${Math.min((usage.thisWeek / (monthLimit / 4)) * 100, 100)}%` }} />
