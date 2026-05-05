@@ -8,6 +8,7 @@ export const providerTable = sqliteTable("provider", {
     baseURL: text("base_url").notNull(),
     model: text("model").notNull(),
     apiKey: text("api_key"),
+    authType: text("auth_type").default("bearer"),
     proxyURL: text("proxy_url"),
     enabled: integer("enabled").notNull().default(1),
     create_time: integer("create_time").notNull(),
