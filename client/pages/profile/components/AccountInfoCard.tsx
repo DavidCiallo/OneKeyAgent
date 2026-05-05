@@ -61,7 +61,7 @@ export default function AccountInfoCard({
                                 <div className="flex justify-between text-xs mb-1">
                                     <span className="text-gray-500">{locale.ThisWeek}</span>
                                     <span className="font-semibold text-danger">
-                                        {toM(usage.today)}M/{toM(monthLimit / 4)}M
+                                        {toM(usage.thisWeek)}M/{toM(monthLimit / 4)}M
                                     </span>
                                 </div>
                                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
