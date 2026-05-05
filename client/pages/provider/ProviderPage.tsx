@@ -27,6 +27,7 @@ type ProviderForm = {
     baseURL: string;
     model: string;
     apiKey?: string;
+    authType: string;
     proxyURL?: string;
     enabled: number;
 };
@@ -43,7 +44,7 @@ export default function ProviderPage() {
     const { isOpen: isFormOpen, onOpen: onFormOpen, onClose: onFormClose, onOpenChange: onFormOpenChange } = useDisclosure();
     const [formMode, setFormMode] = useState<"create" | "edit">("create");
     const [editId, setEditId] = useState<string>("");
-    const [form, setForm] = useState<ProviderForm>({ modelAlias: "", priority: 1, name: "", baseURL: "", model: "", enabled: 1 });
+    const [form, setForm] = useState<ProviderForm>({ modelAlias: "", priority: 1, name: "", baseURL: "", model: "", authType: "bearer", enabled: 1 });
 
     const getToken = () => localStorage.getItem("access_token") || "";
 
@@ -86,7 +87,7 @@ export default function ProviderPage() {
 
     const openCreate = () => {
         setFormMode("create");
-        setForm({ modelAlias: "", priority: 1, name: "", baseURL: "", model: "", enabled: 1 });
+        setForm({ modelAlias: "", priority: 1, name: "", baseURL: "", model: "", authType: "bearer", enabled: 1 });
         onFormOpen();
     };
 
@@ -99,6 +100,7 @@ export default function ProviderPage() {
                 baseURL: item.baseURL,
                 model: item.model,
                 apiKey: item.apiKey || undefined,
+                authType: item.authType || undefined,
                 proxyURL: item.proxyURL || undefined,
                 enabled: item.enabled,
             }),
@@ -120,6 +122,7 @@ export default function ProviderPage() {
             baseURL: item.baseURL,
             model: item.model,
             apiKey: item.apiKey || "",
+            authType: item.authType || "bearer",
             proxyURL: item.proxyURL || "",
             enabled: item.enabled,
         });
@@ -136,6 +139,7 @@ export default function ProviderPage() {
                     baseURL: form.baseURL,
                     model: form.model,
                     apiKey: form.apiKey || undefined,
+                    authType: form.authType,
                     proxyURL: form.proxyURL || undefined,
                     enabled: form.enabled,
                 }),
@@ -157,6 +161,7 @@ export default function ProviderPage() {
                     baseURL: form.baseURL || undefined,
                     model: form.model || undefined,
                     apiKey: form.apiKey !== undefined ? form.apiKey : undefined,
+                    authType: form.authType,
                     proxyURL: form.proxyURL !== undefined ? form.proxyURL : undefined,
                     enabled: form.enabled !== undefined ? form.enabled : undefined,
                 }),

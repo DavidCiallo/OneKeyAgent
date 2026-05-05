@@ -9,6 +9,7 @@ export class ProviderDTO {
     public baseURL: string;
     public model: string;
     public apiKey?: string;
+    public authType?: string;
     public proxyURL?: string;
     public enabled: number;
     public create_time: number;
@@ -25,6 +26,7 @@ export class ProviderDTO {
         this.baseURL = origin.baseURL;
         this.model = origin.model;
         this.apiKey = origin.apiKey;
+        this.authType = origin.authType;
         this.proxyURL = origin.proxyURL;
         this.enabled = origin.enabled;
         this.create_time = origin.create_time;
@@ -40,12 +42,13 @@ export class ProviderCreateBody {
     public baseURL: string;
     public model: string;
     public apiKey?: string;
+    public authType?: string;
     public proxyURL?: string;
     public enabled?: number;
 
     private isTypeSafe: symbol = Symbol();
 
-    constructor(origin: Pick<ProviderEntity, "modelAlias" | "baseURL" | "model" | "priority" | "name"> & Partial<Pick<ProviderEntity, "apiKey" | "proxyURL" | "enabled">>) {
+    constructor(origin: Pick<ProviderEntity, "modelAlias" | "baseURL" | "model" | "priority" | "name"> & Partial<Pick<ProviderEntity, "apiKey" | "authType" | "proxyURL" | "enabled">>) {
         if (!origin.modelAlias || !origin.baseURL || !origin.model || origin.priority === undefined) {
             throw new Error("modelAlias, baseURL, model and priority are required");
         }
@@ -55,6 +58,7 @@ export class ProviderCreateBody {
         this.baseURL = origin.baseURL;
         this.model = origin.model;
         this.apiKey = origin.apiKey;
+        this.authType = origin.authType;
         this.proxyURL = origin.proxyURL;
         this.enabled = origin.enabled ?? 1;
     }
@@ -71,13 +75,14 @@ export class ProviderUpdateBody {
     public baseURL?: string;
     public model?: string;
     public apiKey?: string;
+    public authType?: string;
     public proxyURL?: string;
     public enabled?: number;
 
     private isTypeSafe: symbol = Symbol();
 
     constructor(origin: Partial<ProviderEntity> = {}) {
-        if (!origin.modelAlias && origin.priority === undefined && !origin.baseURL && !origin.model && !origin.apiKey && origin.apiKey === undefined && !origin.proxyURL && origin.enabled === undefined) {
+        if (!origin.modelAlias && origin.priority === undefined && !origin.baseURL && !origin.model && !origin.apiKey && origin.apiKey === undefined && !origin.authType && !origin.proxyURL && origin.enabled === undefined) {
             throw new Error("At least one field is required");
         }
         origin.modelAlias && (this.modelAlias = origin.modelAlias);
@@ -86,6 +91,7 @@ export class ProviderUpdateBody {
         origin.baseURL && (this.baseURL = origin.baseURL);
         origin.model && (this.model = origin.model);
         origin.apiKey !== undefined && (this.apiKey = origin.apiKey);
+        origin.authType && (this.authType = origin.authType);
         origin.proxyURL !== undefined && (this.proxyURL = origin.proxyURL);
         origin.enabled !== undefined && (this.enabled = origin.enabled);
     }

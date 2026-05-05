@@ -22,6 +22,7 @@ export function ProviderTable({ list, onEdit, onCopy, onDelete, onMoveUp, onMove
                 <TableColumn>{locale.Name}</TableColumn>
                 <TableColumn className="min-w-40">{locale.BaseURL}</TableColumn>
                 <TableColumn align="center">{locale.Model}</TableColumn>
+                <TableColumn align="center">{locale.AuthType}</TableColumn>
                 <TableColumn align="center">{locale.ApiKey}</TableColumn>
                 <TableColumn align="center">{locale.ProxyURL}</TableColumn>
                 <TableColumn align="center">{locale.Enabled}</TableColumn>
@@ -39,6 +40,11 @@ export function ProviderTable({ list, onEdit, onCopy, onDelete, onMoveUp, onMove
                             <TableCell className="max-w-xs truncate">{item.name}</TableCell>
                             <TableCell className="max-w-xs truncate">{item.baseURL}</TableCell>
                             <TableCell>{item.model}</TableCell>
+                            <TableCell>
+                                <Chip size="sm" variant="flat">
+                                    {item.authType || "bearer"}
+                                </Chip>
+                            </TableCell>
                             <TableCell className="max-w-xs truncate">
                                 {item.apiKey ? item.apiKey.slice(0, 8) + '...' + item.apiKey.slice(-8) : "—"}
                             </TableCell>
