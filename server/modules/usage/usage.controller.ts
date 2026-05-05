@@ -28,7 +28,8 @@ async function list(request: UsageListRequest): Promise<UsageListResponse> {
     if (filter?.accountId) search.accountId = filter.accountId;
     if (filter?.modelAlias) search.modelAlias = filter.modelAlias;
 
-    const { list: data, total } = await UsageService.find(page, search);
+    const since = Date.now() - 30 * 86400000;
+    const { list: data, total } = await UsageService.find(page, search, since);
 
     // Resolve accountId to account name (email)
     const accountIds = [...new Set(data.map(item => item.accountId))];
