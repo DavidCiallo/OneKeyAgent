@@ -3,6 +3,7 @@ import { fileURLToPath } from "url";
 import path from "path";
 import { runMigrations } from "../lib/migrate";
 import { initialize } from "./initialize";
+import { seedDefaultModel } from "../modules/ai/ai.session";
 
 config();
 
@@ -21,7 +22,8 @@ import { providerController } from "../modules/provider/provider.controller";
 import { taskController } from "../modules/task/task.controller";
 import { telegramController } from "../modules/telegram/telegram.controller";
 const PORT = parseInt(process.env.SERVER_PORT || "3300");
-initialize();
+await initialize();
+await seedDefaultModel();
 // @ts-ignore
 Bun.serve({
     port: PORT,
