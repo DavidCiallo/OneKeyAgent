@@ -42,16 +42,11 @@ export class AccountRoleService {
         const relations = await accountRoleRepository.find({ account_id: accountId });
         if (relations.length === 0) return [];
         const roleIds = relations.map(r => r.role_id);
-        const roles: RoleEntity[] = [];
-        for (const roleId of roleIds) {
-            const role = await roleRepository.findOne({ id: roleId });
-            if (role) roles.push(role);
-        }
-        return roles;
+        return await roleRepository.findByIds(roleIds);
     }
 
     static async assignPermissions(accountId: string, permissions: { name: string; type: string }[]): Promise<void> {
-        // Delete existing assignments
+        // Delete existing assignments in a single batch
         const existing = await accountRoleRepository.find({ account_id: accountId });
         for (const rel of existing) {
             await accountRoleRepository.delete({ id: rel.id });

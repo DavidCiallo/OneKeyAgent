@@ -8,6 +8,8 @@ export interface ProviderEntity extends BaseEntity {
     baseURL: string;
     model: string;
     apiKey?: string;
+    authType?: string;
+    apiType?: string;
     proxyURL?: string;
     enabled: number;
     create_time: number;

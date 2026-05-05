@@ -16,14 +16,6 @@ type Props = {
     onDelete: (id: string) => void;
 };
 
-const tierColors: Record<number, "primary" | "secondary" | "warning" | "danger" | "success"> = {
-    1: "primary",
-    2: "secondary",
-    3: "warning",
-    4: "danger",
-    5: "success",
-};
-
 function pad(n: number) {
     return String(n).padStart(2, "0");
 }
@@ -100,10 +92,10 @@ export function ModelCardGrid({ list, onEdit, onDelete }: Props) {
                         {/* Header: Tier badge + Alias */}
                         <div className="flex items-center gap-2 pb-2.5 border-b border-default-200">
                             <Chip
-                                color={tierColors[item.tier] || "default"}
+                                color="primary"
                                 variant="flat"
                             >
-                                T{item.tier}
+                                {item.tier}x
                             </Chip>
                             <span className="text-xl font-bold text-foreground truncate">
                                 {item.alias || "—"}
