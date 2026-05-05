@@ -47,6 +47,81 @@ function buildAuthHeader(apiKey: string | undefined, authType?: string): string 
     return `Bearer ${apiKey}`;
 }
 
+/** Convert OpenAI-format chat body to Anthropic format */
+function toAnthropicBody(body: Record<string, any>): Record<string, any> {
+    const messages = body.messages || [];
+    const systemMsg = messages.filter((m: any) => m.role === "system");
+    const chatMessages = messages.filter((m: any) => m.role !== "system");
+
+    const anthropicMessages = chatMessages.map((m: any) => ({
+        role: m.role,
+        content: [{ type: "text", text: m.content }],
+    }));
+
+    const result: Record<string, any> = {
+        model: body.model,
+        max_tokens: body.max_tokens || 4096,
+        messages: anthropicMessages,
+        stream: body.stream,
+    };
+
+    if (systemMsg.length > 0) {
+        result.system = systemMsg.map((m: any) => ({ type: "text", text: m.content }));
+    }
+
+    return result;
+}
+
+/** Convert Anthropic non-stream response to OpenAI-compatible format */
+function anthropicToOpenAI(data: any, model: string): any {
+    const content = data.content?.find((c: any) => c.type === "text")?.text || "";
+    return {
+        id: data.id,
+        model,
+        choices: [{
+            index: 0,
+            message: { role: "assistant", content },
+            finish_reason: data.stop_reason === "end_turn" ? "stop" : data.stop_reason,
+        }],
+        usage: {
+            prompt_tokens: data.usage?.input_tokens || 0,
+            completion_tokens: data.usage?.output_tokens || 0,
+            total_tokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
+        },
+    };
+}
+
+/** Build request headers and URL path based on api type */
+function buildRequestConfig(
+    baseURL: string,
+    apiKey: string | undefined,
+    authType: string | undefined,
+    apiType: string | undefined,
+    body: Record<string, any>,
+): { url: URL; headers: Record<string, string>; requestBody: string } {
+    const isAnthropic = apiType === "anthropic";
+    const path = isAnthropic ? "/messages" : "/chat/completions";
+    const url = new URL(`${baseURL}${path}`);
+
+    const postBody = isAnthropic
+        ? JSON.stringify(toAnthropicBody(body))
+        : JSON.stringify(body);
+
+    const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(postBody).toString(),
+    };
+
+    if (isAnthropic) {
+        headers["x-api-key"] = apiKey || "";
+        headers["anthropic-version"] = "2023-06-01";
+    } else {
+        headers["Authorization"] = buildAuthHeader(apiKey, authType);
+    }
+
+    return { url, headers, requestBody: postBody };
+}
+
 /** Try to call upstream provider, returns response data or null */
 async function tryProvider(
     baseURL: string,
@@ -55,9 +130,9 @@ async function tryProvider(
     proxyURL: string | undefined,
     body: Record<string, any>,
     authType?: string,
+    apiType?: string,
 ): Promise<any> {
-    const url = new URL(`${baseURL}/chat/completions`);
-    const postBody = JSON.stringify(body);
+    const { url, headers, requestBody: postBody } = buildRequestConfig(baseURL, apiKey, authType, apiType, body);
     const agent = proxyURL ? new HttpsProxyAgent(proxyURL) : undefined;
 
     return new Promise((resolve) => {
@@ -67,11 +142,7 @@ async function tryProvider(
             port: url.port || (url.protocol === "https:" ? 443 : 80),
             path: url.pathname + url.search,
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": buildAuthHeader(apiKey, authType),
-                "Content-Length": Buffer.byteLength(postBody).toString(),
-            },
+            headers,
             agent,
             timeout: 300_000,
         };
@@ -80,7 +151,14 @@ async function tryProvider(
             res.on("data", (chunk) => data += chunk);
             res.on("end", () => {
                 if (res.statusCode !== 200) return resolve(null);
-                try { resolve(JSON.parse(data)); } catch { resolve(null); }
+                try {
+                    const parsed = JSON.parse(data);
+                    if (apiType === "anthropic") {
+                        resolve(anthropicToOpenAI(parsed, model));
+                    } else {
+                        resolve(parsed);
+                    }
+                } catch { resolve(null); }
             });
         });
         req.on("error", () => resolve(null));
@@ -98,9 +176,9 @@ async function tryProviderStream(
     proxyURL: string | undefined,
     body: Record<string, any>,
     authType?: string,
+    apiType?: string,
 ): Promise<ReadableStream<Uint8Array> | null> {
-    const url = new URL(`${baseURL}/chat/completions`);
-    const postBody = JSON.stringify(body);
+    const { url, headers, requestBody: postBody } = buildRequestConfig(baseURL, apiKey, authType, apiType, body);
     const agent = proxyURL ? new HttpsProxyAgent(proxyURL) : undefined;
 
     return new Promise((resolve) => {
@@ -110,11 +188,7 @@ async function tryProviderStream(
             port: url.port || (url.protocol === "https:" ? 443 : 80),
             path: url.pathname + url.search,
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": buildAuthHeader(apiKey, authType),
-                "Content-Length": Buffer.byteLength(postBody).toString(),
-            },
+            headers,
             agent,
             timeout: 300_000,
         };
@@ -123,7 +197,7 @@ async function tryProviderStream(
                 res.resume();
                 return resolve(null);
             }
-            // Convert Node.js stream to Web ReadableStream
+            // Anthropic SSE uses event: / data: lines — pass through, client handles SSE
             const ts = new TransformStream<Uint8Array, Uint8Array>();
             const writer = ts.writable.getWriter();
             res.on("data", (chunk: Buffer) => writer.write(chunk));
@@ -162,7 +236,7 @@ async function chatHex(body: Record<string, any>, accountId: string): Promise<an
             model: provider.model,
         };
 
-        const data = await tryProvider(provider.baseURL, provider.model, provider.apiKey, provider.proxyURL, requestBody, provider.authType);
+        const data = await tryProvider(provider.baseURL, provider.model, provider.apiKey, provider.proxyURL, requestBody, provider.authType, provider.apiType);
         if (!data) {
             ProviderService.recordFail(provider.id);
             continue;
@@ -219,7 +293,7 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
             model: provider.model,
         };
 
-        const bodyStream = await tryProviderStream(provider.baseURL, provider.model, provider.apiKey, provider.proxyURL, requestBody, provider.authType);
+        const bodyStream = await tryProviderStream(provider.baseURL, provider.model, provider.apiKey, provider.proxyURL, requestBody, provider.authType, provider.apiType);
         if (!bodyStream) {
             ProviderService.recordFail(provider.id);
             continue;
@@ -239,31 +313,43 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
             try {
                 const reader = parseStream.getReader();
                 const decoder = new TextDecoder();
-                let usage: any = null;
+                let usageData: any = null;
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
 
                     const text = decoder.decode(value, { stream: true });
+                    let pendingAnthropic = false;
                     const lines = text.split('\n');
                     for (const line of lines) {
+                        // Anthropic format: event: message_delta — mark next data line
+                        if (line === 'event: message_delta') {
+                            pendingAnthropic = true;
+                            continue;
+                        }
                         if (line.startsWith('data: ') && !line.startsWith('data: [DONE]')) {
                             try {
                                 const data = JSON.parse(line.slice(6));
                                 if (data.usage) {
-                                    usage = data.usage;
+                                    usageData = data.usage;
+                                } else if (pendingAnthropic && data.type === 'message_delta' && data.usage) {
+                                    usageData = {
+                                        input_tokens: data.usage.input_tokens || 0,
+                                        output_tokens: data.usage.output_tokens || 0,
+                                    };
                                 }
                             } catch { }
+                            pendingAnthropic = false;
                         }
                     }
                 }
 
-                if (usage) {
+                if (usageData) {
                     const ms = Date.now() - t0;
                     const tier = await getModelTier(requestedAlias);
-                    const rawInput = usage.prompt_tokens || 0;
-                    const rawOutput = usage.completion_tokens || 0;
+                    const rawInput = usageData.input_tokens || 0;
+                    const rawOutput = usageData.output_tokens || 0;
                     await logUsage({
                         accountId,
                         modelAlias: requestedAlias,

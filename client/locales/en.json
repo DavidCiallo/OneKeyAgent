@@ -48,6 +48,7 @@
         "ApiKey": "ApiKey",
         "ProxyURL": "Proxy URL",
         "AuthType": "Auth Type",
+        "ApiType": "API Type",
         "Enabled": "Enabled",
         "Actions": "Actions",
         "Edit": "Edit",
