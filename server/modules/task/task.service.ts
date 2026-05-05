@@ -9,14 +9,12 @@ const accountRepository: Repository<AccountEntity> = Repository.instance("Accoun
 export class TaskService {
     // Long polling design for rolling task
     static async pollByAccount(accountId: string): Promise<TaskEntity | null> {
-        const existProcessing = await taskRepository.findOne({ account_id: accountId, status: "processing" });
-        if (existProcessing) {
-            await new Promise(resolve => setTimeout(resolve, 5 * 1000));
-            return existProcessing;
-        }
         let count = 0;
         while (count++ < 50) {
-            const task = await taskRepository.findOne({ account_id: accountId, status: "pending" });
+            const task = (
+                await taskRepository.findOne({ account_id: accountId, status: "pending" }) ||
+                await taskRepository.findOne({ account_id: accountId, status: "processing" })
+            );
             if (!task) {
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 continue;
@@ -28,7 +26,7 @@ export class TaskService {
     }
 
     static async create(data: Partial<TaskEntity>): Promise<TaskEntity> {
-        return await taskRepository.insert(data);
+        return await taskRepository.insert({ ...data, status: "pending" });
     }
 
     static async complete(id: string, status: string, result?: string): Promise<TaskEntity | null> {

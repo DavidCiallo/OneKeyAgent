@@ -5,6 +5,8 @@ import { UsageStatsPeriod, UsageStatsResult, UsageAmountData, UserSession, UserS
 const usageRepo = Repository.instance<UsageLogEntity>("UsageLog");
 
 const TEN_MIN = 10 * 60 * 1000;
+const DAY = 86400000;
+const MONTH = 30 * DAY;
 
 /** Get the local-timezone midnight timestamp (in ms since epoch) */
 function localDayStart(ts: number): number {
@@ -73,15 +75,14 @@ function buildSession(logs: UsageLogEntity[]): UserSession {
 }
 
 export class UsageService {
-    static async find(page: number, filter: Partial<UsageLogEntity>): Promise<{ list: UsageLogEntity[], total: number }> {
-        const list = await usageRepo.find(filter, { offset: (page - 1) * 40, limit: 40 });
-        const total = await usageRepo.count(filter);
+    static async find(page: number, filter: Partial<UsageLogEntity>, since?: number): Promise<{ list: UsageLogEntity[], total: number }> {
+        const list = await usageRepo.find(filter, { offset: (page - 1) * 40, limit: 40, since });
+        const total = since ? await usageRepo.count(filter, since) : await usageRepo.count(filter);
         return { list, total };
     }
 
     static async stats(modelAlias?: string): Promise<UsageStatsResult> {
         const now = Date.now();
-        const DAY = 86400000;
 
         const todayStart = localDayStart(now); // local-timezone midnight
         const nowTenMin = tenMinStart(now);
@@ -91,7 +92,7 @@ export class UsageService {
         const filter: Partial<UsageLogEntity> = {};
         if (modelAlias) filter.modelAlias = modelAlias;
 
-        const allLogs = await usageRepo.find(filter);
+        const allLogs = await usageRepo.find(filter, { since: now - MONTH });
         const todayLogs = allLogs.filter(l => l.create_time >= todayStart && l.create_time < nowTenMin + TEN_MIN);
         const last24hLogs = allLogs.filter(l => l.create_time >= last24hStart && l.create_time < nowTenMin + TEN_MIN);
         const weekLogs = allLogs.filter(l => l.create_time >= weekStart && l.create_time < nowTenMin + TEN_MIN);
@@ -105,13 +106,12 @@ export class UsageService {
 
     static async myStats(accountId: string): Promise<{ today: number; thisWeek: number; total: number }> {
         const now = Date.now();
-        const DAY = 86400000;
 
         const todayStart = localDayStart(now);
         const weekStart = todayStart - 7 * DAY;
         const nowTenMin = tenMinStart(now);
 
-        const allLogs = await usageRepo.find({ accountId });
+        const allLogs = await usageRepo.find({ accountId }, { since: now - MONTH });
         const todayLogs = allLogs.filter(l => l.create_time >= todayStart && l.create_time < nowTenMin + TEN_MIN);
         const weekLogs = allLogs.filter(l => l.create_time >= weekStart && l.create_time < nowTenMin + TEN_MIN);
 
@@ -146,7 +146,7 @@ export class UsageService {
 
     /** Get usage grouped by user with continuous sessions (same modelAlias, gap < 15 min) */
     static async getUserSessions(): Promise<UserSessionGroup[]> {
-        const allLogs = await usageRepo.find({});
+        const allLogs = await usageRepo.find({}, { since: Date.now() - MONTH });
         const SESSION_GAP = 15 * 60 * 1000; // 15 minutes
 
         // Group by accountId
