@@ -19,13 +19,13 @@ export const Header = ({ name }: params) => {
         let lan = "";
         switch (locale) {
             case "cn":
-                lan = "中";
+                lan = "EN";
                 break;
             case "en":
-                lan = "EN";
+                lan = "中";
                 break;
             default:
-                lan = "EN";
+                lan = "中";
         }
         return (
             <Button size="sm" variant="bordered" className="text-xs text-gray-500 w-16" onClick={changeLan}>

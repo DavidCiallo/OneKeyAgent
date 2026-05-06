@@ -44,6 +44,7 @@ export default function SubscriptionPage() {
     const [paymentId, setPaymentId] = useState<string | null>(null);
     const [records, setRecords] = useState<TxRecord[]>([]);
     const [checking, setChecking] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const paymentModal = useDisclosure();
 
     const fetchProfile = useCallback(async () => {
@@ -100,6 +101,13 @@ export default function SubscriptionPage() {
         paymentModal.onClose();
     };
 
+    const handleRefresh = async () => {
+        setRefreshing(true);
+        await fetchRecords();
+        await fetchProfile();
+        setRefreshing(false);
+    };
+
     const selectedPlanData = plans.find(p => p.name === selectedPlan);
 
     return (
@@ -133,7 +141,7 @@ export default function SubscriptionPage() {
                         />
                     )}
 
-                    <TransactionHistory records={records} />
+                    <TransactionHistory records={records} onRefresh={handleRefresh} refreshing={refreshing} />
                 </div>
             </div>
         </div>
