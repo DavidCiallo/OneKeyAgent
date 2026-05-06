@@ -8,24 +8,24 @@ type params = {
 export const Header = ({ name }: params) => {
     function changeLan() {
         const lanList = ["cn", "en"];
-        const locale = localStorage.getItem("locale") || "cn";
+        const locale = localStorage.getItem("locale") || "en";
         const index = lanList.indexOf(locale);
         const nextIndex = (index + 1) % lanList.length;
         localStorage.setItem("locale", lanList[nextIndex]);
         window.location.reload();
     }
     function Language() {
-        const locale = localStorage.getItem("locale") || "cn";
+        const locale = localStorage.getItem("locale") || "en";
         let lan = "";
         switch (locale) {
             case "cn":
-                lan = "中文";
+                lan = "中";
                 break;
             case "en":
                 lan = "EN";
                 break;
             default:
-                lan = "中文";
+                lan = "EN";
         }
         return (
             <Button size="sm" variant="bordered" className="text-xs text-gray-500 w-16" onClick={changeLan}>

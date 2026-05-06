@@ -35,9 +35,9 @@ export async function createInvoice(
     const body = {
         price_amount: priceInUsd,
         price_currency: "usd",
-        pay_currency: "usdt",
+        pay_currency: "USDTERC20",
         order_id: accountId,
-        order_description: `OneKeyAgent ${planName} plan subscription`,
+        order_description: `ehex ${planName} plan subscription`,
         ipn_callback_url: process.env.IPN_CALLBACK_URL + "/api/subscription/ipnwebhook",
         is_fixed_rate: false,
     };
@@ -66,20 +66,14 @@ export async function createInvoice(
     };
 }
 
-/**
- * Check payment status via NowPayments API.
- * Requires a real payment_id (not invoice_id).
- */
 export async function checkPaymentStatus(paymentId: string): Promise<{
     status: string;
     actuallyPaid: number | null;
 }> {
     const apiKey = getApiKey();
-
     const resp = await fetch(`${NOWPAYMENTS_API_URL}/payment/${paymentId}`, {
         headers: { "x-api-key": apiKey },
     });
-
     if (!resp.ok) {
         const text = await resp.text();
         throw new Error(`NowPayments check payment failed (${resp.status}): ${text}`);
