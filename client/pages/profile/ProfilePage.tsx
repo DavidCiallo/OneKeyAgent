@@ -9,6 +9,7 @@ import { AccountDTO } from "../../../shared/modules/account/account.interface";
 import AccountInfoCard from "./components/AccountInfoCard";
 import ApiKeyCard from "./components/ApiKeyCard";
 import EndpointCard from "./components/EndpointCard";
+import ModelsCard from "./components/ModelsCard";
 import RegenerateModal from "./components/RegenerateModal";
 import { useDisclosure } from "@heroui/react";
 
@@ -17,7 +18,7 @@ export default function ProfilePage() {
     const getToken = () => localStorage.getItem("access_token") || "";
 
     const [account, setAccount] = useState<AccountDTO | null>(null);
-    const [models, setModels] = useState<string[]>([]);
+    const [models, setModels] = useState<{ id: string; tier: number }[]>([]);
     const [regenerating, setRegenerating] = useState(false);
     const [usage, setUsage] = useState<{ today: number; thisWeek: number; total: number } | null>(null);
     const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onClose: onConfirmClose, onOpenChange: onConfirmChange } = useDisclosure();
@@ -32,8 +33,8 @@ export default function ProfilePage() {
     const fetchModels = useCallback(async () => {
         const res = await AiRouter.models(new ModelsRequest({ auth: getToken() }));
         if (res.success && res.data) {
-            const allIds = res.data.map((m: any) => m.id);
-            setModels(allIds);
+            const allModels = res.data.map((m: any) => ({ id: m.id, tier: m.tier }));
+            setModels(allModels);
         }
     }, []);
 
@@ -83,7 +84,8 @@ export default function ProfilePage() {
                         regenerating={regenerating}
                         onConfirmOpen={onConfirmOpen}
                     />
-                    <EndpointCard endpoint={endpoint} models={models} onCopy={handleCopy} />
+                    <EndpointCard endpoint={endpoint} onCopy={handleCopy} />
+                    <ModelsCard models={models} />
                 </div>
             </div>
 

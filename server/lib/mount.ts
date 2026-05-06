@@ -15,7 +15,23 @@ export async function mounthttp(req: Request, controllers: BaseRouterInstance[])
                 const auth = req.headers.get("token") || req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
                 let requestBody: Record<string, any> | null = {};
                 try {
-                    requestBody = await req.json();
+                    const contentType = req.headers.get("content-type") || "";
+                    if (contentType.includes("application/json")) {
+                        requestBody = await req.json();
+                    } else if (contentType.includes("application/x-www-form-urlencoded")) {
+                        const text = await req.text();
+                        const params = new URLSearchParams(text);
+                        requestBody = Object.fromEntries(params.entries());
+                    } else {
+                        // Try JSON first, then form-urlencoded
+                        const text = await req.text();
+                        try {
+                            requestBody = JSON.parse(text);
+                        } catch {
+                            const params = new URLSearchParams(text);
+                            requestBody = Object.fromEntries(params.entries());
+                        }
+                    }
                 } catch (e) {
                     requestBody = null;
                 }

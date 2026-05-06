@@ -1,4 +1,4 @@
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Checkbox, CheckboxGroup, Input } from "@heroui/react";
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Checkbox, CheckboxGroup, Input, Select, SelectItem } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
 import { useEffect, useState } from "react";
 import { AiRouter } from "../../../api/instance";
@@ -8,7 +8,9 @@ type Permission = { name: string; type: string };
 
 const PERMISSION_OPTIONS: Permission[] = [
     { name: "profile", type: "menu" },
+    { name: "subscription", type: "menu" },
     { name: "model", type: "menu" },
+    { name: "planmanagement", type: "menu" },
     { name: "usage", type: "menu" },
     { name: "account", type: "menu" },
 ];
@@ -25,7 +27,8 @@ type AccountForm = {
     email: string;
     password: string;
     is_admin: number;
-    monthly_limit: string;
+    plan: string;
+    plan_expires_at: string;
     permissions: string[]; // "menu:model" format for checkbox values
 };
 
@@ -51,6 +54,7 @@ export function AccountFormModal({ isOpen, onOpenChange, mode, form, onFormChang
     const locale = Locale("AccountPage");
     const common = Locale("Common");
     const [allModels, setAllModels] = useState<string[]>([]);
+    const [planOptions, setPlanOptions] = useState<{ id: string; name: string }[]>([]);
 
     // Fetch all model aliases when modal opens in edit mode
     useEffect(() => {
@@ -60,6 +64,17 @@ export function AccountFormModal({ isOpen, onOpenChange, mode, form, onFormChang
                     const res = await AiRouter.models(new ModelsRequest({ auth: "" }));
                     if (res.success && res.data) {
                         setAllModels(res.data.map((m: any) => m.id));
+                    }
+                } catch { /* ignore */ }
+            })();
+            // Fetch plans for the plan selector
+            (async () => {
+                try {
+                    const { SubscriptionPlanRouter } = await import("../../../api/instance");
+                    const { SubscriptionPlanListRequest } = await import("../../../../shared/modules/subscription_plan/subscription_plan.interface");
+                    const res = await SubscriptionPlanRouter.list(new SubscriptionPlanListRequest({}));
+                    if (res.success && res.data) {
+                        setPlanOptions(res.data.list.map((p: any) => ({ id: p.name, name: p.name.toUpperCase() })));
                     }
                 } catch { /* ignore */ }
             })();
@@ -93,12 +108,31 @@ export function AccountFormModal({ isOpen, onOpenChange, mode, form, onFormChang
                                 isRequired
                             />
                         )}
-                        <Input
-                            label="Monthly Limit (tokens)"
-                            value={form.monthly_limit}
-                            onChange={e => onFormChange({ ...form, monthly_limit: e.target.value })}
-                            description="Default: 120000000 (120M tokens)"
-                        />
+                        {mode === "edit" && (
+                            <Select
+                                label="Plan"
+                                selectedKeys={form.plan ? [form.plan] : []}
+                                onSelectionChange={keys => {
+                                    const val = Array.from(keys)[0] as string;
+                                    if (val) onFormChange({ ...form, plan: val });
+                                }}
+                                disallowEmptySelection
+                            >
+                                {planOptions.map(opt => (
+                                    <SelectItem key={opt.id}>{opt.name}</SelectItem>
+                                ))}
+                            </Select>
+                        )}
+
+                        {mode === "edit" && (
+                            <Input
+                                label="套餐到期时间"
+                                type="date"
+                                value={form.plan_expires_at}
+                                onChange={e => onFormChange({ ...form, plan_expires_at: e.target.value })}
+                                description="留空表示不限制"
+                            />
+                        )}
 
                         {mode === "edit" && form.is_admin ? (
                             <p className="text-sm text-gray-500">{locale.AdminAllPermissions}</p>

@@ -1,5 +1,6 @@
 import { Card, CardBody, CardHeader, Divider, Chip } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
+import { useEffect, useState } from "react";
 
 interface UsageData {
     today: number;
@@ -7,17 +8,36 @@ interface UsageData {
     total: number;
 }
 
+const DEFAULT_MONTHLY_LIMIT = 90_000_000;
+const fmt = (val: number) => {
+    if (val >= 1_000_000) return (val / 1_000_000).toFixed(1) + "M";
+    if (val >= 1000) return (val / 1000).toFixed(1) + "K";
+    return val.toString();
+};
+
 export default function AccountInfoCard({
     account,
     usage,
 }: {
-    account: { name: string; email: string; is_admin: number; monthly_limit: number };
+    account: { name: string; email: string; is_admin: number; plan?: string; plan_expires_at?: number | null };
     usage: UsageData | null;
 }) {
     const locale = Locale("ProfilePage");
+    const [monthLimit, setMonthLimit] = useState(DEFAULT_MONTHLY_LIMIT);
 
-    const toM = (val: number) => (val / 1_000_000).toFixed(1);
-    const monthLimit = account.monthly_limit || 100_000_000;
+    useEffect(() => {
+        (async () => {
+            try {
+                const { SubscriptionPlanRouter } = await import("../../../api/instance");
+                const { SubscriptionPlanListRequest } = await import("../../../../shared/modules/subscription_plan/subscription_plan.interface");
+                const res = await SubscriptionPlanRouter.list(new SubscriptionPlanListRequest({}));
+                if (res.success && res.data) {
+                    const plan = res.data.list.find((p: any) => p.name === (account.plan || "free"));
+                    if (plan) setMonthLimit(plan.monthly_limit);
+                }
+            } catch { /* ignore */ }
+        })();
+    }, [account.plan]);
 
     return (
         <Card>
@@ -40,6 +60,17 @@ export default function AccountInfoCard({
                                 {account.is_admin ? locale.Admin : locale.User}
                             </Chip>
                         </div>
+                        <div className="flex items-center gap-3">
+                            <span className="text-sm text-gray-500 w-20">Plan</span>
+                            <Chip size="sm" color={account.plan === "free" ? "default" : account.plan === "pro" ? "primary" : "warning"} variant="flat">
+                                {account.plan?.toUpperCase() || "FREE"}
+                            </Chip>
+                            {account.plan_expires_at && account.plan_expires_at > Date.now() && (
+                                <span className="text-xs text-gray-400">
+                                    Expires: {new Date(account.plan_expires_at || 20000000).toLocaleDateString()}
+                                </span>
+                            )}
+                        </div>
                     </div>
                     {usage && (
                         <div className="w-full md:w-56 space-y-3 md:pl-6">
@@ -47,7 +78,7 @@ export default function AccountInfoCard({
                                 <div className="flex justify-between text-xs mb-1">
                                     <span className="text-gray-500">{locale.Today}</span>
                                     <span className="font-semibold text-primary">
-                                        {toM(usage.today)}M/{toM(monthLimit / 12)}M
+                                        {fmt(usage.today)}/{fmt(monthLimit / 12)}
                                     </span>
                                 </div>
                                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -61,7 +92,7 @@ export default function AccountInfoCard({
                                 <div className="flex justify-between text-xs mb-1">
                                     <span className="text-gray-500">{locale.ThisWeek}</span>
                                     <span className="font-semibold text-danger">
-                                        {toM(usage.thisWeek)}M/{toM(monthLimit / 4)}M
+                                        {fmt(usage.thisWeek)}/{fmt(monthLimit / 4)}
                                     </span>
                                 </div>
                                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -71,7 +102,7 @@ export default function AccountInfoCard({
                             <div>
                                 <div className="flex justify-between text-xs mb-1">
                                     <span className="text-gray-500">{locale.Total}</span>
-                                    <span className="font-semibold text-warning">{toM(usage.total)}M</span>
+                                    <span className="font-semibold text-warning">{fmt(usage.total)}</span>
                                 </div>
                                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                                     <div className="h-full bg-warning rounded-full transition-all" style={{ width: `${Math.min((usage.total / Math.max(usage.total, 1)) * 100, 100)}%` }} />

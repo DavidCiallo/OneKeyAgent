@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { ModelDTO } from "../../../shared/modules/model/model.entity";
 import { ModelRouter, UsageRouter } from "../../api/instance";
 import { Locale } from "../../methods/locale";
-import { useDisclosure } from "@heroui/react";
+import { useDisclosure, Button } from "@heroui/react";
 import {
     ModelListRequest,
     ModelCreateRequest,
@@ -21,6 +21,7 @@ import { ModelFormModal } from "./components/ModelFormModal";
 type ModelForm = {
     tier: number;
     alias?: string;
+    is_public?: number;
 };
 
 export default function ModelPage() {
@@ -80,7 +81,7 @@ export default function ModelPage() {
 
     const openCreate = () => {
         setFormMode("create");
-        setForm({ tier: 1, alias: "" });
+        setForm({ tier: 1, alias: "", is_public: 0 });
         onFormOpen();
     };
 
@@ -90,6 +91,7 @@ export default function ModelPage() {
         setForm({
             tier: item.tier,
             alias: item.alias || "",
+            is_public: item.is_public,
         });
         onFormOpen();
     };
@@ -100,6 +102,7 @@ export default function ModelPage() {
                 model: new ModelCreateBody({
                     tier: form.tier,
                     alias: form.alias || "",
+                    is_public: form.is_public ?? 0,
                 }),
                 auth: getToken(),
             });
@@ -115,6 +118,7 @@ export default function ModelPage() {
                 model: new ModelUpdateBody({
                     tier: form.tier,
                     alias: form.alias || undefined,
+                    is_public: form.is_public,
                 }),
                 auth: getToken(),
             });
@@ -138,6 +142,9 @@ export default function ModelPage() {
         <div className="max-w-screen flex flex-col h-screen">
             <Header name={Locale("Menu").Model} />
             <div className="p-8 flex flex-col gap-4 flex-1 overflow-hidden">
+                <div className="flex justify-end">
+                    <Button color="primary" onPress={openCreate}>{locale.CreateModel}</Button>
+                </div>
                 <ModelCardGrid
                     list={list.map(item => ({ ...item, ...usageMap[item.id] }))}
                     onEdit={openEdit}
