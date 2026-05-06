@@ -15,6 +15,8 @@ export const Header = ({ name }: params) => {
             ja: "JA",
             es: "ES",
             "pt-BR": "PT",
+            vi: "VI",
+            th: "TH",
         };
 
         const handleSelect = (key: string) => {

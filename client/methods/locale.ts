@@ -4,6 +4,8 @@ import RU from "../locales/ru.json";
 import JA from "../locales/ja.json";
 import ES from "../locales/es.json";
 import PT_BR from "../locales/pt-BR.json";
+import VI from "../locales/vi.json";
+import TH from "../locales/th.json";
 
 export function Locale(page: string): { [key: string]: string } {
     const language = localStorage.getItem("locale") || "en";
@@ -38,6 +40,16 @@ export function Locale(page: string): { [key: string]: string } {
         case "pt-BR":
             if (page in PT_BR) {
                 strMap = PT_BR[page as keyof typeof PT_BR];
+            }
+            break;
+        case "vi":
+            if (page in VI) {
+                strMap = VI[page as keyof typeof VI];
+            }
+            break;
+        case "th":
+            if (page in TH) {
+                strMap = TH[page as keyof typeof TH];
             }
             break;
         default:

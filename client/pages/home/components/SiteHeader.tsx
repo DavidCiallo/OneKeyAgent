@@ -16,6 +16,8 @@ export default function SiteHeader({
         ja: "JA",
         es: "ES",
         "pt-BR": "PT",
+        vi: "VI",
+        th: "TH",
     };
 
     const currentLan = localStorage.getItem("locale") || "en";
