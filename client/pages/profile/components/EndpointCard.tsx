@@ -1,13 +1,11 @@
-import { Card, CardBody, CardHeader, Divider, Chip, Button } from "@heroui/react";
+import { Card, CardBody, CardHeader, Divider, Button } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
 
 export default function EndpointCard({
     endpoint,
-    models,
     onCopy,
 }: {
     endpoint: string;
-    models: string[];
     onCopy: (text: string) => void;
 }) {
     const locale = Locale("ProfilePage");
@@ -27,12 +25,6 @@ export default function EndpointCard({
                             {locale.Copy}
                         </Button>
                     </div>
-                </div>
-                <div className="flex flex-row gap-2 items-center">
-                    <span className="text-sm text-gray-500 block">{locale.AvailableModels}</span>
-                    {models.map((model, index) => (
-                        <Chip key={index} color="primary" variant="flat">{model}</Chip>
-                    ))}
                 </div>
                 <div className="pt-2">
                     <a href="/terms" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">{locale.TermsLink}</a>
