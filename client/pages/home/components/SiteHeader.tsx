@@ -11,15 +11,15 @@ export default function SiteHeader({
 }) {
     function changeLan() {
         const lanList = ["cn", "en"];
-        const locale = localStorage.getItem("locale") || "cn";
+        const locale = localStorage.getItem("locale") || "en";
         const index = lanList.indexOf(locale);
         const nextIndex = (index + 1) % lanList.length;
         localStorage.setItem("locale", lanList[nextIndex]);
         window.location.reload();
     }
 
-    const currentLan = localStorage.getItem("locale") || "cn";
-    const lanLabel = currentLan === "cn" ? "中" : "EN";
+    const currentLan = localStorage.getItem("locale") || "en";
+    const lanLabel = currentLan === "en" ? "EN" : "ZH";
 
     return (
         <header className="fixed top-0 inset-x-0 z-50 transition-all duration-300 bg-white">
