@@ -5,7 +5,6 @@ interface TxRecord {
     id: string;
     plan_name: string;
     txid: string;
-    from_address: string;
     amount: number;
     status: string;
     create_time: number;
@@ -19,8 +18,6 @@ const STATUS_MAP: Record<string, { color: "warning" | "success" | "danger" | "de
 
 export default function TransactionHistory({ records }: { records: TxRecord[] }) {
     const locale = Locale("SubscriptionPage");
-
-    const toM = (val: number) => (val / 1_000_000).toFixed(0);
 
     return (
         <Card>
@@ -48,7 +45,7 @@ export default function TransactionHistory({ records }: { records: TxRecord[] })
                                     </div>
                                     <div className="text-right">
                                         <p className="text-sm font-semibold">
-                                            ${(record.amount / 1_000_000).toFixed(2)}
+                                            ${(record.amount / 100).toFixed(2)}
                                         </p>
                                         <p className="text-xs text-gray-400">
                                             {new Date(record.create_time).toLocaleDateString()}

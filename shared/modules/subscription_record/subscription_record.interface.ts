@@ -6,12 +6,10 @@ export class SubscriptionRecordDTO {
     public account_id: string;
     public plan_name: string;
     public txid: string;
-    public from_address: string;
-    public to_address: string;
-    public chain: string;
     public amount: number;
     public status: TxStatus;
     public create_time: number;
+    public payment_id: string;
 
     private isTypeSafe: symbol = Symbol();
 
@@ -20,12 +18,10 @@ export class SubscriptionRecordDTO {
         this.account_id = origin.account_id;
         this.plan_name = origin.plan_name;
         this.txid = origin.txid;
-        this.from_address = origin.from_address;
-        this.to_address = origin.to_address;
-        this.chain = origin.chain;
         this.amount = origin.amount;
         this.status = origin.status;
         this.create_time = origin.create_time;
+        this.payment_id = origin.payment_id;
     }
 }
 
@@ -55,29 +51,47 @@ export class SubscriptionRecordListResponse implements BaseResponse<Subscription
     }
 }
 
-export class SubscriptionAddressRequest implements BaseRequest {
+export class SubscriptionCreatePaymentRequest implements BaseRequest {
     public auth?: string;
+    public plan_name?: string;
 
-    constructor(origin: Partial<SubscriptionAddressRequest>) {
+    constructor(origin: Partial<SubscriptionCreatePaymentRequest>) {
         if (false) throw new Error("Unexpected error");
         origin.auth && (this.auth = origin.auth);
+        origin.plan_name && (this.plan_name = origin.plan_name);
     }
-    static self(unsafe: SubscriptionAddressRequest) {
-        return new SubscriptionAddressRequest(unsafe);
+    static self(unsafe: SubscriptionCreatePaymentRequest) {
+        return new SubscriptionCreatePaymentRequest(unsafe);
     }
 }
 
-export class SubscriptionAddressResponse implements BaseResponse<{ address: string; chain: string }> {
+export class SubscriptionCreatePaymentResponse implements BaseResponse<{ invoice_url: string; payment_id: string }> {
     public success: boolean;
     public message: string;
     public data: {
-        address: string;
-        chain: string;
+        invoice_url: string;
+        payment_id: string;
     };
 
-    constructor(origin: SubscriptionAddressResponse) {
+    constructor(origin: SubscriptionCreatePaymentResponse) {
         this.success = origin.success;
         this.message = origin.message;
         this.data = origin.data;
+    }
+}
+
+export class SubscriptionIpnWebhookBody {
+    public payment_id?: string;
+    public payment_status?: string;
+    public invoice_id?: string;
+    public order_id?: string;
+    public actually_paid?: string;
+    public pay_amount?: string;
+    public price_amount?: string;
+    public price_currency?: string;
+    public pay_currency?: string;
+
+    constructor(origin: Partial<SubscriptionIpnWebhookBody>) {
+        Object.assign(this, origin);
     }
 }

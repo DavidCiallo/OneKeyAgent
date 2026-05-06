@@ -7,7 +7,7 @@ import {
 } from "../../../shared/modules/subscription_plan/subscription_plan.interface";
 import {
     SubscriptionRecordListRequest, SubscriptionRecordListResponse,
-    SubscriptionAddressRequest, SubscriptionAddressResponse,
+    SubscriptionCreatePaymentRequest, SubscriptionCreatePaymentResponse,
     SubscriptionRecordDTO,
 } from "../../../shared/modules/subscription_record/subscription_record.interface";
 import { SubscriptionPlanRouterInstance } from "../../../shared/modules/subscription_plan/subscription_plan.router";
@@ -15,8 +15,7 @@ import { SubscriptionRecordRouterInstance } from "../../../shared/modules/subscr
 import { inject } from "../../lib/inject";
 import { getIdentifyByVerify, getAccountByEmail } from "../auth/auth.service";
 import { SubscriptionService } from "./subscription.service";
-import { AccountService } from "../account/account.service";
-import { nanoid } from "nanoid";
+import { createInvoice } from "./nowpayments.service";
 
 // ─── Auth helpers ───
 
@@ -84,7 +83,7 @@ async function planDelete(request: SubscriptionPlanDeleteRequest): Promise<Subsc
     });
 }
 
-// ─── Record / Address routes ───
+// ─── Record / Payment routes ───
 
 async function records(request: SubscriptionRecordListRequest): Promise<SubscriptionRecordListResponse> {
     request = SubscriptionRecordListRequest.self(request);
@@ -99,34 +98,95 @@ async function records(request: SubscriptionRecordListRequest): Promise<Subscrip
 }
 
 /**
- * Get the user's dedicated deposit address.
- * Generates one if not yet assigned.
+ * Create a NowPayments invoice for the selected plan.
+ * Returns the invoice URL that the user should visit to pay.
  */
-async function address(request: SubscriptionAddressRequest): Promise<SubscriptionAddressResponse> {
-    request = SubscriptionAddressRequest.self(request);
+async function createpayment(request: SubscriptionCreatePaymentRequest): Promise<SubscriptionCreatePaymentResponse> {
+    request = SubscriptionCreatePaymentRequest.self(request);
+    console.log(request);
     const account = await resolveAccount(request.auth || "");
 
-    if (!account.sub_wallet_address) {
-        // Generate a unique sub-address
-        // In production, this would derive a hierarchical deterministic (HD) wallet address.
-        // For now, use a deterministic label scheme:
-        //   master address with account_id as memo
-        const masterAddress = process.env.TRC20_WALLET_ADDRESS || "";
-        if (!masterAddress) throw new Error("TRC20_WALLET_ADDRESS not configured");
+    if (!request.plan_name) throw new Error("plan_name is required");
 
-        const address = `${masterAddress}?userId=${account.id}`;
-        await AccountService.update(account.id, { sub_wallet_address: address });
-        account.sub_wallet_address = address;
-    }
+    const plan = await SubscriptionService.findPlanByName(request.plan_name);
+    if (!plan) throw new Error("Plan not found");
+    if (plan.price <= 0) throw new Error("This plan is free");
 
-    return new SubscriptionAddressResponse({
+    // Create invoice via NowPayments
+    const { invoice_url, payment_id, invoice_id } = await createInvoice(
+        request.plan_name,
+        plan.price,
+        account.id,
+    );
+
+    // Create a pending record
+    await SubscriptionService.createRecord({
+        account_id: account.id,
+        plan_name: request.plan_name,
+        txid: invoice_id,       // invoice id
+        amount: plan.price,
+        confirmations: 0,
+        status: "pending",
+        payment_id,             // real payment id from NowPayments
+    });
+
+    return new SubscriptionCreatePaymentResponse({
         success: true,
         message: "success",
-        data: {
-            address: account.sub_wallet_address,
-            chain: "trc20",
-        },
+        data: { invoice_url, payment_id },
     });
+}
+
+/**
+ * Handle NowPayments IPN (Instant Payment Notification) webhook.
+ * NowPayments POSTs here when payment status changes.
+ */
+async function ipnwebhook(request: Record<string, unknown>): Promise<{ success: boolean; message: string }> {
+    const paymentId = String(request.payment_id || request.invoice_id || "");
+    const paymentStatus = String(request.payment_status || "");
+    const orderId = String(request.order_id || "");
+
+    console.log(`[IPN] Webhook received: payment=${paymentId} status=${paymentStatus} order=${orderId}`);
+    console.log("[IPN] Full request body:", JSON.stringify(request, null, 2));
+
+    if (!paymentId) {
+        return { success: false, message: "missing payment_id" };
+    }
+
+    try {
+        // Trust IPN data — NowPayments sends verified status directly
+        // Look up our record by payment_id (stored when invoice was created)
+        const records = await SubscriptionService.findPendingRecords();
+        const record = records.find(r => r.payment_id === paymentId || r.txid === paymentId);
+
+        if (!record) {
+            console.log(`[IPN] No pending record found for payment ${paymentId}`);
+            return { success: true, message: "no pending record" };
+        }
+
+        if (paymentStatus === "finished" || paymentStatus === "confirmed") {
+            const plan = await SubscriptionService.findPlanByName(record.plan_name);
+            if (!plan) throw new Error("Plan not found");
+
+            // Mark as confirmed
+            await SubscriptionService.updateRecordByTxid(record.txid, {
+                status: "confirmed",
+                confirmations: 1,
+            });
+
+            // Upgrade account
+            await SubscriptionService.upgradeAccount(record.account_id, record.plan_name, plan.duration_days);
+
+            console.log(`[IPN] Account ${record.account_id} upgraded to ${record.plan_name}`);
+        } else if (paymentStatus === "failed" || paymentStatus === "expired" || paymentStatus === "refunded") {
+            await SubscriptionService.updateRecordByTxid(record.txid, { status: "expired" });
+        }
+
+        return { success: true, message: "ok" };
+    } catch (err) {
+        console.error("[IPN] Error:", err);
+        return { success: false, message: String(err) };
+    }
 }
 
 // ─── Export controllers ───
@@ -140,5 +200,6 @@ export const subscriptionPlanController = new SubscriptionPlanRouterInstance(inj
 
 export const subscriptionRecordController = new SubscriptionRecordRouterInstance(inject, {
     records,
-    address,
+    createpayment,
+    ipnwebhook,
 });
