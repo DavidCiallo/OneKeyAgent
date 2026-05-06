@@ -18,7 +18,7 @@ COPY . .
 RUN bun run build
 
 # Generate Drizzle migrations from schema
-RUN bun run db:generate
+RUN bunx drizzle-kit push
 
 # Create data directory for SQLite
 RUN mkdir -p data
