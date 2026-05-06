@@ -39,7 +39,8 @@
         "UsageCardTitle": "用量统计",
         "Today": "今日",
         "Last24h": "近24小时",
-        "Last7Days": "近7天"
+        "Last7Days": "近7天",
+        "Public": "公开"
     },
 
     "ProviderPage": {

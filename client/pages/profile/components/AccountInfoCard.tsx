@@ -1,5 +1,6 @@
 import { Card, CardBody, CardHeader, Divider, Chip } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
+import { useEffect, useState } from "react";
 
 interface UsageData {
     today: number;
@@ -7,21 +8,36 @@ interface UsageData {
     total: number;
 }
 
+const DEFAULT_MONTHLY_LIMIT = 90_000_000;
+const fmt = (val: number) => {
+    if (val >= 1_000_000) return (val / 1_000_000).toFixed(1) + "M";
+    if (val >= 1000) return (val / 1000).toFixed(1) + "K";
+    return val.toString();
+};
+
 export default function AccountInfoCard({
     account,
     usage,
 }: {
-    account: { name: string; email: string; is_admin: number; monthly_limit: number; plan?: string; plan_expires_at?: number | null };
+    account: { name: string; email: string; is_admin: number; plan?: string; plan_expires_at?: number | null };
     usage: UsageData | null;
 }) {
     const locale = Locale("ProfilePage");
+    const [monthLimit, setMonthLimit] = useState(DEFAULT_MONTHLY_LIMIT);
 
-    const fmt = (val: number) => {
-        if (val >= 1_000_000) return (val / 1_000_000).toFixed(1) + "M";
-        if (val >= 1) return (val / 1000).toFixed(1) + "K";
-        return val.toString();
-    };
-    const monthLimit = account.monthly_limit || 60_000_000;
+    useEffect(() => {
+        (async () => {
+            try {
+                const { SubscriptionPlanRouter } = await import("../../../api/instance");
+                const { SubscriptionPlanListRequest } = await import("../../../../shared/modules/subscription_plan/subscription_plan.interface");
+                const res = await SubscriptionPlanRouter.list(new SubscriptionPlanListRequest({}));
+                if (res.success && res.data) {
+                    const plan = res.data.list.find((p: any) => p.name === (account.plan || "free"));
+                    if (plan) setMonthLimit(plan.monthly_limit);
+                }
+            } catch { /* ignore */ }
+        })();
+    }, [account.plan]);
 
     return (
         <Card>

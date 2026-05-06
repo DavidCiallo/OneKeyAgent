@@ -1,11 +1,10 @@
-import { Card, CardBody, CardHeader, Divider, Chip } from "@heroui/react";
+import { Card, CardBody, CardHeader, Divider, Chip, Button } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
 
 interface TxRecord {
     id: string;
     plan_name: string;
     txid: string;
-    from_address: string;
     amount: number;
     status: string;
     create_time: number;
@@ -14,17 +13,24 @@ interface TxRecord {
 const STATUS_MAP: Record<string, { color: "warning" | "success" | "danger" | "default"; label: string }> = {
     pending: { color: "warning", label: "Pending" },
     confirmed: { color: "success", label: "Confirmed" },
-    failed: { color: "danger", label: "Failed" },
+    expired: { color: "danger", label: "Expired" },
 };
 
-export default function TransactionHistory({ records }: { records: TxRecord[] }) {
+export default function TransactionHistory({ records, onRefresh, refreshing }: { records: TxRecord[]; onRefresh?: () => void; refreshing?: boolean }) {
     const locale = Locale("SubscriptionPage");
-
-    const toM = (val: number) => (val / 1_000_000).toFixed(0);
 
     return (
         <Card>
-            <CardHeader className="px-6 py-4 font-semibold text-lg">{locale.TransactionHistory}</CardHeader>
+            <CardHeader className="px-6 py-4 flex items-center justify-between">
+                <span className="font-semibold text-lg">{locale.TransactionHistory}</span>
+                {onRefresh && (
+                    <Button size="sm" variant="flat" isIconOnly isLoading={refreshing} onPress={onRefresh}>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </Button>
+                )}
+            </CardHeader>
             <Divider />
             <CardBody className="px-6 py-4">
                 {records.length === 0 ? (
@@ -48,7 +54,7 @@ export default function TransactionHistory({ records }: { records: TxRecord[] })
                                     </div>
                                     <div className="text-right">
                                         <p className="text-sm font-semibold">
-                                            ${(record.amount / 1_000_000).toFixed(2)}
+                                            ${(record.amount / 100).toFixed(2)}
                                         </p>
                                         <p className="text-xs text-gray-400">
                                             {new Date(record.create_time).toLocaleDateString()}

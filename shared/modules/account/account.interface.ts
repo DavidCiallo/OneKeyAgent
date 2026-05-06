@@ -13,7 +13,6 @@ export class AccountDTO {
     public email: string;
     public apiKey: string;
     public is_admin: number;
-    public monthly_limit: number;
     public plan: string;
     public plan_expires_at: number | null;
     public sub_wallet_address: string | null;
@@ -27,7 +26,6 @@ export class AccountDTO {
         this.email = origin.email;
         this.apiKey = origin.apiKey || "";
         this.is_admin = origin.is_admin;
-        this.monthly_limit = origin.monthly_limit;
         this.plan = origin.plan || "free";
         this.plan_expires_at = origin.plan_expires_at || null;
         this.sub_wallet_address = origin.sub_wallet_address || null;
@@ -90,7 +88,6 @@ export class AccountUpdateBody {
     public email?: string;
     public password?: string;
     public is_admin?: number;
-    public monthly_limit?: number;
     public plan?: string;
     public plan_expires_at?: number | null;
     public sub_wallet_address?: string | null;
@@ -98,14 +95,13 @@ export class AccountUpdateBody {
     private isTypeSafe: symbol = Symbol();
 
     constructor(origin: Partial<AccountEntity> = {}) {
-        if (!origin.name && !origin.email && !origin.password && origin.is_admin === undefined && origin.monthly_limit === undefined && origin.plan === undefined && origin.plan_expires_at === undefined && origin.sub_wallet_address === undefined) {
+        if (!origin.name && !origin.email && !origin.password && origin.is_admin === undefined && origin.plan === undefined && origin.plan_expires_at === undefined && origin.sub_wallet_address === undefined) {
             throw new Error("At least one field is required");
         }
         origin.name && (this.name = origin.name);
         origin.email && (this.email = origin.email);
         origin.password && (this.password = origin.password);
         origin.is_admin !== undefined && (this.is_admin = origin.is_admin);
-        origin.monthly_limit !== undefined && (this.monthly_limit = origin.monthly_limit);
         origin.plan !== undefined && (this.plan = origin.plan);
         origin.plan_expires_at !== undefined && (this.plan_expires_at = origin.plan_expires_at);
         origin.sub_wallet_address !== undefined && (this.sub_wallet_address = origin.sub_wallet_address);

@@ -31,6 +31,7 @@ export default function PlanSelector({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {plans.sort((a, b) => a.price - b.price).map(plan => {
                         const isCurrent = plan.name === currentPlan;
+                        const currentPrice = plans.find(p => p.name === currentPlan)?.price ?? 0;
                         return (!!plan?.price && (<Card
                             key={plan.id}
                             className={`border-2 ${isCurrent ? "border-primary" : "border-transparent"}`}
@@ -39,17 +40,15 @@ export default function PlanSelector({
                                 <p className="text-lg font-bold">{plan.name.toUpperCase()}</p>
                                 <p className="text-2xl font-bold text-primary">
                                     {formatPrice(plan.price)}
-                                    <span className="text-sm font-normal text-gray-500">
-                                        /{plan.duration_days}d
-                                    </span>
                                 </p>
                                 <p className="text-sm text-gray-500">
                                     {toM(plan.monthly_limit)} {locale.TokensPerMonth}
                                 </p>
+
                                 <Button
                                     color={isCurrent ? "default" : "primary"}
                                     variant={isCurrent ? "flat" : "solid"}
-                                    isDisabled={isCurrent}
+                                    isDisabled={plan.price <= currentPrice}
                                     onPress={() => onSelect(plan)}
                                     className="w-full"
                                 >

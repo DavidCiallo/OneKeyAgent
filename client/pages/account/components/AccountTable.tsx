@@ -13,6 +13,8 @@ const columns = (locale: Record<string, string>, is_admin: boolean) => {
     const cols = [
         <TableColumn key="name">{locale.Name}</TableColumn>,
         <TableColumn key="email">{locale.Email}</TableColumn>,
+        <TableColumn key="plan">Plan</TableColumn>,
+        <TableColumn key="plan_expires">Expires</TableColumn>,
         <TableColumn key="is_admin" align="center">{locale.IsAdmin}</TableColumn>,
         <TableColumn key="apiKey" align="center">{locale.ApiKey}</TableColumn>,
     ];
@@ -27,6 +29,8 @@ const rows = (list: AccountDTO[], locale: Record<string, string>, is_admin: bool
         const cells = [
             <TableCell key="name">{item.name}</TableCell>,
             <TableCell key="email">{item.email}</TableCell>,
+            <TableCell key="plan">{(item.plan || "free").toUpperCase()}</TableCell>,
+            <TableCell key="plan_expires">{item.plan_expires_at ? new Date(item.plan_expires_at).toLocaleString() : "N/A"}</TableCell>,
             <TableCell key="is_admin">{item.is_admin ? locale.IsAdmin : locale.User}</TableCell>,
             <TableCell key="apiKey">{item.apiKey}</TableCell>,
         ];

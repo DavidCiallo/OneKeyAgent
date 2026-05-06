@@ -75,7 +75,6 @@ export class SubscriptionService {
 
         await AccountService.update(accountId, {
             plan: planName,
-            monthly_limit: plan.monthly_limit,
             plan_expires_at: expiresAt,
         });
     }
@@ -96,7 +95,6 @@ export class SubscriptionService {
             if (account.plan_expires_at && account.plan_expires_at < now) {
                 await AccountService.update(account.id, {
                     plan: "free",
-                    monthly_limit: freePlan.monthly_limit,
                     plan_expires_at: null,
                 });
                 console.log(`[Subscription] Account ${account.email} plan expired, downgraded to free`);
