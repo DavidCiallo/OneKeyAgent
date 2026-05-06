@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { ModelDTO } from "../../../shared/modules/model/model.entity";
 import { ModelRouter, UsageRouter } from "../../api/instance";
 import { Locale } from "../../methods/locale";
-import { useDisclosure } from "@heroui/react";
+import { useDisclosure, Button } from "@heroui/react";
 import {
     ModelListRequest,
     ModelCreateRequest,
@@ -142,6 +142,9 @@ export default function ModelPage() {
         <div className="max-w-screen flex flex-col h-screen">
             <Header name={Locale("Menu").Model} />
             <div className="p-8 flex flex-col gap-4 flex-1 overflow-hidden">
+                <div className="flex justify-end">
+                    <Button color="primary" onPress={openCreate}>{locale.CreateModel}</Button>
+                </div>
                 <ModelCardGrid
                     list={list.map(item => ({ ...item, ...usageMap[item.id] }))}
                     onEdit={openEdit}
