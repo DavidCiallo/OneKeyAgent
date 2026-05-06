@@ -31,9 +31,11 @@ export function ModelFormModal({ isOpen, onOpenChange, mode, form, onFormChange,
                             selectedKeys={[String(form.tier)]}
                             onChange={e => onFormChange({ ...form, tier: parseInt(e.target.value) })}
                         >
-                            {[...Array(10)].map((_, i) => (
-                                <SelectItem key={String(i + 1)}>{String(i + 1)}</SelectItem>
-                            ))}
+                            {[...Array(100)]
+                                .map((_, i) => (i))
+                                .filter(i => i < 10 || i % 5 == 4)
+                                .map(i => <SelectItem key={String(i + 1)}>{String(i + 1)}</SelectItem>)
+                            }
                         </Select>
                         <Input
                             label={locale.Alias}
