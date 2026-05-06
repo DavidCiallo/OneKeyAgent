@@ -15,6 +15,7 @@ type AccountForm = {
     email: string;
     password: string;
     is_admin: number;
+    plan: string;
     monthly_limit: string;
     permissions: string[]; // "menu:model" format
 };
@@ -32,7 +33,7 @@ export default function AccountPage() {
     const { isOpen: isFormOpen, onOpen: onFormOpen, onClose: onFormClose, onOpenChange: onFormOpenChange } = useDisclosure();
     const [formMode, setFormMode] = useState<"create" | "edit">("create");
     const [editId, setEditId] = useState<string>("");
-    const [form, setForm] = useState<AccountForm>({ name: "", email: "", password: "", is_admin: 0, monthly_limit: "", permissions: [] });
+    const [form, setForm] = useState<AccountForm>({ name: "", email: "", password: "", is_admin: 0, plan: "free", monthly_limit: "", permissions: [] });
 
     const getToken = () => localStorage.getItem("access_token") || "";
 
@@ -55,7 +56,7 @@ export default function AccountPage() {
 
     const openCreate = () => {
         setFormMode("create");
-        setForm({ name: "", email: "", password: "", is_admin: 0, monthly_limit: "", permissions: [] });
+        setForm({ name: "", email: "", password: "", is_admin: 0, plan: "free", monthly_limit: "", permissions: [] });
         onFormOpen();
     };
 
@@ -75,7 +76,7 @@ export default function AccountPage() {
             } catch { /* ignore */ }
         }
 
-        setForm({ name: item.name, email: item.email, password: "", is_admin: item.is_admin, monthly_limit: String(item.monthly_limit ?? ""), permissions });
+        setForm({ name: item.name, email: item.email, password: "", is_admin: item.is_admin, plan: item.plan || "free", monthly_limit: String(item.monthly_limit ?? ""), permissions });
         onFormOpen();
     };
 
@@ -118,6 +119,7 @@ export default function AccountPage() {
             if (form.email) updateData.email = form.email;
             if (form.password) updateData.password = form.password;
             updateData.is_admin = form.is_admin;
+            updateData.plan = form.plan;
             if (form.monthly_limit) updateData.monthly_limit = Number(form.monthly_limit);
 
             const req = new AccountUpdateRequest({

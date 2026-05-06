@@ -16,6 +16,14 @@ export class AccountService {
         return result;
     }
 
+    static async findAll(): Promise<AccountEntity[]> {
+        return await accountRepository.find({ delete_time: null });
+    }
+
+    static async findBySubWalletAddress(address: string): Promise<AccountEntity | null> {
+        return await accountRepository.findOne({ sub_wallet_address: address });
+    }
+
     static async findByEmail(email: string): Promise<AccountEntity | null> {
         return await accountRepository.findIgnoreDelete({ email });
     }
