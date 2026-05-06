@@ -36,7 +36,8 @@
         "EditTitle": "Edit Model",
         "NoData": "No data",
         "Usage": "Usage",
-        "UsageCardTitle": "Usage Stats"
+        "UsageCardTitle": "Usage Stats",
+        "Public": "Public"
     },
 
     "ProviderPage": {

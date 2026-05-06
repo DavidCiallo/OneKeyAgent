@@ -213,9 +213,14 @@ async function getAllowedModelAliases(accountId: string): Promise<string[] | nul
     const account = await AccountService.findOne(accountId);
     if (!account || account.is_admin) return null; // admin — no restriction
 
+    const models = await getAllModels();
+    const publicAliases = models.filter(m => m.is_public).map(m => m.alias);
+
     const roles = await AccountRoleService.findByAccount(accountId);
-    const modelRoles = roles.filter(r => r.type === "model");
-    return modelRoles.map(r => r.name);
+    const modelRoles = roles.filter(r => r.type === "model").map(r => r.name);
+
+    // Union of explicitly assigned roles + public model aliases
+    return [...new Set([...modelRoles, ...publicAliases])];
 }
 
 /** Check if the requested model alias is allowed for this account */
