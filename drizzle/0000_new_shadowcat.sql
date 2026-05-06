@@ -5,7 +5,9 @@ CREATE TABLE `account` (
 	`password` text NOT NULL,
 	`api_key` text,
 	`is_admin` integer DEFAULT 0 NOT NULL,
-	`monthly_limit` integer DEFAULT 120000000,
+	`plan` text DEFAULT 'free' NOT NULL,
+	`plan_expires_at` integer,
+	`sub_wallet_address` text,
 	`tg_chat_id` text,
 	`create_time` integer NOT NULL,
 	`update_time` integer,
@@ -16,6 +18,7 @@ CREATE TABLE `model` (
 	`id` text PRIMARY KEY NOT NULL,
 	`alias` text NOT NULL,
 	`tier` integer DEFAULT 1 NOT NULL,
+	`is_public` integer DEFAULT 0,
 	`create_time` integer NOT NULL,
 	`update_time` integer,
 	`delete_time` integer
@@ -79,3 +82,30 @@ CREATE TABLE `task` (
 	`update_time` integer,
 	`delete_time` integer
 );
+--> statement-breakpoint
+CREATE TABLE `subscription_plan` (
+	`id` text PRIMARY KEY NOT NULL,
+	`name` text NOT NULL,
+	`monthly_limit` integer NOT NULL,
+	`price` integer DEFAULT 0 NOT NULL,
+	`duration_days` integer DEFAULT 30 NOT NULL,
+	`create_time` integer NOT NULL,
+	`update_time` integer,
+	`delete_time` integer
+);
+--> statement-breakpoint
+CREATE TABLE `subscription_record` (
+	`id` text PRIMARY KEY NOT NULL,
+	`account_id` text NOT NULL,
+	`plan_name` text NOT NULL,
+	`txid` text NOT NULL,
+	`amount` integer NOT NULL,
+	`confirmations` integer DEFAULT 0 NOT NULL,
+	`status` text DEFAULT 'pending' NOT NULL,
+	`payment_id` text,
+	`create_time` integer NOT NULL,
+	`update_time` integer,
+	`delete_time` integer
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `subscription_record_txid_unique` ON `subscription_record` (`txid`);
