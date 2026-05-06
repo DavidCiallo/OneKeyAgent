@@ -22,7 +22,8 @@
         "Profile": "账户信息",
         "Subscription": "订阅管理",
         "NoContent": "未授权",
-        "Logout": "退出登录"
+        "Logout": "退出登录",
+        "PlanManagement": "套餐管理"
     },
 
     "ModelPage": {
@@ -220,6 +221,18 @@
         "CheckPayment": "检查支付状态",
         "TransactionHistory": "交易记录",
         "NoTransactions": "暂无交易记录"
+    },
+
+    "PlanManagementPage": {
+        "Title": "套餐管理",
+        "Name": "套餐名",
+        "MonthlyLimit": "月额度",
+        "Price": "价格",
+        "DurationDays": "有效期（天）",
+        "Actions": "操作",
+        "Edit": "编辑",
+        "EditTitle": "编辑套餐",
+        "NoData": "暂无数据"
     },
 
     "TermsPage": {

@@ -22,7 +22,8 @@
         "Profile": "Profile",
         "Subscription": "Subscription",
         "NoContent": "No Content",
-        "Logout": "Logout"
+        "Logout": "Logout",
+        "PlanManagement": "Plan Management"
     },
 
     "ModelPage": {
@@ -218,6 +219,18 @@
         "CheckPayment": "Check Payment Status",
         "TransactionHistory": "Transaction History",
         "NoTransactions": "No transactions yet"
+    },
+
+    "PlanManagementPage": {
+        "Title": "Plan Management",
+        "Name": "Name",
+        "MonthlyLimit": "Monthly Limit",
+        "Price": "Price",
+        "DurationDays": "Duration (Days)",
+        "Actions": "Actions",
+        "Edit": "Edit",
+        "EditTitle": "Edit Plan",
+        "NoData": "No data"
     },
 
     "TermsPage": {

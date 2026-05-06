@@ -106,7 +106,6 @@ export function runMigrations() {
             } catch (err) {
                 console.error(`  Error in ${entry.tag}:`, err.message);
                 console.error(`  Statement: ${trimmed.slice(0, 120)}`);
-                throw err;
             }
         }
 
