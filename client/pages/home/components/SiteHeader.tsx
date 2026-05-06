@@ -1,4 +1,4 @@
-import { Button } from "@heroui/react";
+import { Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/react";
 import { AuthStatus } from "../../../methods/auth";
 import NeuralLogo from "./NeuralLogo";
 
@@ -9,17 +9,21 @@ export default function SiteHeader({
     auth: AuthStatus;
     locale: { [key: string]: string };
 }) {
-    function changeLan() {
-        const lanList = ["cn", "en"];
-        const locale = localStorage.getItem("locale") || "en";
-        const index = lanList.indexOf(locale);
-        const nextIndex = (index + 1) % lanList.length;
-        localStorage.setItem("locale", lanList[nextIndex]);
-        window.location.reload();
-    }
+    const lanMap: Record<string, string> = {
+        cn: "ZH",
+        en: "EN",
+        ru: "RU",
+        ja: "JA",
+        es: "ES",
+        "pt-BR": "PT",
+    };
 
     const currentLan = localStorage.getItem("locale") || "en";
-    const lanLabel = currentLan === "en" ? "EN" : "ZH";
+
+    const handleSelect = (key: string) => {
+        localStorage.setItem("locale", key);
+        window.location.reload();
+    };
 
     return (
         <header className="fixed top-0 inset-x-0 z-50 transition-all duration-300 bg-white">
@@ -37,9 +41,22 @@ export default function SiteHeader({
                             {locale.NavSignIn}
                         </a>
                     )}
-                    <Button size="sm" variant="bordered" className="text-xs text-gray-500 w-16" onClick={changeLan}>
-                        {lanLabel}
-                    </Button>
+                    <Dropdown>
+                        <DropdownTrigger>
+                            <Button size="sm" variant="bordered" className="text-xs text-gray-500 w-16">
+                                {lanMap[currentLan] || "EN"}
+                            </Button>
+                        </DropdownTrigger>
+                        <DropdownMenu
+                            selectedKeys={new Set([currentLan])}
+                            selectionMode="single"
+                            onAction={(key) => handleSelect(key as string)}
+                        >
+                            {Object.entries(lanMap).map(([key, label]) => (
+                                <DropdownItem key={key}>{label}</DropdownItem>
+                            ))}
+                        </DropdownMenu>
+                    </Dropdown>
                 </div>
             </nav>
         </header>
