@@ -5,6 +5,7 @@ export class ModelDTO {
     public id: string;
     public alias: string;
     public tier: number;
+    public is_public: number;
     public create_time: number;
     public update_time: number | null;
     public delete_time: number | null;
@@ -15,6 +16,7 @@ export class ModelDTO {
         this.id = origin.id;
         this.alias = origin.alias;
         this.tier = origin.tier;
+        this.is_public = origin.is_public;
         this.create_time = origin.create_time;
         this.update_time = origin.update_time;
         this.delete_time = origin.delete_time;
@@ -24,6 +26,7 @@ export class ModelDTO {
 export class ModelQueryBody {
     public alias?: string;
     public tier?: number;
+    public is_public?: number;
 
     private isTypeSafe: symbol = Symbol();
 
@@ -31,6 +34,7 @@ export class ModelQueryBody {
         if (false) throw new Error("Unexpected error");
         origin.alias && (this.alias = origin.alias);
         origin.tier !== undefined && (this.tier = origin.tier);
+        origin.is_public !== undefined && (this.is_public = origin.is_public);
     }
 
     static self(unsafe: Partial<ModelEntity>) {
@@ -41,15 +45,17 @@ export class ModelQueryBody {
 export class ModelCreateBody {
     public alias: string;
     public tier: number;
+    public is_public: number;
 
     private isTypeSafe: symbol = Symbol();
 
-    constructor(origin: Pick<ModelEntity, "alias"> & Partial<Pick<ModelEntity, "tier">>) {
+    constructor(origin: Pick<ModelEntity, "alias"> & Partial<Pick<ModelEntity, "tier" | "is_public">>) {
         if (!origin.alias) {
             throw new Error("alias is required");
         }
         this.alias = origin.alias;
         this.tier = origin.tier ?? 1;
+        this.is_public = origin.is_public ?? 0;
     }
 
     static self(unsafe: ModelCreateBody) {
@@ -60,15 +66,17 @@ export class ModelCreateBody {
 export class ModelUpdateBody {
     public alias?: string;
     public tier?: number;
+    public is_public?: number;
 
     private isTypeSafe: symbol = Symbol();
 
     constructor(origin: Partial<ModelEntity> = {}) {
-        if (!origin.alias && origin.tier === undefined) {
+        if (!origin.alias && origin.tier === undefined && origin.is_public === undefined) {
             throw new Error("At least one field is required");
         }
         origin.alias && (this.alias = origin.alias);
         origin.tier !== undefined && (this.tier = origin.tier);
+        origin.is_public !== undefined && (this.is_public = origin.is_public);
     }
 
     static self(unsafe: ModelUpdateBody) {

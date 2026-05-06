@@ -36,6 +36,13 @@
       "when": 1746576000000,
       "tag": "0004_drop_wallet_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1746604800000,
+      "tag": "0005_add_model_is_public",
+      "breakpoints": true
     }
   ]
 }
