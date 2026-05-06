@@ -11,24 +11,17 @@ COPY package.json bun.lock ./
 # Install dependencies
 RUN bun install --frozen-lockfile
 
-# Copy source code
+# Copy source code (includes pre-committed Drizzle migration files)
 COPY . .
 
 # Build frontend
 RUN bun run build
 
-# Generate Drizzle migrations from schema
-RUN bun run db:generate
-
 # Create data directory for SQLite
 RUN mkdir -p data
-
-# Make entrypoint executable
-RUN chmod +x /app/docker-entrypoint.sh
 
 # Expose port
 EXPOSE 3300
 
-# Start the server
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
+# Start the server (migrate.ts runs automatically on startup)
 CMD ["bun", "run", "server/app/index.ts"]
