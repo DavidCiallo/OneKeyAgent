@@ -1,5 +1,6 @@
 import CN from "../locales/cn.json";
 import EN from "../locales/en.json";
+import RU from "../locales/ru.json";
 
 export function Locale(page: string): { [key: string]: string } {
     const language = localStorage.getItem("locale") || "cn";
@@ -14,6 +15,11 @@ export function Locale(page: string): { [key: string]: string } {
         case "en":
             if (page in EN) {
                 strMap = EN[page as keyof typeof EN];
+            }
+            break;
+        case "ru":
+            if (page in RU) {
+                strMap = RU[page as keyof typeof RU];
             }
             break;
         default:
