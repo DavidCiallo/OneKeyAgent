@@ -191,7 +191,9 @@
         "EndpointSection": "API Info",
         "Endpoint": "Endpoint",
         "AvailableModels": "Available Models",
-        "TierHint": "Tier {tier} — consumes {tier}× tokens per request",
+        "ModelName": "Model",
+        "Tier": "Tier",
+        "Consumption": "Consumption",
         "BillingHint": "Usage is multiplied by the model tier. A 3× model consumes 3× the tokens of a 1× model.",
         "TermsLink": "By using the API, you agree to the Terms of Service"
     },
