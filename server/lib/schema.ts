@@ -4,3 +4,5 @@ export * from "../../shared/modules/usage/usage.schema";
 export * from "../../shared/modules/role/role.schema";
 export * from "../../shared/modules/provider/provider.schema";
 export * from "../../shared/modules/task/task.schema";
+export * from "../../shared/modules/subscription_plan/subscription_plan.schema";
+export * from "../../shared/modules/subscription_record/subscription_record.schema";
