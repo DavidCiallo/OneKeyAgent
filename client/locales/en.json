@@ -20,8 +20,10 @@
         "Account": "Account",
         "Chat": "Chat",
         "Profile": "Profile",
+        "Subscription": "Subscription",
         "NoContent": "No Content",
-        "Logout": "Logout"
+        "Logout": "Logout",
+        "PlanManagement": "Plan Management"
     },
 
     "ModelPage": {
@@ -35,7 +37,8 @@
         "EditTitle": "Edit Model",
         "NoData": "No data",
         "Usage": "Usage",
-        "UsageCardTitle": "Usage Stats"
+        "UsageCardTitle": "Usage Stats",
+        "Public": "Public"
     },
 
     "ProviderPage": {
@@ -189,7 +192,45 @@
         "EndpointSection": "API Info",
         "Endpoint": "Endpoint",
         "AvailableModels": "Available Models",
+        "ModelName": "Model",
+        "Tier": "Tier",
+        "Consumption": "Consumption",
+        "BillingHint": "Usage is multiplied by the model tier. A 3× model consumes 3× the tokens of a 1× model.",
         "TermsLink": "By using the API, you agree to the Terms of Service"
+    },
+
+    "SubscriptionPage": {
+        "CurrentPlan": "Current Plan",
+        "PlanName": "Plan",
+        "MonthlyLimit": "Monthly Limit",
+        "Expires": "Expires",
+        "Expired": "Expired",
+        "AvailablePlans": "Available Plans",
+        "TokensPerMonth": "credits/month",
+        "Current": "Current",
+        "Free": "Free",
+        "Upgrade": "Upgrade",
+        "Payment": "Payment",
+        "DepositAmount": "Required Payment",
+        "DepositHint": "Send exactly this amount in USDT (TRC-20) to the address below. The system will automatically detect the payment and upgrade your account.",
+        "DepositAddress": "Deposit Address",
+        "Copy": "Copy",
+        "Copied": "Copied!",
+        "CheckPayment": "Check Payment Status",
+        "TransactionHistory": "Transaction History",
+        "NoTransactions": "No transactions yet"
+    },
+
+    "PlanManagementPage": {
+        "Title": "Plan Management",
+        "Name": "Name",
+        "MonthlyLimit": "Monthly Limit",
+        "Price": "Price",
+        "DurationDays": "Duration (Days)",
+        "Actions": "Actions",
+        "Edit": "Edit",
+        "EditTitle": "Edit Plan",
+        "NoData": "No data"
     },
 
     "TermsPage": {

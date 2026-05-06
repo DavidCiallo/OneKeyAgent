@@ -89,7 +89,7 @@ export function ModelCardGrid({ list, onEdit, onDelete }: Props) {
                         key={item.id}
                         className="bg-content1 rounded-xl shadow-sm border border-default-100 p-4 flex flex-col gap-2.5 hover:shadow-md transition-shadow"
                     >
-                        {/* Header: Tier badge + Alias */}
+                        {/* Header: Tier badge + Alias + Public */}
                         <div className="flex items-center gap-2 pb-2.5 border-b border-default-200">
                             <Chip
                                 color="primary"
@@ -100,6 +100,9 @@ export function ModelCardGrid({ list, onEdit, onDelete }: Props) {
                             <span className="text-xl font-bold text-foreground truncate">
                                 {item.alias || "—"}
                             </span>
+                            {item.is_public === 1 && (
+                                <Chip color="success" variant="flat" size="sm">{locale.Public}</Chip>
+                            )}
                         </div>
 
                         {/* Three mini charts */}

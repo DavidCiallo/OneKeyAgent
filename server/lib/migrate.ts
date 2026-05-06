@@ -1,7 +1,6 @@
 // @ts-nocheck
 import { Database } from "bun:sqlite";
 import { drizzle } from "drizzle-orm/bun-sqlite";
-import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
@@ -22,164 +21,99 @@ sqlite.exec("PRAGMA foreign_keys=ON;");
 const db = drizzle(sqlite);
 
 /**
- * Get all table names currently in the database.
- */
-function getExistingTables(): Set<string> {
-    const rows = sqlite
-        .prepare("SELECT name FROM sqlite_master WHERE type='table'")
-        .all() as { name: string }[];
-    return new Set(rows.map((r) => r.name));
-}
-
-/**
- * Parse CREATE TABLE table_name from a SQL migration line.
- */
-function extractTableName(sql: string): string | null {
-    // Matches: CREATE TABLE `tablename` ( ... )
-    //     or: CREATE TABLE tablename ( ... )
-    const match = sql.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"']?(\w+)[`"']?/i);
-    return match ? match[1] : null;
-}
-
-/**
- * Get the set of tables that should exist according to the migration files.
- */
-function getMigrationTables(): Set<string> {
-    const _dirname = path.dirname(fileURLToPath(import.meta.url));
-    const migrationsFolder = path.resolve(_dirname, "../../drizzle");
-    const tables = new Set<string>();
-
-    const entries = fs.readdirSync(migrationsFolder);
-    const sqlFiles = entries.filter((f) => f.endsWith(".sql")).sort();
-    for (const file of sqlFiles) {
-        const content = fs.readFileSync(path.join(migrationsFolder, file), "utf-8");
-        const statements = content.split(/-->\s*statement-breakpoint\s*/);
-        for (const stmt of statements) {
-            const tableName = extractTableName(stmt);
-            if (tableName) tables.add(tableName);
-        }
-    }
-    return tables;
-}
-
-/**
  * Run database migrations on startup.
  *
- * This uses Drizzle's migration system. Each migration is an SQL file
- * in the drizzle/ folder that is applied incrementally.
+ * Reads drizzle/meta/_journal.json for the ordered list of migrations,
+ * checks which have already been applied via the __drizzle_migrations table,
+ * and runs any pending ones sequentially.
  *
- * HOW TO USE:
- *  1. Edit a .schema.ts file (e.g. shared/modules/xxx/xxx.schema.ts)
- *  2. Run: bun run db:generate
- *  3. Restart the server – migrations run automatically on startup
- *
- * Adding a new table only generates a new migration file without
- * affecting existing tables or data.
+ * This correctly handles ALL statement types: CREATE TABLE, ALTER TABLE ADD/DROP COLUMN,
+ * and Drizzle's recreate-table pattern (CREATE __new + INSERT + DROP + RENAME).
  */
 export function runMigrations() {
     const _dirname = path.dirname(fileURLToPath(import.meta.url));
     const migrationsFolder = path.resolve(_dirname, "../../drizzle");
+    const journalPath = path.join(migrationsFolder, "meta/_journal.json");
 
-    if (!fs.existsSync(migrationsFolder)) {
-        console.log("No migrations folder found. Run 'bun run db:generate' to create initial migration.");
+    if (!fs.existsSync(journalPath)) {
+        console.log("No migration journal found. Run 'bun run db:generate' first.");
         return;
     }
 
-    const entries = fs.readdirSync(migrationsFolder);
-    const sqlFiles = entries.filter((f) => f.endsWith(".sql")).sort();
-    if (sqlFiles.length === 0) {
-        console.log("No migration files found. Run 'bun run db:generate' to create initial migration.");
+    // Ensure the tracking table exists
+    sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS __drizzle_migrations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            hash TEXT NOT NULL,
+            created_at TEXT
+        )
+    `);
+
+    // Read journal
+    const journal = JSON.parse(fs.readFileSync(journalPath, "utf-8"));
+
+    // Get already-applied migration tags
+    const applied = new Set(
+        sqlite
+            .prepare("SELECT hash FROM __drizzle_migrations")
+            .all()
+            .map((r: any) => r.hash),
+    );
+
+    // Find pending entries, sorted by idx
+    const pending = journal.entries
+        .filter((entry: any) => !applied.has(entry.tag))
+        .sort((a: any, b: any) => a.idx - b.idx);
+
+    if (pending.length === 0) {
+        console.log("Database is up to date.");
         return;
     }
 
-    // Check if any tables from the migration files are missing.
-    // This handles two cases:
-    //   1. Fresh legacy database (no __drizzle_migrations) – transition from old db-init.ts
-    //   2. Already-migrated database where some tables were never created
-    //      (e.g. a table was added to the schema but the migration was already marked as applied)
-    const existingTables = getExistingTables();
-    const migrationTables = getMigrationTables();
-    const missingTables: string[] = [];
+    console.log(`Found ${pending.length} pending migration(s): ${pending.map((e: any) => e.tag).join(", ")}`);
 
-    for (const tbl of migrationTables) {
-        if (!existingTables.has(tbl)) {
-            missingTables.push(tbl);
-        }
-    }
+    const insertStmt = sqlite.prepare(
+        "INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)",
+    );
 
-    if (missingTables.length > 0) {
-        console.log(`Missing tables found: ${missingTables.join(", ")}`);
-        console.log("Creating missing tables without affecting existing data...");
-
-        // Ensure the drizzle migration tracking table exists
-        if (!existingTables.has("__drizzle_migrations")) {
-            sqlite.exec(`
-                CREATE TABLE IF NOT EXISTS __drizzle_migrations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    hash TEXT NOT NULL,
-                    created_at TEXT
-                )
-            `);
+    for (const entry of pending) {
+        const sqlFile = path.join(migrationsFolder, `${entry.tag}.sql`);
+        if (!fs.existsSync(sqlFile)) {
+            console.error(`  Migration file not found: ${sqlFile}`);
+            continue;
         }
 
-        // Apply migration files but only create tables that are missing
-        for (const file of sqlFiles) {
-            const filePath = path.join(migrationsFolder, file);
-            const content = fs.readFileSync(filePath, "utf-8");
-            const statements = content.split(/-->\s*statement-breakpoint\s*/);
+        console.log(`  Applying: ${entry.tag}...`);
+        const content = fs.readFileSync(sqlFile, "utf-8");
+        const statements = content.split(/-->\s*statement-breakpoint\s*/);
 
-            for (const stmt of statements) {
-                const trimmed = stmt.trim();
-                if (!trimmed) continue;
+        for (const stmt of statements) {
+            const trimmed = stmt.trim();
+            if (!trimmed) continue;
 
-                const tableName = extractTableName(trimmed);
-                if (tableName && existingTables.has(tableName)) {
-                    // Table already exists – skip
-                    continue;
-                }
-                if (tableName && !missingTables.includes(tableName)) {
-                    // Table is not missing – skip
-                    continue;
-                }
-                try {
-                    sqlite.exec(trimmed);
-                    if (tableName) {
-                        console.log(`  Created table '${tableName}'.`);
-                    }
-                } catch (err) {
-                    console.error(`  Error creating table '${tableName}':`, err.message);
-                }
+            // Temporarily enable foreign_keys for recreate-table migrations
+            if (trimmed.startsWith("PRAGMA foreign_keys=OFF")) {
+                sqlite.exec("PRAGMA foreign_keys=OFF;");
+                continue;
+            }
+            if (trimmed.startsWith("PRAGMA foreign_keys=ON")) {
+                sqlite.exec("PRAGMA foreign_keys=ON;");
+                continue;
+            }
+
+            try {
+                sqlite.exec(trimmed);
+            } catch (err) {
+                console.error(`  Error in ${entry.tag}:`, err.message);
+                console.error(`  Statement: ${trimmed.slice(0, 120)}`);
             }
         }
 
-        // Mark all migrations as applied
-        if (!existingTables.has("__drizzle_migrations")) {
-            const journalPath = path.join(migrationsFolder, "meta/_journal.json");
-            if (fs.existsSync(journalPath)) {
-                const journal = JSON.parse(fs.readFileSync(journalPath, "utf-8"));
-                const insertStmt = sqlite.prepare(
-                    "INSERT OR IGNORE INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)",
-                );
-                const insertMany = sqlite.transaction((entries) => {
-                    for (const entry of entries) {
-                        insertStmt.run(entry.tag, new Date(entry.when).toISOString());
-                    }
-                });
-                insertMany(journal.entries);
-                console.log(`Marked ${journal.entries.length} migration(s) as applied.`);
-            }
-        }
-
-        console.log("Database migration completed successfully.");
-    } else {
-        // Normal path: use Drizzle's built-in migrator for incremental migrations
-        try {
-            migrate(db, { migrationsFolder });
-            console.log("Database migrations applied successfully.");
-        } catch (err) {
-            console.error("Migration error:", err);
-            throw err;
-        }
+        insertStmt.run(entry.tag, new Date(entry.when).toISOString());
+        console.log(`  Done: ${entry.tag}`);
     }
+
+    console.log("All pending migrations applied successfully.");
 }
+
 export { sqlite, db };

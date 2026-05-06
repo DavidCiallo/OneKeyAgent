@@ -1,9 +1,10 @@
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input } from "@heroui/react";
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input, Switch } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
 
 type ModelForm = {
     tier: number;
     alias?: string;
+    is_public?: number;
 };
 
 type Props = {
@@ -40,6 +41,12 @@ export function ModelFormModal({ isOpen, onOpenChange, mode, form, onFormChange,
                             onChange={e => onFormChange({ ...form, alias: e.target.value })}
                             isRequired
                         />
+                        <Switch
+                            isSelected={form.is_public === 1}
+                            onValueChange={v => onFormChange({ ...form, is_public: v ? 1 : 0 })}
+                        >
+                            {locale.Public}
+                        </Switch>
                     </div>
                 </ModalBody>
                 <ModalFooter>

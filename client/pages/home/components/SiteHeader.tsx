@@ -19,7 +19,7 @@ export default function SiteHeader({
     }
 
     const currentLan = localStorage.getItem("locale") || "cn";
-    const lanLabel = currentLan === "cn" ? "中文" : "EN";
+    const lanLabel = currentLan === "cn" ? "中" : "EN";
 
     return (
         <header className="fixed top-0 inset-x-0 z-50 transition-all duration-300 bg-white">

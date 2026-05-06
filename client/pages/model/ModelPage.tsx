@@ -21,6 +21,7 @@ import { ModelFormModal } from "./components/ModelFormModal";
 type ModelForm = {
     tier: number;
     alias?: string;
+    is_public?: number;
 };
 
 export default function ModelPage() {
@@ -80,7 +81,7 @@ export default function ModelPage() {
 
     const openCreate = () => {
         setFormMode("create");
-        setForm({ tier: 1, alias: "" });
+        setForm({ tier: 1, alias: "", is_public: 0 });
         onFormOpen();
     };
 
@@ -90,6 +91,7 @@ export default function ModelPage() {
         setForm({
             tier: item.tier,
             alias: item.alias || "",
+            is_public: item.is_public,
         });
         onFormOpen();
     };
@@ -100,6 +102,7 @@ export default function ModelPage() {
                 model: new ModelCreateBody({
                     tier: form.tier,
                     alias: form.alias || "",
+                    is_public: form.is_public ?? 0,
                 }),
                 auth: getToken(),
             });
@@ -115,6 +118,7 @@ export default function ModelPage() {
                 model: new ModelUpdateBody({
                     tier: form.tier,
                     alias: form.alias || undefined,
+                    is_public: form.is_public,
                 }),
                 auth: getToken(),
             });
