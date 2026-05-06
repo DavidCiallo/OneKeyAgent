@@ -193,6 +193,10 @@
         "EndpointSection": "调用信息",
         "Endpoint": "接口地址",
         "AvailableModels": "可用模型",
+        "ModelName": "模型",
+        "Tier": "层级",
+        "Consumption": "消耗倍率",
+        "BillingHint": "用量按模型层级倍率计算。3× 模型消耗的额度是 1× 模型的 3 倍。",
         "TermsLink": "调用时默认您已查看并同意服务条款"
     },
 
