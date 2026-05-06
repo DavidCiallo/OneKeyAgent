@@ -11,13 +11,13 @@ export default function AccountInfoCard({
     account,
     usage,
 }: {
-    account: { name: string; email: string; is_admin: number; monthly_limit: number };
+    account: { name: string; email: string; is_admin: number; monthly_limit: number; plan?: string; plan_expires_at?: number | null };
     usage: UsageData | null;
 }) {
     const locale = Locale("ProfilePage");
 
-    const toM = (val: number) => (val / 1_000_000).toFixed(1);
-    const monthLimit = account.monthly_limit || 100_000_000;
+    const toM = (val: number) => (val / 1000).toFixed(1);
+    const monthLimit = account.monthly_limit || 60_000_000;
 
     return (
         <Card>
@@ -39,6 +39,17 @@ export default function AccountInfoCard({
                             <Chip size="sm" color={account.is_admin ? "warning" : "default"} variant="flat">
                                 {account.is_admin ? locale.Admin : locale.User}
                             </Chip>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <span className="text-sm text-gray-500 w-20">Plan</span>
+                            <Chip size="sm" color={account.plan === "free" ? "default" : account.plan === "pro" ? "primary" : "warning"} variant="flat">
+                                {account.plan?.toUpperCase() || "FREE"}
+                            </Chip>
+                            {account.plan_expires_at && account.plan_expires_at > Date.now() && (
+                                <span className="text-xs text-gray-400">
+                                    Expires: {new Date(account.plan_expires_at || 20000000).toLocaleDateString()}
+                                </span>
+                            )}
                         </div>
                     </div>
                     {usage && (

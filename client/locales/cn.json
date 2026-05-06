@@ -20,6 +20,7 @@
         "Account": "账号管理",
         "Chat": "在线对话",
         "Profile": "账户信息",
+        "Subscription": "订阅管理",
         "NoContent": "未授权",
         "Logout": "退出登录"
     },
@@ -192,6 +193,28 @@
         "Endpoint": "接口地址",
         "AvailableModels": "可用模型",
         "TermsLink": "调用时默认您已查看并同意服务条款"
+    },
+
+    "SubscriptionPage": {
+        "CurrentPlan": "当前套餐",
+        "PlanName": "套餐",
+        "MonthlyLimit": "月额度",
+        "Expires": "到期时间",
+        "Expired": "已过期",
+        "AvailablePlans": "可选套餐",
+        "TokensPerMonth": "credits/月",
+        "Current": "当前",
+        "Free": "免费",
+        "Upgrade": "升级",
+        "Payment": "支付",
+        "DepositAmount": "需支付",
+        "DepositHint": "请向以下地址转入准确的 USDT (TRC-20) 金额，系统会自动检测到账并升级您的账号。",
+        "DepositAddress": "充值地址",
+        "Copy": "复制",
+        "Copied": "已复制！",
+        "CheckPayment": "检查支付状态",
+        "TransactionHistory": "交易记录",
+        "NoTransactions": "暂无交易记录"
     },
 
     "TermsPage": {

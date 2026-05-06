@@ -12,7 +12,7 @@ import { UsageService } from "../usage/usage.service";
 import { AccountService } from "../account/account.service";
 import { AccountRoleService } from "../role/role.service";
 
-const DEFAULT_MONTHLY_LIMIT = 120_000_000; // 120M tokens default
+const DEFAULT_MONTHLY_LIMIT = 60_000_000; // 60M tokens default (free plan)
 
 /** Check monthly usage limit, throw 429 if exceeded */
 async function checkUsageLimit(accountId: string): Promise<void> {
@@ -254,8 +254,9 @@ async function chatHex(body: Record<string, any>, accountId: string): Promise<an
         const ms = Date.now() - t0;
         const tier = await getModelTier(requestedAlias);
         const { usage } = data;
-        const rawInput = usage?.prompt_tokens || 0;
-        const rawOutput = usage?.completion_tokens || 0;
+        // OpenAI format: prompt_tokens/completion_tokens; Anthropic format: input_tokens/output_tokens
+        const rawInput = usage?.input_tokens ?? usage?.prompt_tokens ?? 0;
+        const rawOutput = usage?.output_tokens ?? usage?.completion_tokens ?? 0;
 
         await logUsage({
             accountId,
@@ -301,7 +302,15 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
             model: provider.model,
         };
 
-        const bodyStream = await tryProviderStream(provider.baseURL, provider.model, provider.apiKey, provider.proxyURL, requestBody, provider.authType, provider.apiType);
+        const bodyStream = await tryProviderStream(
+            provider.baseURL,
+            provider.model,
+            provider.apiKey,
+            provider.proxyURL,
+            requestBody,
+            provider.authType,
+            provider.apiType
+        );
         if (!bodyStream) {
             ProviderService.recordFail(provider.id);
             continue;
@@ -356,8 +365,10 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
                 if (usageData) {
                     const ms = Date.now() - t0;
                     const tier = await getModelTier(requestedAlias);
-                    const rawInput = usageData.input_tokens || 0;
-                    const rawOutput = usageData.output_tokens || 0;
+                    // OpenAI format: prompt_tokens/completion_tokens
+                    // Anthropic format: input_tokens/output_tokens
+                    const rawInput = usageData.input_tokens ?? usageData.prompt_tokens ?? 0;
+                    const rawOutput = usageData.output_tokens ?? usageData.completion_tokens ?? 0;
                     await logUsage({
                         accountId,
                         modelAlias: requestedAlias,
@@ -429,8 +440,9 @@ async function completeHex(body: Record<string, any>, accountId: string): Promis
         ProviderService.recordSuccess(provider.id);
         const ms = Date.now() - t0;
         const tier = await getModelTier(requestedAlias);
-        const rawInput = data.usage?.prompt_tokens || 0;
-        const rawOutput = data.usage?.completion_tokens || 0;
+        // OpenAI format: prompt_tokens/completion_tokens; Anthropic format: input_tokens/output_tokens
+        const rawInput = data.usage?.input_tokens ?? data.usage?.prompt_tokens ?? 0;
+        const rawOutput = data.usage?.output_tokens ?? data.usage?.completion_tokens ?? 0;
 
         await logUsage({
             accountId,
