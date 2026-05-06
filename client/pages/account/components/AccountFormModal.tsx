@@ -27,7 +27,7 @@ type AccountForm = {
     password: string;
     is_admin: number;
     plan: string;
-    monthly_limit: string;
+    plan_expires_at: string;
     permissions: string[]; // "menu:model" format for checkbox values
 };
 
@@ -123,12 +123,15 @@ export function AccountFormModal({ isOpen, onOpenChange, mode, form, onFormChang
                             </Select>
                         )}
 
-                        <Input
-                            label="Monthly Limit (tokens)"
-                            value={form.monthly_limit}
-                            onChange={e => onFormChange({ ...form, monthly_limit: e.target.value })}
-                            description="Leave empty to use plan default"
-                        />
+                        {mode === "edit" && (
+                            <Input
+                                label="套餐到期时间"
+                                type="date"
+                                value={form.plan_expires_at}
+                                onChange={e => onFormChange({ ...form, plan_expires_at: e.target.value })}
+                                description="留空表示不限制"
+                            />
+                        )}
 
                         {mode === "edit" && form.is_admin ? (
                             <p className="text-sm text-gray-500">{locale.AdminAllPermissions}</p>

@@ -1,13 +1,14 @@
 import { Header } from "../../components/header/Header";
 import { useEffect, useState, useCallback } from "react";
+import { useDisclosure } from "@heroui/react";
 import { AccountRouter, SubscriptionPlanRouter, SubscriptionRecordRouter } from "../../api/instance";
 import { AccountProfileRequest } from "../../../shared/modules/account/account.interface";
 import { SubscriptionPlanListRequest } from "../../../shared/modules/subscription_plan/subscription_plan.interface";
-import { SubscriptionRecordListRequest, SubscriptionAddressRequest } from "../../../shared/modules/subscription_record/subscription_record.interface";
+import { SubscriptionRecordListRequest, SubscriptionCreatePaymentRequest } from "../../../shared/modules/subscription_record/subscription_record.interface";
 import { Locale } from "../../methods/locale";
 import CurrentPlanCard from "./components/CurrentPlanCard";
 import PlanSelector from "./components/PlanSelector";
-import DepositCard from "./components/DepositCard";
+import PaymentModal from "./components/PaymentModal";
 import TransactionHistory from "./components/TransactionHistory";
 
 interface Plan {
@@ -22,7 +23,6 @@ interface TxRecord {
     id: string;
     plan_name: string;
     txid: string;
-    from_address: string;
     amount: number;
     status: string;
     create_time: number;
@@ -35,15 +35,16 @@ export default function SubscriptionPage() {
     const [account, setAccount] = useState<{
         name: string;
         plan: string;
-        monthly_limit: number;
         plan_expires_at: number | null;
     } | null>(null);
 
     const [plans, setPlans] = useState<Plan[]>([]);
     const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-    const [deposit, setDeposit] = useState<{ address: string; chain: string } | null>(null);
+    const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
+    const [paymentId, setPaymentId] = useState<string | null>(null);
     const [records, setRecords] = useState<TxRecord[]>([]);
     const [checking, setChecking] = useState(false);
+    const paymentModal = useDisclosure();
 
     const fetchProfile = useCallback(async () => {
         const res = await AccountRouter.profile(new AccountProfileRequest({ auth: getToken() }));
@@ -66,32 +67,28 @@ export default function SubscriptionPage() {
         }
     }, []);
 
-    const fetchAddress = useCallback(async () => {
-        try {
-            const res = await SubscriptionRecordRouter.address(new SubscriptionAddressRequest({ auth: getToken() }));
-            if (res.success && res.data) {
-                setDeposit(res.data);
-            }
-        } catch { /* ignore */ }
-    }, []);
-
     useEffect(() => {
         fetchProfile();
         fetchPlans();
         fetchRecords();
-        fetchAddress();
-    }, [fetchProfile, fetchPlans, fetchRecords, fetchAddress]);
+    }, [fetchProfile, fetchPlans, fetchRecords]);
 
     const handleSelectPlan = async (plan: Plan) => {
         setSelectedPlan(plan.name);
-        // Fetch deposit address when a paid plan is selected
-        if (plan.name !== "free" && !deposit) {
+        if (plan.name !== "free") {
             try {
-                const res = await SubscriptionRecordRouter.address(new SubscriptionAddressRequest({ auth: getToken() }));
+                const res = await SubscriptionRecordRouter.createpayment(new SubscriptionCreatePaymentRequest({
+                    auth: getToken(),
+                    plan_name: plan.name,
+                }));
                 if (res.success && res.data) {
-                    setDeposit(res.data);
+                    setInvoiceUrl(res.data.invoice_url);
+                    setPaymentId(res.data.payment_id);
+                    paymentModal.onOpen();
                 }
-            } catch { /* ignore */ }
+            } catch (err) {
+                console.error("Failed to create payment:", err);
+            }
         }
     };
 
@@ -100,6 +97,7 @@ export default function SubscriptionPage() {
         await fetchRecords();
         await fetchProfile();
         setChecking(false);
+        paymentModal.onClose();
     };
 
     const selectedPlanData = plans.find(p => p.name === selectedPlan);
@@ -112,7 +110,7 @@ export default function SubscriptionPage() {
                     {account && (
                         <CurrentPlanCard plan={{
                             name: account.plan,
-                            monthly_limit: account.monthly_limit,
+                            monthly_limit: plans.find(p => p.name === account.plan)?.monthly_limit ?? 90_000_000,
                             plan_expires_at: account.plan_expires_at,
                         }} />
                     )}
@@ -124,9 +122,11 @@ export default function SubscriptionPage() {
                     />
 
                     {selectedPlanData && (
-                        <DepositCard
-                            deposit={deposit}
-                            selectedPlan={selectedPlan}
+                        <PaymentModal
+                            isOpen={paymentModal.isOpen}
+                            onOpenChange={paymentModal.onOpenChange}
+                            invoiceUrl={invoiceUrl}
+                            planName={selectedPlanData.name}
                             planPrice={selectedPlanData.price}
                             onCheck={handleCheckPayment}
                             checking={checking}

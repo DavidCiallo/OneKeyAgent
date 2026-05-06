@@ -7,7 +7,6 @@ export const accountTable = sqliteTable("account", {
     password: text("password").notNull(),
     apiKey: text("api_key"),
     is_admin: integer("is_admin").notNull().default(0),
-    monthly_limit: integer("monthly_limit").default(60000000),
     plan: text("plan").notNull().default("free"),
     plan_expires_at: integer("plan_expires_at"),
     sub_wallet_address: text("sub_wallet_address"),

@@ -11,15 +11,17 @@ import { ProviderService } from "../provider/provider.service";
 import { UsageService } from "../usage/usage.service";
 import { AccountService } from "../account/account.service";
 import { AccountRoleService } from "../role/role.service";
+import { SubscriptionService } from "../subscription/subscription.service";
 
-const DEFAULT_MONTHLY_LIMIT = 60_000_000; // 60M tokens default (free plan)
+const DEFAULT_MONTHLY_LIMIT = 90_000_000; // 90M tokens default (free plan)
 
 /** Check monthly usage limit, throw 429 if exceeded */
 async function checkUsageLimit(accountId: string): Promise<void> {
     const account = await AccountService.findOne(accountId);
     if (!account) return;
 
-    const limit = account.monthly_limit || DEFAULT_MONTHLY_LIMIT;
+    const plan = await SubscriptionService.findPlanByName(account.plan || "free");
+    const limit = plan?.monthly_limit || DEFAULT_MONTHLY_LIMIT;
     const billed = await UsageService.monthlyBilledTokens(accountId);
 
     if (billed >= limit) {
