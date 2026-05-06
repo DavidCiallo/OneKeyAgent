@@ -123,11 +123,10 @@ async function createpayment(request: SubscriptionCreatePaymentRequest): Promise
     await SubscriptionService.createRecord({
         account_id: account.id,
         plan_name: request.plan_name,
-        txid: invoice_id,       // invoice id
+        txid: invoice_id,
         amount: plan.price,
         confirmations: 0,
         status: "pending",
-        payment_id,             // real payment id from NowPayments
     });
 
     return new SubscriptionCreatePaymentResponse({
@@ -142,22 +141,20 @@ async function createpayment(request: SubscriptionCreatePaymentRequest): Promise
  * NowPayments POSTs here when payment status changes.
  */
 async function ipnwebhook(request: Record<string, unknown>): Promise<{ success: boolean; message: string }> {
-    const paymentId = String(request.payment_id || request.invoice_id || "");
+    const paymentId = String(request.payment_id || "");
+    const invoiceId = String(request.invoice_id || "");
     const paymentStatus = String(request.payment_status || "");
     const orderId = String(request.order_id || "");
 
     console.log(`[IPN] Webhook received: payment=${paymentId} status=${paymentStatus} order=${orderId}`);
-    console.log("[IPN] Full request body:", JSON.stringify(request, null, 2));
 
     if (!paymentId) {
         return { success: false, message: "missing payment_id" };
     }
 
     try {
-        // Trust IPN data — NowPayments sends verified status directly
-        // Look up our record by payment_id (stored when invoice was created)
         const records = await SubscriptionService.findPendingRecords();
-        const record = records.find(r => r.payment_id === paymentId || r.txid === paymentId);
+        const record = records.find(r => r.txid === invoiceId);
 
         if (!record) {
             console.log(`[IPN] No pending record found for payment ${paymentId}`);
@@ -170,6 +167,7 @@ async function ipnwebhook(request: Record<string, unknown>): Promise<{ success: 
 
             // Mark as confirmed
             await SubscriptionService.updateRecordByTxid(record.txid, {
+                payment_id: paymentId,
                 status: "confirmed",
                 confirmations: 1,
             });

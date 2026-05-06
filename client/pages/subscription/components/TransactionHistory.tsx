@@ -13,7 +13,7 @@ interface TxRecord {
 const STATUS_MAP: Record<string, { color: "warning" | "success" | "danger" | "default"; label: string }> = {
     pending: { color: "warning", label: "Pending" },
     confirmed: { color: "success", label: "Confirmed" },
-    failed: { color: "danger", label: "Failed" },
+    expired: { color: "danger", label: "Expired" },
 };
 
 export default function TransactionHistory({ records }: { records: TxRecord[] }) {

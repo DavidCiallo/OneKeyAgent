@@ -32,14 +32,17 @@ async function runOnce() {
  */
 async function checkPendingPayments() {
     const pendingRecords = await SubscriptionService.findPendingRecords();
-
     for (const record of pendingRecords) {
-        // Skip records without a real payment_id (only have invoice_id)
-        if (!record.payment_id) continue;
-
         try {
+            if (!record.payment_id) {
+                if (Date.now() - record.create_time > 30 * 60 * 1000) {
+                    await SubscriptionService.updateRecordByTxid(record.txid, { status: "expired" });
+                    console.log(new Date(), `[Monitor] Payment expired for ${record.account_id} - ${record.plan_name}`);
+                    continue;
+                }
+                continue;
+            }
             const { status } = await checkPaymentStatus(record.payment_id);
-
             if (status === "confirmed") {
                 const plan = await SubscriptionService.findPlanByName(record.plan_name);
                 if (!plan) continue;
@@ -55,8 +58,6 @@ async function checkPendingPayments() {
                 console.log(`[Monitor] Payment expired for ${record.account_id} - ${record.plan_name}`);
             }
         } catch (err) {
-            // payment_id may not be valid yet (user hasn't paid)
-            // Just log and continue
             console.log(`[Monitor] Check payment ${record.payment_id} failed:`, (err as Error).message);
         }
     }
