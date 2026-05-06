@@ -12,6 +12,11 @@ export const Header = ({ name }: params) => {
             cn: "ZH",
             en: "EN",
             ru: "RU",
+            ja: "JA",
+            es: "ES",
+            "pt-BR": "PT",
+            vi: "VI",
+            th: "TH",
         };
 
         const handleSelect = (key: string) => {
