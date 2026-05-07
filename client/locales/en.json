@@ -154,7 +154,11 @@
         "Password": "Password",
         "DeleteConfirm": "Are you sure you want to delete this account?",
         "AdminAllPermissions": "Admin has all permissions",
-        "Permissions": "Permissions"
+        "Permissions": "Permissions",
+        "ExportData": "Export Data",
+        "ExportUsage": "Export Usage",
+        "ExportTasks": "Export Tasks",
+        "ImportData": "Import Data"
     },
 
     "NoContentPage": {

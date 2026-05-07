@@ -154,7 +154,11 @@
         "Password": "รหัสผ่าน",
         "DeleteConfirm": "คุณแน่ใจหรือไม่ว่าต้องการลบบัญชีนี้?",
         "AdminAllPermissions": "ผู้ดูแลระบบมีสิทธิ์ทั้งหมด",
-        "Permissions": "สิทธิ์"
+        "Permissions": "สิทธิ์",
+        "ExportData": "ส่งออกข้อมูล",
+        "ExportUsage": "ส่งออกการใช้งาน",
+        "ExportTasks": "ส่งออกงาน",
+        "ImportData": "นำเข้าข้อมูล"
     },
 
     "NoContentPage": {

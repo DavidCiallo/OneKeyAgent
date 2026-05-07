@@ -156,7 +156,11 @@
         "Password": "密码",
         "DeleteConfirm": "确定要删除该账号吗？",
         "AdminAllPermissions": "管理员拥有全部权限",
-        "Permissions": "权限"
+        "Permissions": "权限",
+        "ExportData": "导出数据",
+        "ExportUsage": "导出用量",
+        "ExportTasks": "导出任务",
+        "ImportData": "导入数据"
     },
 
     "NoContentPage": {

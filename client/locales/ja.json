@@ -157,7 +157,11 @@
         "Password": "パスワード",
         "DeleteConfirm": "このアカウントを削除してもよろしいですか？",
         "AdminAllPermissions": "管理者はすべての権限を持っています",
-        "Permissions": "権限"
+        "Permissions": "権限",
+        "ExportData": "データをエクスポート",
+        "ExportUsage": "使用量をエクスポート",
+        "ExportTasks": "タスクをエクスポート",
+        "ImportData": "データをインポート"
     },
 
     "NoContentPage": {

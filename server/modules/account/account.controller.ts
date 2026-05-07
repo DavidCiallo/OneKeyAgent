@@ -15,12 +15,17 @@ import {
     AccountProfileResponse,
     AccountRegenerateRequest,
     AccountRegenerateResponse,
+    AccountExportRequest,
+    AccountExportResponse,
+    AccountImportRequest,
+    AccountImportResponse,
 } from "../../../shared/modules/account/account.interface";
 import { AccountRouterInstance } from "../../../shared/modules/account/account.router"
 import { inject } from "../../lib/inject";
 import { getIdentifyByVerify, getAccountByEmail, registerUser } from "../auth/auth.service";
 import { AccountService } from "./account.service";
 import { generateApiKey } from "../ai/ai.auth";
+import Repository from "../../lib/repository";
 
 async function requireAdmin(auth?: string): Promise<void> {
     if (!auth) throw "Authorization failed";
@@ -149,4 +154,155 @@ async function regenerate(request: AccountRegenerateRequest): Promise<AccountReg
     });
 }
 
-export const accountController = new AccountRouterInstance(inject, { list, detail, create, update, delete: del, profile, regenerate });
+// ========== Export / Import ==========
+
+async function exportData(request: AccountExportRequest): Promise<AccountExportResponse> {
+    await requireAdmin(request.auth);
+
+    const accountRepo = Repository.instance<any>("Account");
+    const modelRepo = Repository.instance<any>("Model");
+    const providerRepo = Repository.instance<any>("Provider");
+    const roleRepo = Repository.instance<any>("Role");
+    const accountRoleRepo = Repository.instance<any>("AccountRole");
+    const planRepo = Repository.instance<any>("SubscriptionPlan");
+    const recordRepo = Repository.instance<any>("SubscriptionRecord");
+
+    const [accounts, models, providers, roles, accountRoles, plans, records] = await Promise.all([
+        accountRepo.findAllIgnoreDelete(),
+        modelRepo.findAllIgnoreDelete(),
+        providerRepo.findAllIgnoreDelete(),
+        roleRepo.findAllIgnoreDelete(),
+        accountRoleRepo.findAllIgnoreDelete(),
+        planRepo.findAllIgnoreDelete(),
+        recordRepo.findAllIgnoreDelete(),
+    ]);
+
+    return new AccountExportResponse({
+        success: true,
+        message: "success",
+        data: {
+            version: 1,
+            exported_at: Date.now(),
+            data: {
+                accounts: (accounts as any[] || []),
+                models: models as any[] || [],
+                providers: providers as any[] || [],
+                roles: roles as any[] || [],
+                account_roles: accountRoles as any[] || [],
+                subscription_plans: plans as any[] || [],
+                subscription_records: records as any[] || [],
+            },
+        },
+    });
+}
+
+async function exportUsage(request: AccountExportRequest): Promise<AccountExportResponse> {
+    await requireAdmin(request.auth);
+
+    const usageRepo = Repository.instance<any>("UsageLog");
+    const logs = await usageRepo.findAllIgnoreDelete();
+
+    return new AccountExportResponse({
+        success: true,
+        message: "success",
+        data: {
+            version: 1,
+            exported_at: Date.now(),
+            data: {
+                usage_logs: (logs as any[] || []),
+            },
+        },
+    });
+}
+
+async function exportTasks(request: AccountExportRequest): Promise<AccountExportResponse> {
+    await requireAdmin(request.auth);
+
+    const taskRepo = Repository.instance<any>("Task");
+    const tasks = await taskRepo.findAllIgnoreDelete();
+
+    return new AccountExportResponse({
+        success: true,
+        message: "success",
+        data: {
+            version: 1,
+            exported_at: Date.now(),
+            data: {
+                tasks: (tasks as any[] || []),
+            },
+        },
+    });
+}
+
+async function importData(request: AccountImportRequest): Promise<AccountImportResponse> {
+    await requireAdmin(request.auth);
+
+    const { data } = request.data;
+    const imported: Record<string, number> = {};
+
+    // Helper: insert if not exists by id
+    async function insertIfMissing(repo: Repository<any>, items: any[], name: string) {
+        if (!items || items.length === 0) return;
+        let count = 0;
+        for (const item of items) {
+            const existing = await repo.findIgnoreDelete({ id: item.id });
+            if (existing) continue;
+            await repo.insert(item);
+            count++;
+        }
+        imported[name] = count;
+    }
+
+    // Replace if duplicate field exists (delete old + insert new)
+    async function insertOrReplace(
+        repo: Repository<any>,
+        items: any[],
+        name: string,
+        duplicateField: string,
+    ) {
+        if (!items || items.length === 0) return;
+        let count = 0;
+        for (const item of items) {
+            const existing = await repo.findIgnoreDelete({ id: item.id });
+            if (existing) continue;
+
+            const dup = await repo.findIgnoreDelete({ [duplicateField]: item[duplicateField] });
+            if (dup) {
+                await repo.hardDelete({ id: dup.id });
+            }
+
+            await repo.insert(item);
+            count++;
+        }
+        imported[name] = count;
+    }
+
+    const accountRepo = Repository.instance<any>("Account");
+    const modelRepo = Repository.instance<any>("Model");
+    const providerRepo = Repository.instance<any>("Provider");
+    const roleRepo = Repository.instance<any>("Role");
+    const accountRoleRepo = Repository.instance<any>("AccountRole");
+    const planRepo = Repository.instance<any>("SubscriptionPlan");
+    const recordRepo = Repository.instance<any>("SubscriptionRecord");
+    const taskRepo = Repository.instance<any>("Task");
+    const usageRepo = Repository.instance<any>("UsageLog");
+
+    // Import in dependency order
+    await insertIfMissing(roleRepo, data.roles, "roles");
+    await insertIfMissing(planRepo, data.subscription_plans, "subscription_plans");
+    await insertOrReplace(accountRepo, data.accounts || [], "accounts", "email");
+    await insertIfMissing(accountRoleRepo, data.account_roles, "account_roles");
+    await insertOrReplace(modelRepo, data.models || [], "models", "name");
+    await insertIfMissing(providerRepo, data.providers, "providers");
+    await insertIfMissing(taskRepo, data.tasks, "tasks");
+    await insertIfMissing(usageRepo, data.usage_logs, "usage_logs");
+    await insertIfMissing(recordRepo, data.subscription_records, "subscription_records");
+
+    return new AccountImportResponse({
+        success: true,
+        message: "import completed",
+        data: { imported },
+    });
+}
+
+export const accountController = new AccountRouterInstance(inject, { list, detail, create, update, delete: del, profile, regenerate, export: exportData, export_usage: exportUsage, export_tasks: exportTasks, import: importData });

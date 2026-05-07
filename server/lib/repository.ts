@@ -92,6 +92,15 @@ class Repository<
         return (result as T) || null;
     }
 
+    /** Get ALL records (including soft-deleted) — used for data export */
+    async findAllIgnoreDelete(): Promise<T[]> {
+        const result = await db
+            .select()
+            .from(this.table)
+            .execute();
+        return result as T[];
+    }
+
     async insert(entity: Partial<T>): Promise<T> {
         const id = entity.id || nanoid(6);
         const now = Date.now();
@@ -152,6 +161,23 @@ class Repository<
             .where(and(...filters))
             .execute();
 
+        return true;
+    }
+
+    /** Permanently delete records (used for replace during import) */
+    async hardDelete(where: Partial<T>): Promise<boolean> {
+        const filters: any[] = [];
+        if (where) {
+            Object.entries(where).forEach(([key, val]) => {
+                if (val !== undefined && val !== null && val !== "" && this.table[key]) {
+                    filters.push(eq(this.table[key], val));
+                }
+            });
+        }
+        await db
+            .delete(this.table)
+            .where(filters.length > 0 ? and(...filters) : undefined)
+            .execute();
         return true;
     }
 
