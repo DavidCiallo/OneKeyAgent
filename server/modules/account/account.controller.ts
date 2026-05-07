@@ -166,8 +166,10 @@ async function exportData(request: AccountExportRequest): Promise<AccountExportR
     const accountRoleRepo = Repository.instance<any>("AccountRole");
     const planRepo = Repository.instance<any>("SubscriptionPlan");
     const recordRepo = Repository.instance<any>("SubscriptionRecord");
+    const taskRepo = Repository.instance<any>("Task");
+    const usageRepo = Repository.instance<any>("UsageLog");
 
-    const [accounts, models, providers, roles, accountRoles, plans, records] = await Promise.all([
+    const [accounts, models, providers, roles, accountRoles, plans, records, tasks, usageLogs] = await Promise.all([
         accountRepo.findAllIgnoreDelete(),
         modelRepo.findAllIgnoreDelete(),
         providerRepo.findAllIgnoreDelete(),
@@ -175,6 +177,8 @@ async function exportData(request: AccountExportRequest): Promise<AccountExportR
         accountRoleRepo.findAllIgnoreDelete(),
         planRepo.findAllIgnoreDelete(),
         recordRepo.findAllIgnoreDelete(),
+        taskRepo.findAllIgnoreDelete(),
+        usageRepo.findAllIgnoreDelete(),
     ]);
 
     return new AccountExportResponse({
@@ -191,6 +195,8 @@ async function exportData(request: AccountExportRequest): Promise<AccountExportR
                 account_roles: accountRoles as any[] || [],
                 subscription_plans: plans as any[] || [],
                 subscription_records: records as any[] || [],
+                tasks: tasks as any[] || [],
+                usage_logs: usageLogs as any[] || [],
             },
         },
     });
@@ -240,43 +246,6 @@ async function importData(request: AccountImportRequest): Promise<AccountImportR
     const { data } = request.data;
     const imported: Record<string, number> = {};
 
-    // Helper: insert if not exists by id
-    async function insertIfMissing(repo: Repository<any>, items: any[], name: string) {
-        if (!items || items.length === 0) return;
-        let count = 0;
-        for (const item of items) {
-            const existing = await repo.findIgnoreDelete({ id: item.id });
-            if (existing) continue;
-            await repo.insert(item);
-            count++;
-        }
-        imported[name] = count;
-    }
-
-    // Replace if duplicate field exists (delete old + insert new)
-    async function insertOrReplace(
-        repo: Repository<any>,
-        items: any[],
-        name: string,
-        duplicateField: string,
-    ) {
-        if (!items || items.length === 0) return;
-        let count = 0;
-        for (const item of items) {
-            const existing = await repo.findIgnoreDelete({ id: item.id });
-            if (existing) continue;
-
-            const dup = await repo.findIgnoreDelete({ [duplicateField]: item[duplicateField] });
-            if (dup) {
-                await repo.hardDelete({ id: dup.id });
-            }
-
-            await repo.insert(item);
-            count++;
-        }
-        imported[name] = count;
-    }
-
     const accountRepo = Repository.instance<any>("Account");
     const modelRepo = Repository.instance<any>("Model");
     const providerRepo = Repository.instance<any>("Provider");
@@ -287,16 +256,37 @@ async function importData(request: AccountImportRequest): Promise<AccountImportR
     const taskRepo = Repository.instance<any>("Task");
     const usageRepo = Repository.instance<any>("UsageLog");
 
-    // Import in dependency order
-    await insertIfMissing(roleRepo, data.roles || [], "roles");
-    await insertOrReplace(planRepo, data.subscription_plans || [], "subscription_plans", "name");
-    await insertOrReplace(accountRepo, data.accounts || [], "accounts", "email");
-    await insertIfMissing(accountRoleRepo, data.account_roles || [], "account_roles");
-    await insertOrReplace(modelRepo, data.models || [], "models", "name");
-    await insertIfMissing(providerRepo, data.providers || [], "providers");
-    await insertIfMissing(taskRepo, data.tasks || [], "tasks");
-    await insertIfMissing(usageRepo, data.usage_logs || [], "usage_logs");
-    await insertIfMissing(recordRepo, data.subscription_records || [], "subscription_records");
+    type TableDef = { repo: Repository<any>; items: any[] | undefined; name: string };
+    const tables: TableDef[] = [
+        { repo: roleRepo, items: data.roles, name: "roles" },
+        { repo: planRepo, items: data.subscription_plans, name: "subscription_plans" },
+        { repo: accountRepo, items: data.accounts, name: "accounts" },
+        { repo: accountRoleRepo, items: data.account_roles, name: "account_roles" },
+        { repo: modelRepo, items: data.models, name: "models" },
+        { repo: providerRepo, items: data.providers, name: "providers" },
+        { repo: taskRepo, items: data.tasks, name: "tasks" },
+        { repo: usageRepo, items: data.usage_logs, name: "usage_logs" },
+        { repo: recordRepo, items: data.subscription_records, name: "subscription_records" },
+    ];
+
+    async function importTable(repo: Repository<any>, items: any[] | undefined, name: string) {
+        if (!items || items.length === 0) return;
+        let count = 0;
+        for (const item of items) {
+            await repo.insert(item);
+            count++;
+        }
+        imported[name] = count;
+    }
+
+    // Only hard-delete and import tables with non-empty arrays
+    for (const { repo, items, name } of tables) {
+        if (!items || items.length === 0) {
+            continue;
+        }
+        await repo.hardDelete({});
+        await importTable(repo, items, name);
+    }
 
     return new AccountImportResponse({
         success: true,
