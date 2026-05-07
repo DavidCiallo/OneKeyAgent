@@ -156,8 +156,6 @@
         "AdminAllPermissions": "Admin has all permissions",
         "Permissions": "Permissions",
         "ExportData": "Export Data",
-        "ExportUsage": "Export Usage",
-        "ExportTasks": "Export Tasks",
         "ImportData": "Import Data"
     },
 
@@ -247,9 +245,9 @@
         "Section2Title": "2. User Responsibilities",
         "Section2Body": "1. You are responsible for safeguarding your account credentials and API Key. Any loss resulting from credential leakage is your sole responsibility.\n\n2. You must not use the service for any illegal purpose, including but not limited to: generating unlawful content, infringing on others' rights, or spreading malicious information.\n\n3. You must not attempt to bypass access controls, usage limits, or other security mechanisms.\n\n4. You must not reverse-engineer, vulnerability-scan, or conduct any form of attack against the platform.\n\n5. If you suspect unauthorized account activity, contact the administrator immediately.",
         "Section3Title": "3. Fair Use Policy",
-        "Section3Body": "To ensure stable service for all users, the platform enforces a monthly usage limit:\n\n• Each account has a monthly token quota (default: 100M tokens)\n• When monthly usage exceeds the limit, subsequent requests will be rejected with 429 Too Many Requests\n• Daily usage is for reference only and does not have a hard limit\n\nUsage resets at the start of each month. Contact the administrator if you need a higher limit.",
+        "Section3Body": "The Service is provided on a fair-use basis. Usage limits are determined by the service tier assigned to each account and may be adjusted at the sole discretion of the platform.\n\nExcessive usage that degrades system performance for other users may result in temporary service restrictions. Please contact the administrator if your requirements exceed the standard allocation.",
         "Section4Title": "4. Disclaimer",
-        "Section4Body": "1. The platform makes no warranties regarding the accuracy, completeness, or reliability of model-generated content. You assume all risks associated with its use.\n\n2. To the maximum extent permitted by law, the platform shall not be liable for any indirect, incidental, special, or consequential damages arising from the use or inability to use the service.\n\n3. We reserve the right to modify, suspend, or discontinue the service at any time. Material changes will be communicated in advance.\n\n4. Service interruptions caused by third-party provider outages are beyond our control.",
+        "Section4Body": "1. The platform provides no warranty, express or implied, regarding the accuracy, completeness, or reliability of model-generated content. You assume all risks associated with the use of such content.\n\n2. To the maximum extent permitted by applicable law, the platform shall not be liable for any indirect, incidental, special, consequential, or exemplary damages arising from your use of or inability to access the service.\n\n3. The platform reserves the right to modify, suspend, or discontinue the service at any time. Material changes will be communicated through reasonable means in advance.",
         "Section5Title": "5. Contact Us",
         "Section5Body": "If you have any questions or need assistance, please contact the administrator. We value every user's feedback.\n\n\"Plain words, profound intelligence.\""
     }

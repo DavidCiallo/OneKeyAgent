@@ -34,14 +34,13 @@ export async function createInvoice(
     const priceInUsd = priceCents / 100;
     const body = {
         price_amount: priceInUsd,
-        price_currency: "usd",
+        price_currency: "USDTERC20",
         pay_currency: "USDTERC20",
         order_id: accountId,
         order_description: `ehex ${planName} plan subscription`,
         ipn_callback_url: process.env.IPN_CALLBACK_URL + "/api/subscription/ipnwebhook",
         is_fixed_rate: false,
     };
-    console.log("priceInUsd", body)
 
     const resp = await fetch(`${NOWPAYMENTS_API_URL}/invoice`, {
         method: "POST",
