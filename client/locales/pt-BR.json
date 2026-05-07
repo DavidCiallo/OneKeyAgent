@@ -109,7 +109,14 @@
         "NameError": "O nome não pode estar vazio",
         "RegisterButtonText": "Registrar",
         "RegisterSuccess": "Registro bem-sucedido",
-        "RegisterFailed": "Falha no registro, e-mail pode já existir"
+        "RegisterFailed": "Falha no registro, e-mail pode já existir",
+        "VerifySuccess": "E-mail verificado com sucesso",
+        "VerifyFailed": "Falha na verificação",
+        "VerifyEmailTitle": "Verifique seu e-mail",
+        "VerifyEmailSent": "Um e-mail de verificação foi enviado para",
+        "VerifyEmailCheckSpam": "Se não encontrar, verifique sua pasta de spam. O link expira em 3 dias.",
+        "VerifyEmailVerifying": "Verificando seu e-mail...",
+        "BackToLogin": "Voltar ao login"
     },
 
     "HomePage": {

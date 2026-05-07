@@ -109,7 +109,14 @@
         "NameError": "名前は必須です",
         "RegisterButtonText": "登録",
         "RegisterSuccess": "登録成功",
-        "RegisterFailed": "登録失敗、メールが既に存在する可能性があります"
+        "RegisterFailed": "登録失敗、メールが既に存在する可能性があります",
+        "VerifySuccess": "メール認証に成功しました",
+        "VerifyFailed": "認証に失敗しました",
+        "VerifyEmailTitle": "メールをご確認ください",
+        "VerifyEmailSent": "認証メールを送信しました",
+        "VerifyEmailCheckSpam": "届かない場合はスパムフォルダをご確認ください。リンクの有効期限は3日間です。",
+        "VerifyEmailVerifying": "メールを認証中...",
+        "BackToLogin": "ログインに戻る"
     },
 
     "HomePage": {

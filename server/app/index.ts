@@ -36,7 +36,6 @@ Bun.serve({
     async fetch(req: Request) {
         const url = new URL(req.url);
         const pathName = url.pathname;
-
         const apiResponse = await mounthttp(req, [
             authController,
             aiController,

@@ -106,7 +106,14 @@
         "NameError": "Tên không được để trống",
         "RegisterButtonText": "Đăng ký",
         "RegisterSuccess": "Đăng ký thành công",
-        "RegisterFailed": "Đăng ký thất bại, email có thể đã tồn tại"
+        "RegisterFailed": "Đăng ký thất bại, email có thể đã tồn tại",
+        "VerifySuccess": "Xác thực email thành công",
+        "VerifyFailed": "Xác thực thất bại",
+        "VerifyEmailTitle": "Kiểm tra email của bạn",
+        "VerifyEmailSent": "Email xác thực đã được gửi đến",
+        "VerifyEmailCheckSpam": "Nếu không thấy, hãy kiểm tra thư mục spam. Liên kết hết hạn sau 3 ngày.",
+        "VerifyEmailVerifying": "Đang xác thực email...",
+        "BackToLogin": "Quay lại đăng nhập"
     },
 
     "HomePage": {

@@ -9,12 +9,12 @@ const usageRepo = Repository.instance<UsageLogEntity>("UsageLog");
 
 /** Ensure the 'hex' model exists in the database */
 export async function seedDefaultModel() {
-    const models = await modelRepo.find();
-    const hasHex = models.some(m => m.alias === "hex");
-    if (!hasHex) {
-        await modelRepo.insert({ alias: "hex", tier: 1 });
-        console.log("[Seed] Created default model 'hex'");
-    }
+    // const models = await modelRepo.find();
+    // const hasHex = models.some(m => m.alias === "hex");
+    // if (!hasHex) {
+    //     await modelRepo.insert({ alias: "hex", tier: 1 });
+    //     console.log("[Seed] Created default model 'hex'");
+    // }
 }
 
 export async function logUsage(usage: {

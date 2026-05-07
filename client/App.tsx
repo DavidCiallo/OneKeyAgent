@@ -3,6 +3,7 @@ import "./App.css";
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import { JSX, useEffect } from "react";
 import AuthPage from "./pages/auth/AuthPage";
+import VerifyPage from "./pages/auth/VerifyPage";
 import HomePage from "./pages/home/HomePage";
 import { AuthStatus, clearAuthData, getAuthStatus, setUserInfo } from "./methods/auth";
 import ModelPage from "./pages/model/ModelPage";
@@ -77,6 +78,7 @@ const AppRoutes = () => {
         <Routes>
             <Route path="/home" element={<HomePage />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/verify" element={<VerifyPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route element={<PrivateRoute />}>
                 <Route path="/nocontent" element={<NoContentPage />} />

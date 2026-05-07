@@ -109,7 +109,14 @@
         "NameError": "用户名不能为空",
         "RegisterButtonText": "注册",
         "RegisterSuccess": "注册成功",
-        "RegisterFailed": "注册失败，邮箱可能已存在"
+        "RegisterFailed": "注册失败，邮箱可能已存在",
+        "VerifySuccess": "邮箱验证成功",
+        "VerifyFailed": "验证失败",
+        "VerifyEmailTitle": "查收验证邮件",
+        "VerifyEmailSent": "验证邮件已发送至",
+        "VerifyEmailCheckSpam": "如未收到，请检查垃圾邮件箱。链接有效期为 3 天。",
+        "VerifyEmailVerifying": "正在验证邮箱...",
+        "BackToLogin": "返回登录"
     },
     "HomePage": {
         "MainText": "HEX",

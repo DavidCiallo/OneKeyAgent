@@ -35,8 +35,14 @@ export async function mounthttp(req: Request, controllers: BaseRouterInstance[])
                 } catch (e) {
                     requestBody = null;
                 }
+                let requertQuery: Record<string, string> | null = {};
                 try {
-                    const result = handler && (await handler({ ...requestBody, auth }));
+                    requertQuery = Object.fromEntries(url.searchParams.entries());
+                } catch {
+                    requertQuery = {};
+                }
+                try {
+                    const result = handler && (await handler({ ...requertQuery, ...requestBody, auth }));
 
                     // 如果 handler 直接返回了 Response 对象 (如 stream)，透传
                     if (result instanceof Response || (result && result.constructor?.name === "Response")) {

@@ -109,7 +109,14 @@
         "NameError": "Имя не может быть пустым",
         "RegisterButtonText": "Зарегистрироваться",
         "RegisterSuccess": "Регистрация успешна",
-        "RegisterFailed": "Регистрация не удалась, email уже существует"
+        "RegisterFailed": "Регистрация не удалась, email уже существует",
+        "VerifySuccess": "Email успешно подтвержден",
+        "VerifyFailed": "Ошибка подтверждения",
+        "VerifyEmailTitle": "Проверьте почту",
+        "VerifyEmailSent": "Письмо с подтверждением отправлено на",
+        "VerifyEmailCheckSpam": "Если письмо не пришло, проверьте папку спам. Ссылка действует 3 дня.",
+        "VerifyEmailVerifying": "Подтверждение email...",
+        "BackToLogin": "Вернуться ко входу"
     },
 
     "HomePage": {

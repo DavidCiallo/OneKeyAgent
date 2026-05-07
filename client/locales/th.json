@@ -106,7 +106,14 @@
         "NameError": "ชื่อต้องไม่เว้นว่าง",
         "RegisterButtonText": "ลงทะเบียน",
         "RegisterSuccess": "ลงทะเบียนสำเร็จ",
-        "RegisterFailed": "ลงทะเบียนล้มเหลว อีเมลอาจมีอยู่แล้ว"
+        "RegisterFailed": "ลงทะเบียนล้มเหลว อีเมลอาจมีอยู่แล้ว",
+        "VerifySuccess": "ยืนยันอีเมลสำเร็จ",
+        "VerifyFailed": "การยืนยันล้มเหลว",
+        "VerifyEmailTitle": "ตรวจสอบอีเมลของคุณ",
+        "VerifyEmailSent": "อีเมลยืนยันถูกส่งไปที่",
+        "VerifyEmailCheckSpam": "หากไม่พบ ให้ตรวจสอบโฟลเดอร์สแปม ลิงก์หมดอายุใน 3 วัน",
+        "VerifyEmailVerifying": "กำลังยืนยันอีเมล...",
+        "BackToLogin": "กลับไปที่หน้าเข้าสู่ระบบ"
     },
 
     "HomePage": {

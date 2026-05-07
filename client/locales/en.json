@@ -106,7 +106,14 @@
         "NameError": "Name cannot be empty",
         "RegisterButtonText": "Register",
         "RegisterSuccess": "Registration successful",
-        "RegisterFailed": "Registration failed, email may already exist"
+        "RegisterFailed": "Registration failed, email may already exist",
+        "VerifySuccess": "Email verified successfully",
+        "VerifyFailed": "Verification failed",
+        "VerifyEmailTitle": "Check your email",
+        "VerifyEmailSent": "A verification email has been sent to",
+        "VerifyEmailCheckSpam": "If you don't see it, check your spam folder. The link expires in 3 days.",
+        "VerifyEmailVerifying": "Verifying your email...",
+        "BackToLogin": "Back to Login"
     },
 
     "HomePage": {
