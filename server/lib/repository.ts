@@ -102,13 +102,12 @@ class Repository<
     }
 
     async insert(entity: Partial<T>): Promise<T> {
-        const id = entity.id || nanoid(6);
         const now = Date.now();
         const data = {
             ...entity,
-            id,
-            create_time: now,
-            update_time: now,
+            id: entity.id || nanoid(6),
+            create_time: entity.create_time || now,
+            update_time: entity.update_time || now,
         };
 
         const result = await db

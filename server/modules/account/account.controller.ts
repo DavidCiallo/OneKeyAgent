@@ -288,15 +288,15 @@ async function importData(request: AccountImportRequest): Promise<AccountImportR
     const usageRepo = Repository.instance<any>("UsageLog");
 
     // Import in dependency order
-    await insertIfMissing(roleRepo, data.roles, "roles");
-    await insertIfMissing(planRepo, data.subscription_plans, "subscription_plans");
+    await insertIfMissing(roleRepo, data.roles || [], "roles");
+    await insertOrReplace(planRepo, data.subscription_plans || [], "subscription_plans", "name");
     await insertOrReplace(accountRepo, data.accounts || [], "accounts", "email");
-    await insertIfMissing(accountRoleRepo, data.account_roles, "account_roles");
+    await insertIfMissing(accountRoleRepo, data.account_roles || [], "account_roles");
     await insertOrReplace(modelRepo, data.models || [], "models", "name");
-    await insertIfMissing(providerRepo, data.providers, "providers");
-    await insertIfMissing(taskRepo, data.tasks, "tasks");
-    await insertIfMissing(usageRepo, data.usage_logs, "usage_logs");
-    await insertIfMissing(recordRepo, data.subscription_records, "subscription_records");
+    await insertIfMissing(providerRepo, data.providers || [], "providers");
+    await insertIfMissing(taskRepo, data.tasks || [], "tasks");
+    await insertIfMissing(usageRepo, data.usage_logs || [], "usage_logs");
+    await insertIfMissing(recordRepo, data.subscription_records || [], "subscription_records");
 
     return new AccountImportResponse({
         success: true,
