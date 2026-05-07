@@ -159,8 +159,6 @@
         "AdminAllPermissions": "El administrador tiene todos los permisos",
         "Permissions": "Permisos",
         "ExportData": "Exportar datos",
-        "ExportUsage": "Exportar uso",
-        "ExportTasks": "Exportar tareas",
         "ImportData": "Importar datos"
     },
 
@@ -250,9 +248,9 @@
         "Section2Title": "2. Responsabilidades del usuario",
         "Section2Body": "1. Usted es responsable de proteger sus credenciales de cuenta y Clave API. Cualquier pérdida resultante de una fuga de credenciales es su única responsabilidad.\n\n2. No debe utilizar el servicio para ningún propósito ilegal, incluyendo pero no limitado a: generar contenido ilegal, infringir los derechos de otros o difundir información maliciosa.\n\n3. No debe intentar eludir los controles de acceso, límites de uso u otros mecanismos de seguridad.\n\n4. No debe realizar ingeniería inversa, escaneo de vulnerabilidades ni ninguna forma de ataque contra la plataforma.\n\n5. Si sospecha de actividad no autorizada en su cuenta, contacte al administrador inmediatamente.",
         "Section3Title": "3. Política de uso justo",
-        "Section3Body": "Para garantizar un servicio estable para todos los usuarios, la plataforma establece un límite de uso mensual:\n\n• Cada cuenta tiene una cuota mensual de tokens (predeterminado: 100M tokens)\n• Cuando el uso mensual excede el límite, las solicitudes posteriores serán rechazadas con 429 Too Many Requests\n• El uso diario es solo de referencia y no tiene un límite estricto\n\nEl uso se restablece al inicio de cada mes. Contacte al administrador si necesita un límite mayor.",
+        "Section3Body": "El Servicio se presta bajo un principio de uso justo. Los límites de uso se determinan según el nivel de servicio asignado a cada cuenta y pueden ajustarse a discreción exclusiva de la plataforma.\n\nEl uso excesivo que degrade el rendimiento del sistema para otros usuarios puede dar lugar a restricciones temporales del servicio. Si sus necesidades superan la asignación estándar, contacte al administrador.",
         "Section4Title": "4. Aviso legal",
-        "Section4Body": "1. La plataforma no ofrece garantías sobre la precisión, integridad o confiabilidad del contenido generado por el modelo. Usted asume todos los riesgos asociados con su uso.\n\n2. En la máxima medida permitida por la ley, la plataforma no será responsable por daños indirectos, incidentales, especiales o consecuentes que surjan del uso o la incapacidad de usar el servicio.\n\n3. Nos reservamos el derecho de modificar, suspender o discontinuar el servicio en cualquier momento. Los cambios importantes se comunicarán con anticipación.\n\n4. Las interrupciones del servicio causadas por cortes de proveedores externos están fuera de nuestro control.",
+        "Section4Body": "1. La plataforma no ofrece garantía alguna, expresa o implícita, sobre la precisión, integridad o fiabilidad del contenido generado por modelos. Usted asume todos los riesgos derivados del uso de dicho contenido.\n\n2. En la máxima medida permitida por la ley aplicable, la plataforma no será responsable por daños indirectos, incidentales, especiales, consecuentes o ejemplares derivados del uso o la imposibilidad de acceder al servicio.\n\n3. La plataforma se reserva el derecho de modificar, suspender o interrumpir el servicio en cualquier momento. Los cambios importantes se comunicarán con antelación por medios razonables.",
         "Section5Title": "5. Contáctenos",
         "Section5Body": "Si tiene alguna pregunta o necesita ayuda, contacte al administrador. Valoramos los comentarios de cada usuario.\n\n\"Palabras sencillas, inteligencia profunda.\""
     }

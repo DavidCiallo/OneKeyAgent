@@ -156,8 +156,6 @@
         "AdminAllPermissions": "Quản trị viên có tất cả quyền",
         "Permissions": "Quyền hạn",
         "ExportData": "Xuất dữ liệu",
-        "ExportUsage": "Xuất dữ liệu sử dụng",
-        "ExportTasks": "Xuất tác vụ",
         "ImportData": "Nhập dữ liệu"
     },
 
@@ -247,9 +245,9 @@
         "Section2Title": "2. Trách nhiệm người dùng",
         "Section2Body": "1. Bạn chịu trách nhiệm bảo vệ thông tin tài khoản và API Key. Mọi tổn thất do rò rỉ thông tin xác thực là trách nhiệm của bạn.\n\n2. Bạn không được sử dụng dịch vụ cho bất kỳ mục đích bất hợp pháp nào, bao gồm nhưng không giới hạn: tạo nội dung bất hợp pháp, xâm phạm quyền của người khác, hoặc phát tán thông tin độc hại.\n\n3. Bạn không được cố gắng vượt qua kiểm soát truy cập, giới hạn sử dụng hoặc các cơ chế bảo mật khác.\n\n4. Bạn không được dịch ngược, quét lỗ hổng bảo mật hoặc thực hiện bất kỳ hình thức tấn công nào vào nền tảng.\n\n5. Nếu nghi ngờ tài khoản bị truy cập trái phép, hãy liên hệ ngay với quản trị viên.",
         "Section3Title": "3. Chính sách sử dụng hợp lý",
-        "Section3Body": "Để đảm bảo dịch vụ ổn định cho tất cả người dùng, nền tảng áp dụng giới hạn sử dụng hàng tháng:\n\n• Mỗi tài khoản có hạn mức token hàng tháng (mặc định: 100M token)\n• Khi sử dụng hàng tháng vượt quá hạn mức, các yêu cầu tiếp theo sẽ bị từ chối với mã 429 Too Many Requests\n• Mức sử dụng hàng ngày chỉ mang tính tham khảo và không có giới hạn cứng\n\nMức sử dụng được đặt lại vào đầu mỗi tháng. Liên hệ quản trị viên nếu bạn cần hạn mức cao hơn.",
+        "Section3Body": "Dịch vụ được cung cấp trên cơ sở nguyên tắc sử dụng hợp lý. Giới hạn sử dụng được xác định theo hạng dịch vụ của từng tài khoản và có thể được điều chỉnh theo quyết định riêng của nền tảng.\n\nViệc sử dụng quá mức làm suy giảm hiệu suất hệ thống cho người dùng khác có thể dẫn đến các hạn chế dịch vụ tạm thời. Nếu nhu cầu của bạn vượt quá mức phân bổ tiêu chuẩn, vui lòng liên hệ quản trị viên.",
         "Section4Title": "4. Tuyên bố miễn trừ",
-        "Section4Body": "1. Nền tảng không đảm bảo về tính chính xác, đầy đủ hoặc độ tin cậy của nội dung do mô hình tạo ra. Bạn tự chịu rủi ro khi sử dụng.\n\n2. Trong phạm vi tối đa được pháp luật cho phép, nền tảng không chịu trách nhiệm cho bất kỳ thiệt hại gián tiếp, ngẫu nhiên, đặc biệt hoặc do hậu quả nào phát sinh từ việc sử dụng hoặc không thể sử dụng dịch vụ.\n\n3. Chúng tôi có quyền sửa đổi, tạm ngừng hoặc ngừng dịch vụ bất cứ lúc nào. Các thay đổi quan trọng sẽ được thông báo trước.\n\n4. Gián đoạn dịch vụ do sự cố từ nhà cung cấp bên thứ ba nằm ngoài tầm kiểm soát của chúng tôi.",
+        "Section4Body": "1. Nền tảng không bảo đảm, dù rõ ràng hay ngụ ý, về tính chính xác, đầy đủ hoặc độ tin cậy của nội dung do mô hình tạo ra. Bạn tự chịu mọi rủi ro liên quan đến việc sử dụng nội dung đó.\n\n2. Trong phạm vi tối đa được pháp luật áp dụng cho phép, nền tảng không chịu trách nhiệm đối với bất kỳ thiệt hại gián tiếp, ngẫu nhiên, đặc biệt, do hậu quả hoặc mang tính chất răn đe nào phát sinh từ việc sử dụng hoặc không thể truy cập dịch vụ.\n\n3. Nền tảng bảo lưu quyền sửa đổi, tạm ngừng hoặc chấm dứt dịch vụ bất cứ lúc nào. Các thay đổi quan trọng sẽ được thông báo trước bằng các phương tiện hợp lý.",
         "Section5Title": "5. Liên hệ",
         "Section5Body": "Nếu bạn có bất kỳ câu hỏi hoặc cần trợ giúp, vui lòng liên hệ quản trị viên. Chúng tôi trân trọng mọi phản hồi từ người dùng.\n\n\"Ngôn từ giản dị, trí tuệ sâu sắc.\""
     }
