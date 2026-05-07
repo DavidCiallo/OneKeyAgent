@@ -157,7 +157,11 @@
         "Password": "Senha",
         "DeleteConfirm": "Tem certeza que deseja excluir esta conta?",
         "AdminAllPermissions": "O administrador tem todas as permissões",
-        "Permissions": "Permissões"
+        "Permissions": "Permissões",
+        "ExportData": "Exportar dados",
+        "ExportUsage": "Exportar uso",
+        "ExportTasks": "Exportar tarefas",
+        "ImportData": "Importar dados"
     },
 
     "NoContentPage": {

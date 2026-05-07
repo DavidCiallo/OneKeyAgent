@@ -154,7 +154,11 @@
         "Password": "Mật khẩu",
         "DeleteConfirm": "Bạn có chắc chắn muốn xóa tài khoản này?",
         "AdminAllPermissions": "Quản trị viên có tất cả quyền",
-        "Permissions": "Quyền hạn"
+        "Permissions": "Quyền hạn",
+        "ExportData": "Xuất dữ liệu",
+        "ExportUsage": "Xuất dữ liệu sử dụng",
+        "ExportTasks": "Xuất tác vụ",
+        "ImportData": "Nhập dữ liệu"
     },
 
     "NoContentPage": {

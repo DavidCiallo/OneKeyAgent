@@ -157,7 +157,11 @@
         "Password": "Пароль",
         "DeleteConfirm": "Вы уверены, что хотите удалить этот аккаунт?",
         "AdminAllPermissions": "Администратор имеет все права",
-        "Permissions": "Права"
+        "Permissions": "Права",
+        "ExportData": "Экспорт данных",
+        "ExportUsage": "Экспорт использования",
+        "ExportTasks": "Экспорт задач",
+        "ImportData": "Импорт данных"
     },
 
     "NoContentPage": {
