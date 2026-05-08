@@ -231,7 +231,17 @@
         "Copied": "コピーしました！",
         "CheckPayment": "支払い状況を確認",
         "TransactionHistory": "取引履歴",
-        "NoTransactions": "取引履歴はありません"
+        "NoTransactions": "取引履歴はありません",
+        "Ultra": "ULTRA",
+        "UltraDesc": "エンタープライズ向けオールインワンソリューション",
+        "ContactService": "カスタマーサービス",
+        "GiftCard": "ギフトカード",
+        "GiftCardDesc": "ギフトカードを使ってサブスクリプションを有効化",
+        "Activate": "有効化",
+        "GiftCardTitle": "ギフトカードを有効化",
+        "GiftCardPlaceholder": "ギフトカードコードを入力",
+        "GiftCardActivateSuccess": "ギフトカードが正常に有効化されました",
+        "GiftCardActivateFailed": "ギフトカードの有効化に失敗しました"
     },
 
     "PlanManagementPage": {

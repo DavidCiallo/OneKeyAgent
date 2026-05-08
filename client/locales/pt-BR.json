@@ -231,7 +231,17 @@
         "Copied": "Copiado!",
         "CheckPayment": "Verificar status do pagamento",
         "TransactionHistory": "Histórico de transações",
-        "NoTransactions": "Nenhuma transação ainda"
+        "NoTransactions": "Nenhuma transação ainda",
+        "Ultra": "ULTRA",
+        "UltraDesc": "Solução completa para empresas",
+        "ContactService": "Fale com o suporte",
+        "GiftCard": "Cartão-presente",
+        "GiftCardDesc": "Use um cartão-presente para ativar um plano de assinatura",
+        "Activate": "Ativar",
+        "GiftCardTitle": "Ativar cartão-presente",
+        "GiftCardPlaceholder": "Digite o código do cartão-presente",
+        "GiftCardActivateSuccess": "Cartão-presente ativado com sucesso",
+        "GiftCardActivateFailed": "Falha ao ativar o cartão-presente"
     },
 
     "PlanManagementPage": {

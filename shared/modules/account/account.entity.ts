@@ -10,6 +10,4 @@ export interface AccountEntity extends BaseEntity {
     plan_expires_at: number | null;
     sub_wallet_address: string | null;
     tg_chat_id: string | null;
-    verification_token: string | null;
-    email_verified_at: number | null;
 }

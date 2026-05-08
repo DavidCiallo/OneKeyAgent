@@ -1,6 +1,23 @@
 import { BaseRequest, BaseResponse } from "../../lib/default/decorator";
 import { SubscriptionRecordEntity, TxStatus } from "./subscription_record.entity";
 
+export const PAYMENT_CURRENCIES = [
+    { token: "USDT", chain: "ETH", pay_currency: "USDTERC20", localeKey: "CurrencyETHUSDT", iconKey: "USDTERC20" },
+    { token: "USDT", chain: "ARB", pay_currency: "USDTARB", localeKey: "CurrencyARBUSDT", iconKey: "USDTARB" },
+    { token: "USDT", chain: "SOL", pay_currency: "USDTSOL", localeKey: "CurrencySOLUSDT", iconKey: "USDTSOL" },
+    { token: "USDT", chain: "OP", pay_currency: "USDTOP", localeKey: "CurrencyOPUSDT", iconKey: "USDTOP" },
+    { token: "USDT", chain: "BSC", pay_currency: "USDTBSC", localeKey: "CurrencyBSCUSDT", iconKey: "USDTBSC" },
+    { token: "USDT", chain: "ALGO", pay_currency: "USDTALGO", localeKey: "CurrencyALGOUSDT", iconKey: "USDTALGO" },
+    { token: "USDC", chain: "ETH", pay_currency: "USDC", localeKey: "CurrencyETHUSDC", iconKey: "USDC" },
+    { token: "USDC", chain: "ARB", pay_currency: "USDCARB", localeKey: "CurrencyARBUSDC", iconKey: "USDCARB" },
+    { token: "USDC", chain: "SOL", pay_currency: "USDCSOL", localeKey: "CurrencySOLUSDC", iconKey: "USDCSOL" },
+    { token: "USDC", chain: "OP", pay_currency: "USDCOP", localeKey: "CurrencyOPUSDC", iconKey: "USDCOP" },
+    { token: "USDC", chain: "BSC", pay_currency: "USDCBSC", localeKey: "CurrencyBSCUSDC", iconKey: "USDCBSC" },
+    { token: "USDC", chain: "ALGO", pay_currency: "USDCALGO", localeKey: "CurrencyALGOUSDC", iconKey: "USDCALGO" },
+] as const;
+
+export type PaymentCurrency = typeof PAYMENT_CURRENCIES[number]["pay_currency"];
+
 export class SubscriptionRecordDTO {
     public id: string;
     public account_id: string;
@@ -54,11 +71,13 @@ export class SubscriptionRecordListResponse implements BaseResponse<Subscription
 export class SubscriptionCreatePaymentRequest implements BaseRequest {
     public auth?: string;
     public plan_name?: string;
+    public pay_currency?: string;
 
     constructor(origin: Partial<SubscriptionCreatePaymentRequest>) {
         if (false) throw new Error("Unexpected error");
         origin.auth && (this.auth = origin.auth);
         origin.plan_name && (this.plan_name = origin.plan_name);
+        origin.pay_currency && (this.pay_currency = origin.pay_currency);
     }
     static self(unsafe: SubscriptionCreatePaymentRequest) {
         return new SubscriptionCreatePaymentRequest(unsafe);
@@ -77,6 +96,31 @@ export class SubscriptionCreatePaymentResponse implements BaseResponse<{ invoice
         this.success = origin.success;
         this.message = origin.message;
         this.data = origin.data;
+    }
+}
+
+export class SubscriptionRedeemGiftCardRequest implements BaseRequest {
+    public auth?: string;
+    public code?: string;
+
+    constructor(origin: Partial<SubscriptionRedeemGiftCardRequest>) {
+        if (false) throw new Error("Unexpected error");
+        origin.auth && (this.auth = origin.auth);
+        origin.code && (this.code = origin.code);
+    }
+    static self(unsafe: SubscriptionRedeemGiftCardRequest) {
+        return new SubscriptionRedeemGiftCardRequest(unsafe);
+    }
+}
+
+export class SubscriptionRedeemGiftCardResponse implements BaseResponse<undefined> {
+    public success: boolean;
+    public message: string;
+    public data?: undefined;
+
+    constructor(origin: SubscriptionRedeemGiftCardResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
     }
 }
 

@@ -228,7 +228,17 @@
         "Copied": "คัดลอกแล้ว!",
         "CheckPayment": "ตรวจสอบสถานะการชำระเงิน",
         "TransactionHistory": "ประวัติธุรกรรม",
-        "NoTransactions": "ยังไม่มีธุรกรรม"
+        "NoTransactions": "ยังไม่มีธุรกรรม",
+        "Ultra": "ULTRA",
+        "UltraDesc": "โซลูชันครบวงจรระดับองค์กร",
+        "ContactService": "ติดต่อฝ่ายบริการ",
+        "GiftCard": "บัตรของขวัญ",
+        "GiftCardDesc": "ใช้บัตรของขวัญเพื่อเปิดใช้งานแพ็กเกจสมัครสมาชิก",
+        "Activate": "เปิดใช้งาน",
+        "GiftCardTitle": "เปิดใช้งานบัตรของขวัญ",
+        "GiftCardPlaceholder": "ป้อนรหัสบัตรของขวัญ",
+        "GiftCardActivateSuccess": "เปิดใช้งานบัตรของขวัญสำเร็จ",
+        "GiftCardActivateFailed": "เปิดใช้งานบัตรของขวัญล้มเหลว"
     },
 
     "PlanManagementPage": {

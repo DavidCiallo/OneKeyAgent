@@ -228,7 +228,17 @@
         "Copied": "Đã sao chép!",
         "CheckPayment": "Kiểm tra trạng thái thanh toán",
         "TransactionHistory": "Lịch sử giao dịch",
-        "NoTransactions": "Chưa có giao dịch nào"
+        "NoTransactions": "Chưa có giao dịch nào",
+        "Ultra": "ULTRA",
+        "UltraDesc": "Giải pháp toàn diện cho doanh nghiệp",
+        "ContactService": "Liên hệ dịch vụ",
+        "GiftCard": "Thẻ quà tặng",
+        "GiftCardDesc": "Sử dụng thẻ quà tặng để kích hoạt gói đăng ký",
+        "Activate": "Kích hoạt",
+        "GiftCardTitle": "Kích hoạt thẻ quà tặng",
+        "GiftCardPlaceholder": "Nhập mã thẻ quà tặng",
+        "GiftCardActivateSuccess": "Kích hoạt thẻ quà tặng thành công",
+        "GiftCardActivateFailed": "Kích hoạt thẻ quà tặng thất bại"
     },
 
     "PlanManagementPage": {

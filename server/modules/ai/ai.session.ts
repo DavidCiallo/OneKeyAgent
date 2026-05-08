@@ -22,7 +22,8 @@ export async function logUsage(usage: {
     modelAlias: string,
     providerId?: string,
     inputTokens: number,
-    outputTokens: number
+    outputTokens: number,
+    tierSnapshot?: number,
 }) {
     await usageRepo.insert(usage);
 }

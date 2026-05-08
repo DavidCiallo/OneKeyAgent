@@ -231,7 +231,17 @@
         "Copied": "¡Copiado!",
         "CheckPayment": "Verificar estado del pago",
         "TransactionHistory": "Historial de transacciones",
-        "NoTransactions": "Sin transacciones aún"
+        "NoTransactions": "Sin transacciones aún",
+        "Ultra": "ULTRA",
+        "UltraDesc": "Solución integral para empresas",
+        "ContactService": "Contactar servicio",
+        "GiftCard": "Tarjeta de regalo",
+        "GiftCardDesc": "Usa una tarjeta de regalo para activar un plan",
+        "Activate": "Activar",
+        "GiftCardTitle": "Activar tarjeta de regalo",
+        "GiftCardPlaceholder": "Ingrese el código de la tarjeta",
+        "GiftCardActivateSuccess": "Tarjeta de regalo activada exitosamente",
+        "GiftCardActivateFailed": "Error al activar la tarjeta de regalo"
     },
 
     "PlanManagementPage": {

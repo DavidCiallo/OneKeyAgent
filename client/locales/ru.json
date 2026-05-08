@@ -231,7 +231,17 @@
         "Copied": "Скопировано!",
         "CheckPayment": "Проверить статус платежа",
         "TransactionHistory": "История транзакций",
-        "NoTransactions": "Нет транзакций"
+        "NoTransactions": "Нет транзакций",
+        "Ultra": "ULTRA",
+        "UltraDesc": "Корпоративное комплексное решение",
+        "ContactService": "Связаться с поддержкой",
+        "GiftCard": "Подарочная карта",
+        "GiftCardDesc": "Используйте подарочную карту для активации подписки",
+        "Activate": "Активировать",
+        "GiftCardTitle": "Активировать подарочную карту",
+        "GiftCardPlaceholder": "Введите код подарочной карты",
+        "GiftCardActivateSuccess": "Подарочная карта успешно активирована",
+        "GiftCardActivateFailed": "Ошибка активации подарочной карты"
     },
 
     "PlanManagementPage": {

@@ -31,6 +31,7 @@ CREATE TABLE `usage_log` (
 	`provider_id` text DEFAULT '',
 	`input_tokens` integer NOT NULL,
 	`output_tokens` integer NOT NULL,
+	`tier_snapshot` integer,
 	`create_time` integer,
 	`update_time` integer,
 	`delete_time` integer

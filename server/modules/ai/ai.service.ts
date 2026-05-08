@@ -269,8 +269,9 @@ async function chatHex(body: Record<string, any>, accountId: string): Promise<an
             accountId,
             modelAlias: requestedAlias,
             providerId: provider.id,
-            inputTokens: rawInput * tier,
-            outputTokens: rawOutput * tier,
+            inputTokens: rawInput,
+            outputTokens: rawOutput,
+            tierSnapshot: tier,
         });
 
         data.model = requestedAlias;
@@ -380,8 +381,9 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
                         accountId,
                         modelAlias: requestedAlias,
                         providerId: provider.id,
-                        inputTokens: rawInput * tier,
-                        outputTokens: rawOutput * tier,
+                        inputTokens: rawInput,
+                        outputTokens: rawOutput,
+                        tierSnapshot: tier,
                     });
                 }
             } catch (err) {
@@ -455,8 +457,9 @@ async function completeHex(body: Record<string, any>, accountId: string): Promis
             accountId,
             modelAlias: requestedAlias,
             providerId: provider.id,
-            inputTokens: rawInput * tier,
-            outputTokens: rawOutput * tier,
+            inputTokens: rawInput,
+            outputTokens: rawOutput,
+            tierSnapshot: tier,
         });
         return data;
     }
