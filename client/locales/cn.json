@@ -21,7 +21,7 @@
         "Chat": "在线对话",
         "Profile": "账户信息",
         "Subscription": "订阅管理",
-        "Plan": "管理",
+        "Plan": "套餐管理",
         "NoContent": "未授权",
         "Logout": "退出登录"
     },
@@ -258,7 +258,7 @@
     },
 
     "PlanPage": {
-        "Title": "套餐",
+        "Title": "套餐管理",
         "Name": "套餐名",
         "MonthlyLimit": "月额度",
         "Price": "价格",
