@@ -168,8 +168,9 @@ async function exportData(request: AccountExportRequest): Promise<AccountExportR
     const recordRepo = Repository.instance<any>("SubscriptionRecord");
     const taskRepo = Repository.instance<any>("Task");
     const usageRepo = Repository.instance<any>("UsageLog");
+    const giftCardRepo = Repository.instance<any>("GiftCard");
 
-    const [accounts, models, providers, roles, accountRoles, plans, records, tasks, usageLogs] = await Promise.all([
+    const [accounts, models, providers, roles, accountRoles, plans, records, tasks, usageLogs, giftCards] = await Promise.all([
         accountRepo.findAllIgnoreDelete(),
         modelRepo.findAllIgnoreDelete(),
         providerRepo.findAllIgnoreDelete(),
@@ -179,6 +180,7 @@ async function exportData(request: AccountExportRequest): Promise<AccountExportR
         recordRepo.findAllIgnoreDelete(),
         taskRepo.findAllIgnoreDelete(),
         usageRepo.findAllIgnoreDelete(),
+        giftCardRepo.findAllIgnoreDelete(),
     ]);
 
     return new AccountExportResponse({
@@ -197,6 +199,7 @@ async function exportData(request: AccountExportRequest): Promise<AccountExportR
                 subscription_records: records as any[] || [],
                 tasks: tasks as any[] || [],
                 usage_logs: usageLogs as any[] || [],
+                gift_cards: giftCards as any[] || [],
             },
         },
     });
@@ -255,6 +258,7 @@ async function importData(request: AccountImportRequest): Promise<AccountImportR
     const recordRepo = Repository.instance<any>("SubscriptionRecord");
     const taskRepo = Repository.instance<any>("Task");
     const usageRepo = Repository.instance<any>("UsageLog");
+    const giftCardRepo = Repository.instance<any>("GiftCard");
 
     type TableDef = { repo: Repository<any>; items: any[] | undefined; name: string };
     const tables: TableDef[] = [
@@ -267,6 +271,7 @@ async function importData(request: AccountImportRequest): Promise<AccountImportR
         { repo: taskRepo, items: data.tasks, name: "tasks" },
         { repo: usageRepo, items: data.usage_logs, name: "usage_logs" },
         { repo: recordRepo, items: data.subscription_records, name: "subscription_records" },
+        { repo: giftCardRepo, items: data.gift_cards, name: "gift_cards" },
     ];
 
     async function importTable(repo: Repository<any>, items: any[] | undefined, name: string) {

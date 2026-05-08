@@ -19,3 +19,5 @@ import { SubscriptionPlanRouterInstance } from "../../shared/modules/subscriptio
 import { SubscriptionRecordRouterInstance } from "../../shared/modules/subscription_record/subscription_record.router";
 export const SubscriptionPlanRouter = new SubscriptionPlanRouterInstance(inject);
 export const SubscriptionRecordRouter = new SubscriptionRecordRouterInstance(inject);
+import { GiftCardRouterInstance } from "../../shared/modules/gift_card/gift_card.router";
+export const GiftCardRouter = new GiftCardRouterInstance(inject);

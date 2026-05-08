@@ -321,6 +321,7 @@ export interface ExportData {
         subscription_records?: any[];
         tasks?: any[];
         usage_logs?: any[];
+        gift_cards?: any[];
     };
 }
 
@@ -334,7 +335,7 @@ export class AccountExportRequest implements BaseRequest {
     }
 }
 
-export class AccountExportResponse implements BaseResponse<ExportData> {
+export class AccountExportResponse implements BaseResponse<any> {
     public success: boolean;
     public message: string;
     public data?: ExportData;

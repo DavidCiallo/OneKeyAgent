@@ -23,7 +23,7 @@
         "Subscription": "Подписка",
         "NoContent": "Нет доступа",
         "Logout": "Выйти",
-        "PlanManagement": "Тарифы"
+        "Plan": "Тариф"
     },
 
     "ModelPage": {
@@ -244,8 +244,8 @@
         "GiftCardActivateFailed": "Ошибка активации подарочной карты"
     },
 
-    "PlanManagementPage": {
-        "Title": "Тарифы",
+    "PlanPage": {
+        "Title": "Тариф",
         "Name": "Название",
         "MonthlyLimit": "Месячный лимит",
         "Price": "Цена",

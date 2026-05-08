@@ -99,31 +99,6 @@ export class SubscriptionCreatePaymentResponse implements BaseResponse<{ invoice
     }
 }
 
-export class SubscriptionRedeemGiftCardRequest implements BaseRequest {
-    public auth?: string;
-    public code?: string;
-
-    constructor(origin: Partial<SubscriptionRedeemGiftCardRequest>) {
-        if (false) throw new Error("Unexpected error");
-        origin.auth && (this.auth = origin.auth);
-        origin.code && (this.code = origin.code);
-    }
-    static self(unsafe: SubscriptionRedeemGiftCardRequest) {
-        return new SubscriptionRedeemGiftCardRequest(unsafe);
-    }
-}
-
-export class SubscriptionRedeemGiftCardResponse implements BaseResponse<undefined> {
-    public success: boolean;
-    public message: string;
-    public data?: undefined;
-
-    constructor(origin: SubscriptionRedeemGiftCardResponse) {
-        this.success = origin.success;
-        this.message = origin.message;
-    }
-}
-
 export class SubscriptionIpnWebhookBody {
     public payment_id?: string;
     public payment_status?: string;

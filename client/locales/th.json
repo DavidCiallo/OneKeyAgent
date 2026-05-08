@@ -23,7 +23,7 @@
         "Subscription": "แพ็กเกจ",
         "NoContent": "ไม่มีเนื้อหา",
         "Logout": "ออกจากระบบ",
-        "PlanManagement": "จัดการแพ็กเกจ"
+        "Plan": "แพ็กเกจ"
     },
 
     "ModelPage": {
@@ -241,8 +241,8 @@
         "GiftCardActivateFailed": "เปิดใช้งานบัตรของขวัญล้มเหลว"
     },
 
-    "PlanManagementPage": {
-        "Title": "จัดการแพ็กเกจ",
+    "PlanPage": {
+        "Title": "แพ็กเกจ",
         "Name": "ชื่อ",
         "MonthlyLimit": "วงเงินรายเดือน",
         "Price": "ราคา",

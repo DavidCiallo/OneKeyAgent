@@ -23,7 +23,7 @@
         "Subscription": "Assinatura",
         "NoContent": "Sem acesso",
         "Logout": "Sair",
-        "PlanManagement": "Gerenciar planos"
+        "Plan": "Planos"
     },
 
     "ModelPage": {
@@ -244,8 +244,8 @@
         "GiftCardActivateFailed": "Falha ao ativar o cartão-presente"
     },
 
-    "PlanManagementPage": {
-        "Title": "Gerenciar planos",
+    "PlanPage": {
+        "Title": "Planos",
         "Name": "Nome",
         "MonthlyLimit": "Limite mensal",
         "Price": "Preço",

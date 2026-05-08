@@ -23,7 +23,7 @@
         "Subscription": "Suscripción",
         "NoContent": "Sin acceso",
         "Logout": "Cerrar sesión",
-        "PlanManagement": "Gestión de planes"
+        "Plan": "Plan"
     },
 
     "ModelPage": {
@@ -244,8 +244,8 @@
         "GiftCardActivateFailed": "Error al activar la tarjeta de regalo"
     },
 
-    "PlanManagementPage": {
-        "Title": "Gestión de planes",
+    "PlanPage": {
+        "Title": "Plan",
         "Name": "Nombre",
         "MonthlyLimit": "Límite mensual",
         "Price": "Precio",

@@ -8,7 +8,6 @@ import {
 import {
     SubscriptionRecordListRequest, SubscriptionRecordListResponse,
     SubscriptionCreatePaymentRequest, SubscriptionCreatePaymentResponse,
-    SubscriptionRedeemGiftCardRequest, SubscriptionRedeemGiftCardResponse,
     SubscriptionRecordDTO,
     PaymentCurrency,
 } from "../../../shared/modules/subscription_record/subscription_record.interface";
@@ -231,33 +230,6 @@ async function ipnwebhook(request: Record<string, unknown>): Promise<{ success: 
     }
 }
 
-async function redeemgiftcard(request: SubscriptionRedeemGiftCardRequest): Promise<SubscriptionRedeemGiftCardResponse> {
-    request = SubscriptionRedeemGiftCardRequest.self(request);
-    const account = await resolveAccount(request.auth || "");
-
-    // Rate limit: max 6 requests per minute per account
-    if (!(await checkRateLimit(`redeemgiftcard:${account.id}`))) {
-        return new SubscriptionRedeemGiftCardResponse({
-            success: false,
-            message: "Too many requests, please try again later",
-        });
-    }
-
-    if (!request.code) {
-        return new SubscriptionRedeemGiftCardResponse({
-            success: false,
-            message: "Gift card code is required",
-        });
-    }
-
-    // For now, return a placeholder response
-    // TODO: implement actual gift card redemption logic
-    return new SubscriptionRedeemGiftCardResponse({
-        success: false,
-        message: "Gift card redemption not yet implemented",
-    });
-}
-
 // ─── Export controllers ───
 
 export const subscriptionPlanController = new SubscriptionPlanRouterInstance(inject, {
@@ -271,5 +243,4 @@ export const subscriptionRecordController = new SubscriptionRecordRouterInstance
     records,
     createpayment,
     ipnwebhook,
-    redeemgiftcard,
 });

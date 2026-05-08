@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
-import { SubscriptionRecordRouter } from "../../../api/instance";
+import { SubscriptionRecordRouter, GiftCardRouter } from "../../../api/instance";
 
 export default function GiftCardModal({
     isOpen,
@@ -23,7 +23,7 @@ export default function GiftCardModal({
         setActivating(true);
         setError("");
         try {
-            const res = await SubscriptionRecordRouter.redeemgiftcard({
+            const res = await GiftCardRouter.redeem({
                 auth: localStorage.getItem("access_token") || "",
                 code: code.trim(),
             });

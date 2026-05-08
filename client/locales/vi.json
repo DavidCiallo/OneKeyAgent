@@ -23,7 +23,7 @@
         "Subscription": "Gói đăng ký",
         "NoContent": "Không có nội dung",
         "Logout": "Đăng xuất",
-        "PlanManagement": "Quản lý gói"
+        "Plan": "Gói"
     },
 
     "ModelPage": {
@@ -241,8 +241,8 @@
         "GiftCardActivateFailed": "Kích hoạt thẻ quà tặng thất bại"
     },
 
-    "PlanManagementPage": {
-        "Title": "Quản lý gói",
+    "PlanPage": {
+        "Title": "Gói",
         "Name": "Tên",
         "MonthlyLimit": "Hạn mức tháng",
         "Price": "Giá",

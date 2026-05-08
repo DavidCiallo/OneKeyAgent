@@ -23,7 +23,7 @@
         "Subscription": "Subscription",
         "NoContent": "No Content",
         "Logout": "Logout",
-        "PlanManagement": "Plan Management"
+        "Plan": "Plan"
     },
 
     "ModelPage": {
@@ -255,8 +255,8 @@
         "GiftCardActivateFailed": "Gift card activation failed"
     },
 
-    "PlanManagementPage": {
-        "Title": "Plan Management",
+    "PlanPage": {
+        "Title": "Plan",
         "Name": "Name",
         "MonthlyLimit": "Monthly Limit",
         "Price": "Price",

@@ -110,3 +110,18 @@ CREATE TABLE `subscription_record` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `subscription_record_txid_unique` ON `subscription_record` (`txid`);
+--> statement-breakpoint
+CREATE TABLE `gift_card` (
+	`id` text PRIMARY KEY NOT NULL,
+	`code` text NOT NULL,
+	`plan_name` text NOT NULL,
+	`duration_days` integer NOT NULL,
+	`status` text DEFAULT 'unused' NOT NULL,
+	`redeemed_by` text,
+	`redeemed_at` integer,
+	`create_time` integer NOT NULL,
+	`update_time` integer,
+	`delete_time` integer
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `gift_card_code_unique` ON `gift_card` (`code`);

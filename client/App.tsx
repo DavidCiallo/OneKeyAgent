@@ -14,7 +14,7 @@ import ProfilePage from "./pages/profile/ProfilePage";
 import TermsPage from "./pages/terms/TermsPage";
 import NoContentPage from "./pages/nocontent/NoContentPage";
 import SubscriptionPage from "./pages/subscription/SubscriptionPage";
-import PlanManagementPage from "./pages/planmanagement/PlanManagementPage";
+import PlanPage from "./pages/plan/PlanPage";
 import { AuthRouter } from "./api/instance";
 import { AliveRequest } from "../shared/modules/auth/auth.interface";
 import { AuthProvider, useAuth } from "./methods/auth-context";
@@ -59,7 +59,7 @@ const TITLE_MAP: Record<string, string> = {
     "/account": "Account",
     "/profile": "Profile",
     "/subscription": "Subscription",
-    "/planmanagement": "Plan Management",
+    "/plan": "Plan",
     "/nocontent": "No Content",
     "/terms": "Terms",
 };
@@ -88,7 +88,7 @@ const AppRoutes = () => {
                 <Route path="/account" element={<ProtectedRoute name="account"><AccountPage /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute name="profile"><ProfilePage /></ProtectedRoute>} />
                 <Route path="/subscription" element={<ProtectedRoute name="subscription"><SubscriptionPage /></ProtectedRoute>} />
-                <Route path="/planmanagement" element={<ProtectedRoute name="planmanagement"><PlanManagementPage /></ProtectedRoute>} />
+                <Route path="/plan" element={<ProtectedRoute name="plan"><PlanPage /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>

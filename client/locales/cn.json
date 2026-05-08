@@ -23,7 +23,7 @@
         "Subscription": "订阅管理",
         "NoContent": "未授权",
         "Logout": "退出登录",
-        "PlanManagement": "套餐管理"
+        "Plan": "套餐"
     },
 
     "ModelPage": {
@@ -257,8 +257,8 @@
         "GiftCardActivateFailed": "礼品卡激活失败"
     },
 
-    "PlanManagementPage": {
-        "Title": "套餐管理",
+    "PlanPage": {
+        "Title": "套餐",
         "Name": "套餐名",
         "MonthlyLimit": "月额度",
         "Price": "价格",

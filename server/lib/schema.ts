@@ -6,3 +6,4 @@ export * from "../../shared/modules/provider/provider.schema";
 export * from "../../shared/modules/task/task.schema";
 export * from "../../shared/modules/subscription_plan/subscription_plan.schema";
 export * from "../../shared/modules/subscription_record/subscription_record.schema";
+export * from "../../shared/modules/gift_card/gift_card.schema";

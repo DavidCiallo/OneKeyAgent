@@ -23,7 +23,7 @@
         "Subscription": "サブスクリプション",
         "NoContent": "アクセス権限がありません",
         "Logout": "ログアウト",
-        "PlanManagement": "プラン管理"
+        "Plan": "プラン"
     },
 
     "ModelPage": {
@@ -244,8 +244,8 @@
         "GiftCardActivateFailed": "ギフトカードの有効化に失敗しました"
     },
 
-    "PlanManagementPage": {
-        "Title": "プラン管理",
+    "PlanPage": {
+        "Title": "プラン",
         "Name": "名前",
         "MonthlyLimit": "月間制限",
         "Price": "価格",
