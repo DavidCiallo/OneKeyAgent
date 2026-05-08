@@ -21,9 +21,9 @@
         "Chat": "在线对话",
         "Profile": "账户信息",
         "Subscription": "订阅管理",
+        "Plan": "管理",
         "NoContent": "未授权",
-        "Logout": "退出登录",
-        "Plan": "套餐"
+        "Logout": "退出登录"
     },
 
     "ModelPage": {
