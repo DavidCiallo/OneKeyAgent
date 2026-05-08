@@ -46,7 +46,7 @@ export async function preRegisterUser(name: string, email: string, password: str
     // Encrypt registration data into the token: name|-|email|-|password(plain)
     const payload = [name, email, password].join("|-|");
     const verificationToken = aesEncrypt(payload);
-    const verifyUrl = `${process.env.CLIENT_URL || "http://localhost:61206"}/verify-email?token=${encodeURIComponent(verificationToken)}`;
+    const verifyUrl = `${process.env.CLIENT_URL}/verify?token=${encodeURIComponent(verificationToken)}`;
     const emailSent = await sendEmail({
         to: email,
         ...buildVerificationEmail(verifyUrl),
