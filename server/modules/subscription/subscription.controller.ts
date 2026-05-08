@@ -9,6 +9,7 @@ import {
     SubscriptionRecordListRequest, SubscriptionRecordListResponse,
     SubscriptionCreatePaymentRequest, SubscriptionCreatePaymentResponse,
     SubscriptionRecordDTO,
+    PaymentCurrency,
 } from "../../../shared/modules/subscription_record/subscription_record.interface";
 import { SubscriptionPlanRouterInstance } from "../../../shared/modules/subscription_plan/subscription_plan.router";
 import { SubscriptionRecordRouterInstance } from "../../../shared/modules/subscription_record/subscription_record.router";
@@ -16,8 +17,6 @@ import { inject } from "../../lib/inject";
 import { getIdentifyByVerify, getAccountByEmail } from "../auth/auth.service";
 import { SubscriptionService } from "./subscription.service";
 import { createInvoice } from "./nowpayments.service";
-
-// ─── Auth helpers ───
 
 async function requireAdmin(auth?: string): Promise<void> {
     if (!auth) throw "Authorization failed";
@@ -34,6 +33,39 @@ async function resolveAccount(auth: string) {
     if (!account) throw new Error("Account not found");
     return account;
 }
+
+// ─── Rate limiter ───
+
+const requestCounts = new Map<string, { count: number; windowStart: number }>();
+const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
+const RATE_LIMIT_MAX = 6; // max requests per window
+
+async function checkRateLimit(key: string): Promise<boolean> {
+    const now = Date.now();
+    const entry = requestCounts.get(key);
+
+    if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+        requestCounts.set(key, { count: 1, windowStart: now });
+        return true;
+    }
+
+    if (entry.count >= RATE_LIMIT_MAX) {
+        return false;
+    }
+
+    entry.count++;
+    return true;
+}
+
+// Clean up stale entries every 2 minutes
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of requestCounts) {
+        if (now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+            requestCounts.delete(key);
+        }
+    }
+}, 120_000);
 
 // ─── Plan routes ───
 
@@ -106,6 +138,15 @@ async function createpayment(request: SubscriptionCreatePaymentRequest): Promise
     console.log(request);
     const account = await resolveAccount(request.auth || "");
 
+    // Rate limit: max 6 requests per minute per account
+    if (!(await checkRateLimit(`createpayment:${account.id}`))) {
+        return new SubscriptionCreatePaymentResponse({
+            success: false,
+            message: "Too many requests, please try again later",
+            data: { invoice_url: "", payment_id: "" },
+        });
+    }
+
     if (!request.plan_name) throw new Error("plan_name is required");
 
     const plan = await SubscriptionService.findPlanByName(request.plan_name);
@@ -113,10 +154,12 @@ async function createpayment(request: SubscriptionCreatePaymentRequest): Promise
     if (plan.price <= 0) throw new Error("This plan is free");
 
     // Create invoice via NowPayments
+    const payCurrency = (request.pay_currency as PaymentCurrency) || "USDTERC20";
     const { invoice_url, payment_id, invoice_id } = await createInvoice(
         request.plan_name,
         plan.price,
         account.id,
+        payCurrency,
     );
 
     // Create a pending record

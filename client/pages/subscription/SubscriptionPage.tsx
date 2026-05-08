@@ -39,11 +39,11 @@ export default function SubscriptionPage() {
     } | null>(null);
 
     const [plans, setPlans] = useState<Plan[]>([]);
-    const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+    const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
     const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
     const [paymentId, setPaymentId] = useState<string | null>(null);
     const [records, setRecords] = useState<TxRecord[]>([]);
-    const [checking, setChecking] = useState(false);
+    const [paying, setPaying] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const paymentModal = useDisclosure();
 
@@ -64,7 +64,7 @@ export default function SubscriptionPage() {
     const fetchRecords = useCallback(async () => {
         const res = await SubscriptionRecordRouter.records(new SubscriptionRecordListRequest({ auth: getToken() }));
         if (res.success && res.data) {
-            setRecords(res.data.list);
+            setRecords(res.data.list?.filter(r => r.status !== "expired" || Date.now() - r.create_time < 6 * 60 * 60 * 1000));
         }
     }, []);
 
@@ -74,31 +74,34 @@ export default function SubscriptionPage() {
         fetchRecords();
     }, [fetchProfile, fetchPlans, fetchRecords]);
 
-    const handleSelectPlan = async (plan: Plan) => {
-        setSelectedPlan(plan.name);
+    const handleSelectPlan = (plan: Plan) => {
+        setSelectedPlan(plan);
         if (plan.name !== "free") {
-            try {
-                const res = await SubscriptionRecordRouter.createpayment(new SubscriptionCreatePaymentRequest({
-                    auth: getToken(),
-                    plan_name: plan.name,
-                }));
-                if (res.success && res.data) {
-                    setInvoiceUrl(res.data.invoice_url);
-                    setPaymentId(res.data.payment_id);
-                    paymentModal.onOpen();
-                }
-            } catch (err) {
-                console.error("Failed to create payment:", err);
-            }
+            setInvoiceUrl(null);
+            setPaymentId(null);
+            paymentModal.onOpen();
         }
     };
 
-    const handleCheckPayment = async () => {
-        setChecking(true);
-        await fetchRecords();
-        await fetchProfile();
-        setChecking(false);
-        paymentModal.onClose();
+    const handleProceedToPay = async (payCurrency: string) => {
+        if (!selectedPlan) return;
+        setPaying(true);
+        try {
+            const res = await SubscriptionRecordRouter.createpayment(new SubscriptionCreatePaymentRequest({
+                auth: getToken(),
+                plan_name: selectedPlan.name,
+                pay_currency: payCurrency,
+            }));
+            if (res.success && res.data) {
+                setInvoiceUrl(res.data.invoice_url);
+                setPaymentId(res.data.payment_id);
+                window.open(res.data.invoice_url, "_blank");
+            }
+        } catch (err) {
+            console.error("Failed to create payment:", err);
+        } finally {
+            setPaying(false);
+        }
     };
 
     const handleRefresh = async () => {
@@ -107,8 +110,6 @@ export default function SubscriptionPage() {
         await fetchProfile();
         setRefreshing(false);
     };
-
-    const selectedPlanData = plans.find(p => p.name === selectedPlan);
 
     return (
         <div className="max-w-screen flex flex-col h-screen">
@@ -127,17 +128,17 @@ export default function SubscriptionPage() {
                         plans={plans}
                         currentPlan={account?.plan || "free"}
                         onSelect={handleSelectPlan}
+                        onGiftCardActivated={handleRefresh}
                     />
 
-                    {selectedPlanData && (
+                    {selectedPlan && (
                         <PaymentModal
                             isOpen={paymentModal.isOpen}
                             onOpenChange={paymentModal.onOpenChange}
-                            invoiceUrl={invoiceUrl}
-                            planName={selectedPlanData.name}
-                            planPrice={selectedPlanData.price}
-                            onCheck={handleCheckPayment}
-                            checking={checking}
+                            planName={selectedPlan.name}
+                            planPrice={selectedPlan.price}
+                            onProceedToPay={handleProceedToPay}
+                            paying={paying}
                         />
                     )}
 

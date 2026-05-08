@@ -7,6 +7,7 @@ export interface UsageLogEntity extends BaseEntity {
     providerId?: string;
     inputTokens: number;
     outputTokens: number;
+    tierSnapshot?: number | null;
     create_time: number;
     update_time: number;
     delete_time: number | null;

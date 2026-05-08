@@ -7,6 +7,7 @@ export const usageLogTable = sqliteTable("usage_log", {
     providerId: text("provider_id").default(""),
     inputTokens: integer("input_tokens").notNull(),
     outputTokens: integer("output_tokens").notNull(),
+    tierSnapshot: integer("tier_snapshot"),
     create_time: integer("create_time"),
     update_time: integer("update_time"),
     delete_time: integer("delete_time"),

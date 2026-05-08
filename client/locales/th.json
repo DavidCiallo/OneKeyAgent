@@ -23,7 +23,7 @@
         "Subscription": "แพ็กเกจ",
         "NoContent": "ไม่มีเนื้อหา",
         "Logout": "ออกจากระบบ",
-        "PlanManagement": "จัดการแพ็กเกจ"
+        "Plan": "แพ็กเกจ"
     },
 
     "ModelPage": {
@@ -106,7 +106,14 @@
         "NameError": "ชื่อต้องไม่เว้นว่าง",
         "RegisterButtonText": "ลงทะเบียน",
         "RegisterSuccess": "ลงทะเบียนสำเร็จ",
-        "RegisterFailed": "ลงทะเบียนล้มเหลว อีเมลอาจมีอยู่แล้ว"
+        "RegisterFailed": "ลงทะเบียนล้มเหลว อีเมลอาจมีอยู่แล้ว",
+        "VerifySuccess": "ยืนยันอีเมลสำเร็จ",
+        "VerifyFailed": "การยืนยันล้มเหลว",
+        "VerifyEmailTitle": "ตรวจสอบอีเมลของคุณ",
+        "VerifyEmailSent": "อีเมลยืนยันถูกส่งไปที่",
+        "VerifyEmailCheckSpam": "หากไม่พบ ให้ตรวจสอบโฟลเดอร์สแปม ลิงก์หมดอายุใน 3 วัน",
+        "VerifyEmailVerifying": "กำลังยืนยันอีเมล...",
+        "BackToLogin": "กลับไปที่หน้าเข้าสู่ระบบ"
     },
 
     "HomePage": {
@@ -221,11 +228,21 @@
         "Copied": "คัดลอกแล้ว!",
         "CheckPayment": "ตรวจสอบสถานะการชำระเงิน",
         "TransactionHistory": "ประวัติธุรกรรม",
-        "NoTransactions": "ยังไม่มีธุรกรรม"
+        "NoTransactions": "ยังไม่มีธุรกรรม",
+        "Ultra": "ULTRA",
+        "UltraDesc": "โซลูชันครบวงจรระดับองค์กร",
+        "ContactService": "ติดต่อฝ่ายบริการ",
+        "GiftCard": "บัตรของขวัญ",
+        "GiftCardDesc": "ใช้บัตรของขวัญเพื่อเปิดใช้งานแพ็กเกจสมัครสมาชิก",
+        "Activate": "เปิดใช้งาน",
+        "GiftCardTitle": "เปิดใช้งานบัตรของขวัญ",
+        "GiftCardPlaceholder": "ป้อนรหัสบัตรของขวัญ",
+        "GiftCardActivateSuccess": "เปิดใช้งานบัตรของขวัญสำเร็จ",
+        "GiftCardActivateFailed": "เปิดใช้งานบัตรของขวัญล้มเหลว"
     },
 
-    "PlanManagementPage": {
-        "Title": "จัดการแพ็กเกจ",
+    "PlanPage": {
+        "Title": "แพ็กเกจ",
         "Name": "ชื่อ",
         "MonthlyLimit": "วงเงินรายเดือน",
         "Price": "ราคา",

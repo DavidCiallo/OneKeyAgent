@@ -1,8 +1,10 @@
 import Repository from "../../lib/repository";
+import { ModelEntity } from "../../../shared/modules/model/model.entity";
 import { UsageLogEntity } from "../../../shared/modules/usage/usage.entity";
 import { UsageStatsPeriod, UsageStatsResult, UsageAmountData, UserSession, UserSessionGroup, ProviderUsage } from "../../../shared/modules/usage/usage.interface";
 
 const usageRepo = Repository.instance<UsageLogEntity>("UsageLog");
+const modelRepo = Repository.instance<ModelEntity>("Model");
 
 const TEN_MIN = 10 * 60 * 1000;
 const DAY = 86400000;
@@ -21,7 +23,35 @@ function tenMinStart(ts: number): number {
     return localMidnight + rounded;
 }
 
-function buildPeriod(logs: UsageLogEntity[], periodStart: number, periodEnd: number): UsageStatsPeriod {
+async function getTierMap(logs: UsageLogEntity[]): Promise<Map<string, number>> {
+    const aliases = [...new Set(logs.map(log => log.modelAlias).filter(Boolean))];
+    if (aliases.length === 0) return new Map();
+
+    const models = await modelRepo.find({ delete_time: null });
+    const tierMap = new Map<string, number>();
+    for (const model of models) {
+        if (!aliases.includes(model.alias)) continue;
+        const currentTier = tierMap.get(model.alias) ?? 0;
+        tierMap.set(model.alias, Math.max(currentTier, model.tier ?? 1));
+    }
+    return tierMap;
+}
+
+function getBilledInputTokens(log: UsageLogEntity, tierMap: Map<string, number>): number {
+    if (log.tierSnapshot == null) return log.inputTokens || 0;
+    return (log.inputTokens || 0) * (log.tierSnapshot || tierMap.get(log.modelAlias) || 1);
+}
+
+function getBilledOutputTokens(log: UsageLogEntity, tierMap: Map<string, number>): number {
+    if (log.tierSnapshot == null) return log.outputTokens || 0;
+    return (log.outputTokens || 0) * (log.tierSnapshot || tierMap.get(log.modelAlias) || 1);
+}
+
+function getBilledTotalTokens(log: UsageLogEntity, tierMap: Map<string, number>): number {
+    return getBilledInputTokens(log, tierMap) + getBilledOutputTokens(log, tierMap);
+}
+
+function buildPeriod(logs: UsageLogEntity[], periodStart: number, periodEnd: number, tierMap: Map<string, number>): UsageStatsPeriod {
     // Pre-generate all 10-min buckets in the period
     const bucketMap = new Map<number, number>();
     for (let t = periodStart; t < periodEnd; t += TEN_MIN) {
@@ -30,7 +60,7 @@ function buildPeriod(logs: UsageLogEntity[], periodStart: number, periodEnd: num
 
     for (const log of logs) {
         const h = tenMinStart(log.create_time);
-        const tokens = (log.inputTokens || 0) + (log.outputTokens || 0);
+        const tokens = getBilledTotalTokens(log, tierMap);
         bucketMap.set(h, (bucketMap.get(h) || 0) + tokens);
     }
 
@@ -47,21 +77,21 @@ function buildPeriod(logs: UsageLogEntity[], periodStart: number, periodEnd: num
 }
 
 /** Build a UserSession from a list of consecutive usage logs (same modelAlias, gap < 15 min) */
-function buildSession(logs: UsageLogEntity[]): UserSession {
+function buildSession(logs: UsageLogEntity[], tierMap: Map<string, number>): UserSession {
     let inputTokens = 0;
     let outputTokens = 0;
     const providerMap = new Map<string, ProviderUsage>();
 
     for (const log of logs) {
-        inputTokens += log.inputTokens || 0;
-        outputTokens += log.outputTokens || 0;
+        inputTokens += getBilledInputTokens(log, tierMap);
+        outputTokens += getBilledOutputTokens(log, tierMap);
         const key = log.providerId || "unknown";
         if (!providerMap.has(key)) {
             providerMap.set(key, { providerName: key, inputTokens: 0, outputTokens: 0 });
         }
         const p = providerMap.get(key)!;
-        p.inputTokens += log.inputTokens || 0;
-        p.outputTokens += log.outputTokens || 0;
+        p.inputTokens += getBilledInputTokens(log, tierMap);
+        p.outputTokens += getBilledOutputTokens(log, tierMap);
     }
 
     return {
@@ -93,14 +123,15 @@ export class UsageService {
         if (modelAlias) filter.modelAlias = modelAlias;
 
         const allLogs = await usageRepo.find(filter, { since: now - MONTH });
+        const tierMap = await getTierMap(allLogs);
         const todayLogs = allLogs.filter(l => l.create_time >= todayStart && l.create_time < nowTenMin + TEN_MIN);
         const last24hLogs = allLogs.filter(l => l.create_time >= last24hStart && l.create_time < nowTenMin + TEN_MIN);
         const weekLogs = allLogs.filter(l => l.create_time >= weekStart && l.create_time < nowTenMin + TEN_MIN);
 
         return {
-            today: buildPeriod(todayLogs, todayStart, nowTenMin + TEN_MIN),
-            last24h: buildPeriod(last24hLogs, last24hStart, nowTenMin + TEN_MIN),
-            last7Days: buildPeriod(weekLogs, weekStart, nowTenMin + TEN_MIN),
+            today: buildPeriod(todayLogs, todayStart, nowTenMin + TEN_MIN, tierMap),
+            last24h: buildPeriod(last24hLogs, last24hStart, nowTenMin + TEN_MIN, tierMap),
+            last7Days: buildPeriod(weekLogs, weekStart, nowTenMin + TEN_MIN, tierMap),
         };
     }
 
@@ -112,11 +143,12 @@ export class UsageService {
         const nowTenMin = tenMinStart(now);
 
         const allLogs = await usageRepo.find({ accountId }, { since: now - MONTH });
+        const tierMap = await getTierMap(allLogs);
         const todayLogs = allLogs.filter(l => l.create_time >= todayStart && l.create_time < nowTenMin + TEN_MIN);
         const weekLogs = allLogs.filter(l => l.create_time >= weekStart && l.create_time < nowTenMin + TEN_MIN);
 
         const sum = (logs: UsageLogEntity[]) =>
-            logs.reduce((acc, l) => acc + (l.inputTokens || 0) + (l.outputTokens || 0), 0);
+            logs.reduce((acc, l) => acc + getBilledTotalTokens(l, tierMap), 0);
 
         return {
             today: sum(todayLogs),
@@ -131,8 +163,9 @@ export class UsageService {
         const monthStartTs = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
 
         const allLogs = await usageRepo.find({ accountId });
+        const tierMap = await getTierMap(allLogs);
         const thisMonthLogs = allLogs.filter(l => l.create_time >= monthStartTs);
-        return thisMonthLogs.reduce((acc, l) => acc + (l.inputTokens || 0) + (l.outputTokens || 0), 0);
+        return thisMonthLogs.reduce((acc, l) => acc + getBilledTotalTokens(l, tierMap), 0);
     }
 
     /** Get total billed tokens for an account in the current week */
@@ -140,13 +173,15 @@ export class UsageService {
         const weekStart = localDayStart(Date.now()) - 7 * 86400000;
 
         const allLogs = await usageRepo.find({ accountId });
+        const tierMap = await getTierMap(allLogs);
         const thisWeekLogs = allLogs.filter(l => l.create_time >= weekStart);
-        return thisWeekLogs.reduce((acc, l) => acc + (l.inputTokens || 0) + (l.outputTokens || 0), 0);
+        return thisWeekLogs.reduce((acc, l) => acc + getBilledTotalTokens(l, tierMap), 0);
     }
 
     /** Get usage grouped by user with continuous sessions (same modelAlias, gap < 15 min) */
     static async getUserSessions(): Promise<UserSessionGroup[]> {
         const allLogs = await usageRepo.find({}, { since: Date.now() - MONTH });
+        const tierMap = await getTierMap(allLogs);
         const SESSION_GAP = 30 * 60 * 1000; // 30 minutes
 
         // Group by accountId
@@ -173,12 +208,12 @@ export class UsageService {
                 if (gap < SESSION_GAP && curr.modelAlias === prev.modelAlias) {
                     currentSession.push(curr);
                 } else {
-                    sessions.push(buildSession(currentSession));
+                    sessions.push(buildSession(currentSession, tierMap));
                     currentSession = [curr];
                 }
             }
             if (currentSession.length > 0) {
-                sessions.push(buildSession(currentSession));
+                sessions.push(buildSession(currentSession, tierMap));
             }
 
             const totalTokens = sessions.reduce((sum, s) => sum + s.inputTokens + s.outputTokens, 0);

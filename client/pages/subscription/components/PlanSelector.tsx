@@ -1,5 +1,6 @@
-import { Card, CardBody, CardHeader, Divider, Button } from "@heroui/react";
+import { Card, CardBody, CardHeader, Divider, Button, useDisclosure } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
+import GiftCardModal from "./GiftCardModal";
 
 interface Plan {
     id: string;
@@ -9,57 +10,114 @@ interface Plan {
     duration_days: number;
 }
 
-export default function PlanSelector({
-    plans,
-    currentPlan,
-    onSelect,
-}: {
+interface PlanSelectorProps {
     plans: Plan[];
     currentPlan: string;
     onSelect: (plan: Plan) => void;
-}) {
-    const locale = Locale("SubscriptionPage");
+    onGiftCardActivated?: () => void;
+}
+
+export default function PlanSelector({ plans, currentPlan, onSelect, onGiftCardActivated }: PlanSelectorProps) {
+    const t = Locale("SubscriptionPage");
+    const giftCardModal = useDisclosure();
 
     const toM = (val: number) => (val / 1_000_000).toFixed(0) + "M";
     const formatPrice = (cents: number) => "$" + (cents / 100).toFixed(cents % 100 ? 2 : 0);
 
-    return (
-        <Card>
-            <CardHeader className="px-6 py-4 font-semibold text-lg">{locale.AvailablePlans}</CardHeader>
-            <Divider />
-            <CardBody className="px-6 py-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {plans.sort((a, b) => a.price - b.price).map(plan => {
-                        const isCurrent = plan.name === currentPlan;
-                        const currentPrice = plans.find(p => p.name === currentPlan)?.price ?? 0;
-                        return (!!plan?.price && (<Card
-                            key={plan.id}
-                            className={`border-2 ${isCurrent ? "border-primary" : "border-transparent"}`}
-                        >
-                            <CardBody className="p-4 space-y-3">
-                                <p className="text-lg font-bold">{plan.name.toUpperCase()}</p>
-                                <p className="text-2xl font-bold text-primary">
-                                    {formatPrice(plan.price)}
-                                </p>
-                                <p className="text-sm text-gray-500">
-                                    {toM(plan.monthly_limit)} {locale.TokensPerMonth}
-                                </p>
+    const currentPrice = plans.find((p) => p.name === currentPlan)?.price ?? 0;
 
-                                <Button
-                                    color={isCurrent ? "default" : "primary"}
-                                    variant={isCurrent ? "flat" : "solid"}
-                                    isDisabled={plan.price <= currentPrice}
-                                    onPress={() => onSelect(plan)}
-                                    className="w-full"
-                                >
-                                    {isCurrent ? locale.Current : plan.name === "free" ? locale.Free : locale.Upgrade}
-                                </Button>
-                            </CardBody>
-                        </Card>)
-                        );
-                    })}
-                </div>
-            </CardBody>
-        </Card>
+    const handleContactService = () => {
+        window.open("https://t.me/xxx", "_blank");
+    };
+
+    const handleGiftCardActivated = () => {
+        onGiftCardActivated?.();
+    };
+
+    return (
+        <>
+            <Card>
+                <CardHeader className="px-6 py-4 font-semibold text-lg">{t.AvailablePlans}</CardHeader>
+                <Divider />
+                <CardBody className="px-6 py-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {plans
+                            .sort((a, b) => a.price - b.price)
+                            .map((plan) => {
+                                const isCurrent = plan.name === currentPlan;
+                                const isDisabled = plan.price <= currentPrice;
+                                return plan.price ? (
+                                    <Card
+                                        key={plan.id}
+                                        className={`border-2 ${isCurrent ? "border-primary" : "border-transparent"}`}
+                                    >
+                                        <CardBody className="p-4 space-y-3">
+                                            <p className="text-lg">{plan.name.toUpperCase()}</p>
+                                            <p className="text-2xl font-bold text-primary">
+                                                {formatPrice(plan.price)}
+                                                <span className="text-sm font-normal text-gray-500">
+                                                    /{plan.duration_days}d
+                                                </span>
+                                            </p>
+                                            <p className="text-sm text-gray-500">
+                                                {toM(plan.monthly_limit)} {t.TokensPerMonth}
+                                            </p>
+                                            <Button
+                                                color={isCurrent ? "default" : "primary"}
+                                                variant={isCurrent ? "flat" : "solid"}
+                                                isDisabled={isDisabled}
+                                                onPress={() => onSelect(plan)}
+                                                className="w-full"
+                                            >
+                                                {isCurrent
+                                                    ? t.Current
+                                                    : plan.name === "free"
+                                                        ? t.Free
+                                                        : t.Upgrade}
+                                            </Button>
+                                        </CardBody>
+                                    </Card>
+                                ) : null;
+                            })}
+
+                        {/* Ultra */}
+                        <div className="rounded-xl bg-gradient-to-b from-purple-100 to-transparent dark:from-purple-900/20 px-4 py-6 space-y-4 flex flex-col shadow-lg shadow-purple-500/10">
+                            <p className="text-lg">{t.Ultra}</p>
+                            <p className="text-sm text-gray-500">{t.UltraDesc}</p>
+                            <div className="flex-1" />
+                            <Button
+                                color="secondary"
+                                variant="solid"
+                                onPress={handleContactService}
+                                className="w-full text-white"
+                            >
+                                {t.ContactService}
+                            </Button>
+                        </div>
+
+                        {/* 礼品卡 */}
+                        <div className="rounded-xl bg-gradient-to-b from-amber-100 to-transparent dark:from-amber-900/20 px-4 py-6 space-y-4 flex flex-col shadow-lg shadow-amber-500/10">
+                            <p className="text-lg">{t.GiftCard}</p>
+                            <p className="text-sm text-gray-500">{t.GiftCardDesc}</p>
+                            <div className="flex-1" />
+                            <Button
+                                color="warning"
+                                variant="solid"
+                                onPress={giftCardModal.onOpen}
+                                className="w-full text-white"
+                            >
+                                {t.Activate}
+                            </Button>
+                        </div>
+                    </div>
+                </CardBody>
+            </Card>
+
+            <GiftCardModal
+                isOpen={giftCardModal.isOpen}
+                onOpenChange={giftCardModal.onOpenChange}
+                onSuccess={handleGiftCardActivated}
+            />
+        </>
     );
 }

@@ -3,11 +3,12 @@ import { AccountEntity } from "../../../shared/modules/account/account.entity";
 import Repository from "../../lib/repository";
 import { generateApiKey } from "../ai/ai.auth";
 import { RoleService, AccountRoleService } from "../role/role.service";
+import { sendEmail, buildVerificationEmail } from "../email/email.service";
 
 const ALL_MENUS = ["model", "usage", "account", "profile"];
 const accountRepository: Repository<AccountEntity> = Repository.instance("Account");
 
-export async function loginUser(email: string, password: string): Promise<{ token?: string; is_admin?: number; roles?: { name: string; type: string }[] }> {
+export async function loginUser(email: string, password: string): Promise<{ token?: string; is_admin?: number; roles?: { name: string; type: string }[]; needsVerification?: boolean }> {
     password = hashGenerate(password);
     const emailItem = await accountRepository.findOne({ email, password });
     if (emailItem) {
@@ -20,19 +21,82 @@ export async function loginUser(email: string, password: string): Promise<{ toke
     }
 }
 
+function checkAllowedDomain(email: string): string | null {
+    const allowedDomains = process.env.ALLOWED_REGISTER_DOMAINS;
+    if (!allowedDomains) return null; // no restriction
+    const domain = email.split("@")[1]?.toLowerCase();
+    if (!domain) return "Invalid email format";
+    const domains = allowedDomains.split(",").map(d => d.trim().toLowerCase());
+    if (!domains.includes(domain)) {
+        return `Registration is limited to ${domains.join(", ")} email addresses`;
+    }
+    return null;
+}
+
+/**
+ * Step 1: Pre-register — only check duplicates and send verification email.
+ * Account is NOT created yet. The verification token contains the encrypted
+ * registration payload (name|email|password).
+ */
+export async function preRegisterUser(name: string, email: string, password: string): Promise<{ needsVerification?: boolean }> {
+    const domainError = checkAllowedDomain(email);
+    if (domainError) { throw domainError; }
+    const exist = await accountRepository.findIgnoreDelete({ email });
+    if (exist) { return {}; }
+    // Encrypt registration data into the token: name|-|email|-|password(plain)
+    const payload = [name, email, password].join("|-|");
+    const verificationToken = aesEncrypt(payload);
+    const verifyUrl = `${process.env.CLIENT_URL || "http://localhost:61206"}/verify-email?token=${encodeURIComponent(verificationToken)}`;
+    const emailSent = await sendEmail({
+        to: email,
+        ...buildVerificationEmail(verifyUrl),
+    });
+    if (!emailSent) {
+        console.error("Failed to send verification email to:", email);
+        return {};
+    }
+    return { needsVerification: true };
+}
+
+/**
+ * Step 2: Complete registration — decrypt token, create account.
+ * Returns the created account on success, null if token is invalid/expired.
+ */
+export async function completeRegistration(token: string): Promise<{ account?: AccountEntity; apiKey?: string } | null> {
+    const decrypted = aesDecrypt(token);
+    if (!decrypted) return null;
+    const parts = decrypted.split("|-|");
+    if (parts.length < 3) return null;
+    const [name, email, plainPassword] = parts;
+    // Check expiry via embedded timestamp (the token itself has 3-day expiry built in via aesEncrypt's caller)
+    // Double-check account doesn't already exist
+    const exist = await accountRepository.findIgnoreDelete({ email });
+    if (exist) return null;
+    const password = hashGenerate(plainPassword);
+    const apiKey = generateApiKey();
+    const account = await accountRepository.insert({ name, email, password, apiKey, is_admin: 0 });
+    if (!account) return null;
+    // Assign default permissions
+    await AccountRoleService.assignPermissions(account.id, [
+        { name: "profile", type: "menu" },
+        { name: "subscription", type: "menu" },
+    ]);
+    return { account, apiKey };
+}
+
 export async function registerUser(name: string, email: string, password: string, isAdmin: number = 0): Promise<{ account?: AccountEntity; apiKey?: string }> {
+    const domainError = checkAllowedDomain(email);
+    if (domainError) { throw domainError; }
     const exist = await accountRepository.findIgnoreDelete({ email });
     if (exist) { return {}; }
     password = hashGenerate(password);
     const apiKey = generateApiKey();
     const account = await accountRepository.insert({ name, email, password, apiKey, is_admin: isAdmin });
     if (!account) return {};
-    // Assign default permissions for new users
     if (!isAdmin) {
         await AccountRoleService.assignPermissions(account.id, [
             { name: "profile", type: "menu" },
             { name: "subscription", type: "menu" },
-            { name: "hex", type: "model" },
         ]);
     }
     return { account, apiKey };

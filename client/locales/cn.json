@@ -23,7 +23,7 @@
         "Subscription": "订阅管理",
         "NoContent": "未授权",
         "Logout": "退出登录",
-        "PlanManagement": "套餐管理"
+        "Plan": "套餐"
     },
 
     "ModelPage": {
@@ -109,7 +109,14 @@
         "NameError": "用户名不能为空",
         "RegisterButtonText": "注册",
         "RegisterSuccess": "注册成功",
-        "RegisterFailed": "注册失败，邮箱可能已存在"
+        "RegisterFailed": "注册失败，邮箱可能已存在",
+        "VerifySuccess": "邮箱验证成功",
+        "VerifyFailed": "验证失败",
+        "VerifyEmailTitle": "查收验证邮件",
+        "VerifyEmailSent": "验证邮件已发送至",
+        "VerifyEmailCheckSpam": "如未收到，请检查垃圾邮件箱。链接有效期为 3 天。",
+        "VerifyEmailVerifying": "正在验证邮箱...",
+        "BackToLogin": "返回登录"
     },
     "HomePage": {
         "MainText": "HEX",
@@ -223,11 +230,35 @@
         "Copied": "已复制！",
         "CheckPayment": "检查支付状态",
         "TransactionHistory": "交易记录",
-        "NoTransactions": "暂无交易记录"
+        "NoTransactions": "暂无交易记录",
+        "SelectCurrency": "选择支付渠道",
+        "ProceedToPay": "确认订单",
+        "CurrencyETHUSDT": "ETH-USDT",
+        "CurrencyETHUSDC": "ETH-USDC",
+        "CurrencySOLUSDT": "SOL-USDT",
+        "CurrencySOLUSDC": "SOL-USDC",
+        "CurrencyARBUSDT": "ARB-USDT",
+        "CurrencyARBUSDC": "ARB-USDC",
+        "CurrencyOPUSDT": "OP-USDT",
+        "CurrencyOPUSDC": "OP-USDC",
+        "CurrencyBSCUSDT": "BSC-USDT",
+        "CurrencyBSCUSDC": "BSC-USDC",
+        "CurrencyALGOUSDT": "ALGO-USDT",
+        "CurrencyALGOUSDC": "ALGO-USDC",
+        "Ultra": "ULTRA",
+        "UltraDesc": "企业级全方位解决方案",
+        "ContactService": "联系客服",
+        "GiftCard": "礼品卡",
+        "GiftCardDesc": "使用礼品卡以激活订阅套餐",
+        "Activate": "激活",
+        "GiftCardTitle": "激活礼品卡",
+        "GiftCardPlaceholder": "请输入礼品卡号",
+        "GiftCardActivateSuccess": "礼品卡激活成功",
+        "GiftCardActivateFailed": "礼品卡激活失败"
     },
 
-    "PlanManagementPage": {
-        "Title": "套餐管理",
+    "PlanPage": {
+        "Title": "套餐",
         "Name": "套餐名",
         "MonthlyLimit": "月额度",
         "Price": "价格",

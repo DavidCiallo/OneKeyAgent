@@ -60,20 +60,24 @@ export default function AccountInfoCard({
                                 {account.is_admin ? locale.Admin : locale.User}
                             </Chip>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <span className="text-sm text-gray-500 w-20">Plan</span>
-                            <Chip size="sm" color={account.plan === "free" ? "default" : account.plan === "pro" ? "primary" : "warning"} variant="flat">
-                                {account.plan?.toUpperCase() || "FREE"}
-                            </Chip>
-                            {account.plan_expires_at && account.plan_expires_at > Date.now() && (
-                                <span className="text-xs text-gray-400">
-                                    Expires: {new Date(account.plan_expires_at || 20000000).toLocaleDateString()}
-                                </span>
-                            )}
-                        </div>
                     </div>
                     {usage && (
                         <div className="w-full md:w-56 space-y-3 md:pl-6">
+                            <div className="flex justify-between items-center mx-[-5px]">
+                                <Chip size="sm" color={account.plan === "free" ? "default" : account.plan === "pro" ? "primary" : "warning"} variant="flat">
+                                    {account.plan?.toUpperCase() || "FREE"}
+                                </Chip>
+                                {account.plan !== "free" && account.plan_expires_at && account.plan_expires_at > Date.now() && (
+                                    <span className="text-xs text-gray-400">
+                                        Expires: {new Date(account.plan_expires_at).toLocaleDateString()}
+                                    </span>
+                                )}
+                                {account.plan == "free" && (
+                                    <span className="text-xs text-gray-400">
+                                        Expires: N/A
+                                    </span>
+                                )}
+                            </div>
                             <div>
                                 <div className="flex justify-between text-xs mb-1">
                                     <span className="text-gray-500">{locale.Today}</span>
@@ -97,15 +101,6 @@ export default function AccountInfoCard({
                                 </div>
                                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                                     <div className="h-full bg-success rounded-full transition-all" style={{ width: `${Math.min((usage.thisWeek / (monthLimit / 4)) * 100, 100)}%` }} />
-                                </div>
-                            </div>
-                            <div>
-                                <div className="flex justify-between text-xs mb-1">
-                                    <span className="text-gray-500">{locale.Total}</span>
-                                    <span className="font-semibold text-warning">{fmt(usage.total)}</span>
-                                </div>
-                                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                    <div className="h-full bg-warning rounded-full transition-all" style={{ width: `${Math.min((usage.total / Math.max(usage.total, 1)) * 100, 100)}%` }} />
                                 </div>
                             </div>
                         </div>

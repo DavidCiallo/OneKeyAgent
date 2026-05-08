@@ -23,7 +23,7 @@
         "Subscription": "Gói đăng ký",
         "NoContent": "Không có nội dung",
         "Logout": "Đăng xuất",
-        "PlanManagement": "Quản lý gói"
+        "Plan": "Gói"
     },
 
     "ModelPage": {
@@ -106,7 +106,14 @@
         "NameError": "Tên không được để trống",
         "RegisterButtonText": "Đăng ký",
         "RegisterSuccess": "Đăng ký thành công",
-        "RegisterFailed": "Đăng ký thất bại, email có thể đã tồn tại"
+        "RegisterFailed": "Đăng ký thất bại, email có thể đã tồn tại",
+        "VerifySuccess": "Xác thực email thành công",
+        "VerifyFailed": "Xác thực thất bại",
+        "VerifyEmailTitle": "Kiểm tra email của bạn",
+        "VerifyEmailSent": "Email xác thực đã được gửi đến",
+        "VerifyEmailCheckSpam": "Nếu không thấy, hãy kiểm tra thư mục spam. Liên kết hết hạn sau 3 ngày.",
+        "VerifyEmailVerifying": "Đang xác thực email...",
+        "BackToLogin": "Quay lại đăng nhập"
     },
 
     "HomePage": {
@@ -221,11 +228,21 @@
         "Copied": "Đã sao chép!",
         "CheckPayment": "Kiểm tra trạng thái thanh toán",
         "TransactionHistory": "Lịch sử giao dịch",
-        "NoTransactions": "Chưa có giao dịch nào"
+        "NoTransactions": "Chưa có giao dịch nào",
+        "Ultra": "ULTRA",
+        "UltraDesc": "Giải pháp toàn diện cho doanh nghiệp",
+        "ContactService": "Liên hệ dịch vụ",
+        "GiftCard": "Thẻ quà tặng",
+        "GiftCardDesc": "Sử dụng thẻ quà tặng để kích hoạt gói đăng ký",
+        "Activate": "Kích hoạt",
+        "GiftCardTitle": "Kích hoạt thẻ quà tặng",
+        "GiftCardPlaceholder": "Nhập mã thẻ quà tặng",
+        "GiftCardActivateSuccess": "Kích hoạt thẻ quà tặng thành công",
+        "GiftCardActivateFailed": "Kích hoạt thẻ quà tặng thất bại"
     },
 
-    "PlanManagementPage": {
-        "Title": "Quản lý gói",
+    "PlanPage": {
+        "Title": "Gói",
         "Name": "Tên",
         "MonthlyLimit": "Hạn mức tháng",
         "Price": "Giá",

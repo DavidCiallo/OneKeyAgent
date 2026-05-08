@@ -23,7 +23,7 @@
         "Subscription": "Subscription",
         "NoContent": "No Content",
         "Logout": "Logout",
-        "PlanManagement": "Plan Management"
+        "Plan": "Plan"
     },
 
     "ModelPage": {
@@ -106,7 +106,14 @@
         "NameError": "Name cannot be empty",
         "RegisterButtonText": "Register",
         "RegisterSuccess": "Registration successful",
-        "RegisterFailed": "Registration failed, email may already exist"
+        "RegisterFailed": "Registration failed, email may already exist",
+        "VerifySuccess": "Email verified successfully",
+        "VerifyFailed": "Verification failed",
+        "VerifyEmailTitle": "Check your email",
+        "VerifyEmailSent": "A verification email has been sent to",
+        "VerifyEmailCheckSpam": "If you don't see it, check your spam folder. The link expires in 3 days.",
+        "VerifyEmailVerifying": "Verifying your email...",
+        "BackToLogin": "Back to Login"
     },
 
     "HomePage": {
@@ -221,11 +228,35 @@
         "Copied": "Copied!",
         "CheckPayment": "Check Payment Status",
         "TransactionHistory": "Transaction History",
-        "NoTransactions": "No transactions yet"
+        "NoTransactions": "No transactions yet",
+        "SelectCurrency": "Select Payment Channel",
+        "ProceedToPay": "Proceed to Pay",
+        "CurrencyETHUSDT": "ETH-USDT",
+        "CurrencyETHUSDC": "ETH-USDC",
+        "CurrencySOLUSDT": "SOL-USDT",
+        "CurrencySOLUSDC": "SOL-USDC",
+        "CurrencyARBUSDT": "ARB-USDT",
+        "CurrencyARBUSDC": "ARB-USDC",
+        "CurrencyOPUSDT": "OP-USDT",
+        "CurrencyOPUSDC": "OP-USDC",
+        "CurrencyBSCUSDT": "BSC-USDT",
+        "CurrencyBSCUSDC": "BSC-USDC",
+        "CurrencyALGOUSDT": "ALGO-USDT",
+        "CurrencyALGOUSDC": "ALGO-USDC",
+        "Ultra": "ULTRA",
+        "UltraDesc": "Enterprise-grade all-in-one solution",
+        "ContactService": "Contact Service",
+        "GiftCard": "Gift Card",
+        "GiftCardDesc": "Use a gift card to activate a subscription plan",
+        "Activate": "Activate",
+        "GiftCardTitle": "Activate Gift Card",
+        "GiftCardPlaceholder": "Enter gift card code",
+        "GiftCardActivateSuccess": "Gift card activated successfully",
+        "GiftCardActivateFailed": "Gift card activation failed"
     },
 
-    "PlanManagementPage": {
-        "Title": "Plan Management",
+    "PlanPage": {
+        "Title": "Plan",
         "Name": "Name",
         "MonthlyLimit": "Monthly Limit",
         "Price": "Price",

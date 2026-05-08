@@ -23,7 +23,7 @@
         "Subscription": "Assinatura",
         "NoContent": "Sem acesso",
         "Logout": "Sair",
-        "PlanManagement": "Gerenciar planos"
+        "Plan": "Planos"
     },
 
     "ModelPage": {
@@ -109,7 +109,14 @@
         "NameError": "O nome não pode estar vazio",
         "RegisterButtonText": "Registrar",
         "RegisterSuccess": "Registro bem-sucedido",
-        "RegisterFailed": "Falha no registro, e-mail pode já existir"
+        "RegisterFailed": "Falha no registro, e-mail pode já existir",
+        "VerifySuccess": "E-mail verificado com sucesso",
+        "VerifyFailed": "Falha na verificação",
+        "VerifyEmailTitle": "Verifique seu e-mail",
+        "VerifyEmailSent": "Um e-mail de verificação foi enviado para",
+        "VerifyEmailCheckSpam": "Se não encontrar, verifique sua pasta de spam. O link expira em 3 dias.",
+        "VerifyEmailVerifying": "Verificando seu e-mail...",
+        "BackToLogin": "Voltar ao login"
     },
 
     "HomePage": {
@@ -224,11 +231,21 @@
         "Copied": "Copiado!",
         "CheckPayment": "Verificar status do pagamento",
         "TransactionHistory": "Histórico de transações",
-        "NoTransactions": "Nenhuma transação ainda"
+        "NoTransactions": "Nenhuma transação ainda",
+        "Ultra": "ULTRA",
+        "UltraDesc": "Solução completa para empresas",
+        "ContactService": "Fale com o suporte",
+        "GiftCard": "Cartão-presente",
+        "GiftCardDesc": "Use um cartão-presente para ativar um plano de assinatura",
+        "Activate": "Ativar",
+        "GiftCardTitle": "Ativar cartão-presente",
+        "GiftCardPlaceholder": "Digite o código do cartão-presente",
+        "GiftCardActivateSuccess": "Cartão-presente ativado com sucesso",
+        "GiftCardActivateFailed": "Falha ao ativar o cartão-presente"
     },
 
-    "PlanManagementPage": {
-        "Title": "Gerenciar planos",
+    "PlanPage": {
+        "Title": "Planos",
         "Name": "Nome",
         "MonthlyLimit": "Limite mensal",
         "Price": "Preço",

@@ -214,6 +214,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "tier_snapshot": {
+          "name": "tier_snapshot",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "create_time": {
           "name": "create_time",
           "type": "integer",

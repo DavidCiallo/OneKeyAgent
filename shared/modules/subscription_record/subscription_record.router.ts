@@ -2,7 +2,7 @@ import { BaseRouterInstance } from "../../lib/default/decorator";
 import {
     SubscriptionRecordListRequest, SubscriptionRecordListResponse,
     SubscriptionCreatePaymentRequest, SubscriptionCreatePaymentResponse,
-} from "./subscription_record.interface";
+    } from "./subscription_record.interface";
 
 export class SubscriptionRecordRouterInstance extends BaseRouterInstance {
     base = "/api";

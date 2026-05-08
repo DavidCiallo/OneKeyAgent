@@ -23,7 +23,7 @@
         "Subscription": "サブスクリプション",
         "NoContent": "アクセス権限がありません",
         "Logout": "ログアウト",
-        "PlanManagement": "プラン管理"
+        "Plan": "プラン"
     },
 
     "ModelPage": {
@@ -109,7 +109,14 @@
         "NameError": "名前は必須です",
         "RegisterButtonText": "登録",
         "RegisterSuccess": "登録成功",
-        "RegisterFailed": "登録失敗、メールが既に存在する可能性があります"
+        "RegisterFailed": "登録失敗、メールが既に存在する可能性があります",
+        "VerifySuccess": "メール認証に成功しました",
+        "VerifyFailed": "認証に失敗しました",
+        "VerifyEmailTitle": "メールをご確認ください",
+        "VerifyEmailSent": "認証メールを送信しました",
+        "VerifyEmailCheckSpam": "届かない場合はスパムフォルダをご確認ください。リンクの有効期限は3日間です。",
+        "VerifyEmailVerifying": "メールを認証中...",
+        "BackToLogin": "ログインに戻る"
     },
 
     "HomePage": {
@@ -224,11 +231,21 @@
         "Copied": "コピーしました！",
         "CheckPayment": "支払い状況を確認",
         "TransactionHistory": "取引履歴",
-        "NoTransactions": "取引履歴はありません"
+        "NoTransactions": "取引履歴はありません",
+        "Ultra": "ULTRA",
+        "UltraDesc": "エンタープライズ向けオールインワンソリューション",
+        "ContactService": "カスタマーサービス",
+        "GiftCard": "ギフトカード",
+        "GiftCardDesc": "ギフトカードを使ってサブスクリプションを有効化",
+        "Activate": "有効化",
+        "GiftCardTitle": "ギフトカードを有効化",
+        "GiftCardPlaceholder": "ギフトカードコードを入力",
+        "GiftCardActivateSuccess": "ギフトカードが正常に有効化されました",
+        "GiftCardActivateFailed": "ギフトカードの有効化に失敗しました"
     },
 
-    "PlanManagementPage": {
-        "Title": "プラン管理",
+    "PlanPage": {
+        "Title": "プラン",
         "Name": "名前",
         "MonthlyLimit": "月間制限",
         "Price": "価格",

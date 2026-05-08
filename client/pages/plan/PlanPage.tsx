@@ -1,9 +1,10 @@
 import { Header } from "../../components/header/Header";
 import { useEffect, useState } from "react";
 import { SubscriptionPlanDTO, SubscriptionPlanListRequest, SubscriptionPlanUpdateRequest, SubscriptionPlanUpdateBody } from "../../../shared/modules/subscription_plan/subscription_plan.interface";
-import { SubscriptionPlanRouter } from "../../api/instance";
+import { SubscriptionPlanRouter, GiftCardRouter } from "../../api/instance";
 import { Locale } from "../../methods/locale";
-import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Button, useDisclosure, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input } from "@heroui/react";
+import { toast } from "../../methods/notify";
+import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Button, useDisclosure, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Tooltip } from "@heroui/react";
 
 type EditForm = {
     name: string;
@@ -14,12 +15,14 @@ type EditForm = {
 
 export default function PlanManagementPage() {
     const [list, setList] = useState<SubscriptionPlanDTO[]>([]);
-    const locale = Locale("PlanManagementPage");
+    const locale = Locale("PlanPage");
     const common = Locale("Common");
 
     const { isOpen: isFormOpen, onOpen: onFormOpen, onClose: onFormClose, onOpenChange: onFormOpenChange } = useDisclosure();
     const [editId, setEditId] = useState<string>("");
     const [form, setForm] = useState<EditForm>({ name: "", monthly_limit: 0, price: 0, duration_days: 0 });
+
+    const [generating, setGenerating] = useState<string | null>(null);
 
     const getToken = () => localStorage.getItem("access_token") || "";
 
@@ -60,11 +63,38 @@ export default function PlanManagementPage() {
         }
     };
 
+    const handleGenerateGiftCard = async (planName: string, durationDays: number) => {
+        setGenerating(planName);
+        try {
+            const res = await GiftCardRouter.create({
+                auth: getToken(),
+                plan_name: planName,
+                duration_days: durationDays,
+            });
+            if (res.success && res.data?.card) {
+                const code = res.data.card.code;
+                try {
+                    await navigator.clipboard.writeText(code);
+                    toast({ description: `${code}\nCopied to clipboard!`, color: "success" });
+                } catch {
+                    toast({ description: code, color: "success" });
+                }
+            } else {
+                toast({ description: res.message || "Failed", color: "danger" });
+            }
+        } catch (err) {
+            toast({ description: "Failed to generate gift card", color: "danger" });
+            console.error(err);
+        } finally {
+            setGenerating(null);
+        }
+    };
+
     const columns = [
-        <TableColumn key="name">{locale.Name}</TableColumn>,
-        <TableColumn key="monthly_limit">{locale.MonthlyLimit}</TableColumn>,
-        <TableColumn key="price">{locale.Price}</TableColumn>,
-        <TableColumn key="duration_days">{locale.DurationDays}</TableColumn>,
+        <TableColumn key="name" align="center" className="w-48">{locale.Name}</TableColumn>,
+        <TableColumn key="monthly_limit" align="center">{locale.MonthlyLimit}</TableColumn>,
+        <TableColumn key="price" align="center">{locale.Price}</TableColumn>,
+        <TableColumn key="duration_days" align="center">{locale.DurationDays}</TableColumn>,
         <TableColumn key="actions" align="center">{locale.Actions}</TableColumn>,
     ];
 
@@ -75,9 +105,22 @@ export default function PlanManagementPage() {
             <TableCell>${(item.price / 100).toFixed(2)}</TableCell>
             <TableCell>{item.duration_days}</TableCell>
             <TableCell>
-                <Button size="sm" variant="flat" color="primary" onPress={() => openEdit(item)}>
-                    {locale.Edit}
-                </Button>
+                <div className="flex gap-2 justify-center">
+                    <Button size="sm" variant="flat" color="primary" onPress={() => openEdit(item)}>
+                        {locale.Edit}
+                    </Button>
+                    <Tooltip content={locale.GenerateGiftCard || "Generate 1-month gift card"}>
+                        <Button
+                            size="sm"
+                            variant="flat"
+                            color="warning"
+                            isLoading={generating === item.name}
+                            onPress={() => handleGenerateGiftCard(item.name, item.duration_days)}
+                        >
+                            {locale.GenerateBtn || "Gift Card"}
+                        </Button>
+                    </Tooltip>
+                </div>
             </TableCell>
         </TableRow>
     ));

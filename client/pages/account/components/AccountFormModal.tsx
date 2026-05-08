@@ -10,7 +10,7 @@ const PERMISSION_OPTIONS: Permission[] = [
     { name: "profile", type: "menu" },
     { name: "subscription", type: "menu" },
     { name: "model", type: "menu" },
-    { name: "planmanagement", type: "menu" },
+    { name: "plan", type: "menu" },
     { name: "usage", type: "menu" },
     { name: "account", type: "menu" },
 ];

@@ -23,7 +23,7 @@
         "Subscription": "Suscripción",
         "NoContent": "Sin acceso",
         "Logout": "Cerrar sesión",
-        "PlanManagement": "Gestión de planes"
+        "Plan": "Plan"
     },
 
     "ModelPage": {
@@ -109,7 +109,14 @@
         "NameError": "El nombre no puede estar vacío",
         "RegisterButtonText": "Registrarse",
         "RegisterSuccess": "Registro exitoso",
-        "RegisterFailed": "Registro fallido, el correo ya existe"
+        "RegisterFailed": "Registro fallido, el correo ya existe",
+        "VerifySuccess": "Correo verificado exitosamente",
+        "VerifyFailed": "Verificación fallida",
+        "VerifyEmailTitle": "Revise su correo",
+        "VerifyEmailSent": "Se ha enviado un correo de verificación a",
+        "VerifyEmailCheckSpam": "Si no lo ve, revise su carpeta de spam. El enlace vence en 3 días.",
+        "VerifyEmailVerifying": "Verificando su correo...",
+        "BackToLogin": "Volver al inicio de sesión"
     },
 
     "HomePage": {
@@ -224,11 +231,21 @@
         "Copied": "¡Copiado!",
         "CheckPayment": "Verificar estado del pago",
         "TransactionHistory": "Historial de transacciones",
-        "NoTransactions": "Sin transacciones aún"
+        "NoTransactions": "Sin transacciones aún",
+        "Ultra": "ULTRA",
+        "UltraDesc": "Solución integral para empresas",
+        "ContactService": "Contactar servicio",
+        "GiftCard": "Tarjeta de regalo",
+        "GiftCardDesc": "Usa una tarjeta de regalo para activar un plan",
+        "Activate": "Activar",
+        "GiftCardTitle": "Activar tarjeta de regalo",
+        "GiftCardPlaceholder": "Ingrese el código de la tarjeta",
+        "GiftCardActivateSuccess": "Tarjeta de regalo activada exitosamente",
+        "GiftCardActivateFailed": "Error al activar la tarjeta de regalo"
     },
 
-    "PlanManagementPage": {
-        "Title": "Gestión de planes",
+    "PlanPage": {
+        "Title": "Plan",
         "Name": "Nombre",
         "MonthlyLimit": "Límite mensual",
         "Price": "Precio",

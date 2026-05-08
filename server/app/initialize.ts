@@ -8,7 +8,7 @@ export async function initialize() {
             process.env.ADMIN_NAME,
             process.env.ADMIN_EMAIL,
             process.env.ADMIN_PASSWORD,
-            1 // is_admin = 1
+            1
         );
     }
 }
