@@ -1,5 +1,6 @@
 import Repository from "../../lib/repository";
 import { AccountEntity } from "../../../shared/modules/account/account.entity";
+import { generateApiKey } from "../ai/ai.auth";
 
 const accountRepository: Repository<AccountEntity> = Repository.instance("Account");
 
@@ -26,6 +27,10 @@ export class AccountService {
 
     static async findByEmail(email: string): Promise<AccountEntity | null> {
         return await accountRepository.findIgnoreDelete({ email });
+    }
+
+    static async findActiveByEmail(email: string): Promise<AccountEntity | null> {
+        return await accountRepository.findOne({ email });
     }
 
     static async create(data: Partial<AccountEntity>): Promise<AccountEntity> {

@@ -99,7 +99,7 @@ async function sessions(request: UsageSessionsRequest): Promise<UsageSessionsRes
         throw "Authorization failed";
     }
 
-    const groups = await UsageService.getUserSessions();
+    const groups = await UsageService.getUserSessions(request.gapMinutes, request.since);
 
     // Resolve account names
     const accountIds = [...new Set(groups.map(g => g.accountId))];

@@ -119,15 +119,15 @@
         "BackToLogin": "返回登录"
     },
     "HomePage": {
-        "MainText": "HEX",
+        "MainText": "EHEX",
         "Slogan1": "朴素的语言蕴含无穷力量",
         "Slogan2": "凝聚的智慧也应触手可及",
         "ViewSource": "查看源代码",
         "StartFree": "开始使用",
         "TryChat": "在线体验",
-        "FeatureTitle": "为什么选择 HEX",
+        "FeatureTitle": "为什么选择 EHEX",
         "Feature1Title": "强大性能",
-        "Feature1Desc": "HEX 系列模型在多种基准测试中表现优异，兼顾推理速度与生成质量，为各类应用场景提供稳定支撑。",
+        "Feature1Desc": "EHEX 系列模型在多种基准测试中表现优异，兼顾推理速度与生成质量，为各类应用场景提供稳定支撑。",
         "Feature2Title": "开放兼容",
         "Feature2Desc": "原生兼容 OpenAI API 格式，无需额外适配即可接入现有工具链与平台，迁移成本趋近于零。",
         "Feature3Title": "清晰透明",
@@ -266,7 +266,9 @@
         "Actions": "操作",
         "Edit": "编辑",
         "EditTitle": "编辑套餐",
-        "NoData": "暂无数据"
+        "NoData": "暂无数据",
+        "GenerateBtn": "礼品卡",
+        "GenerateGiftCard": "生成礼品卡"
     },
 
     "TermsPage": {

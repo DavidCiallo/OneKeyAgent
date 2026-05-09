@@ -98,6 +98,7 @@ function buildSession(logs: UsageLogEntity[], tierMap: Map<string, number>): Use
         startTime: logs[0].create_time,
         endTime: logs[logs.length - 1].create_time,
         modelAlias: logs[0].modelAlias,
+        requestCount: logs.length,
         inputTokens,
         outputTokens,
         providerUsage: Array.from(providerMap.values()),
@@ -178,11 +179,11 @@ export class UsageService {
         return thisWeekLogs.reduce((acc, l) => acc + getBilledTotalTokens(l, tierMap), 0);
     }
 
-    /** Get usage grouped by user with continuous sessions (same modelAlias, gap < 15 min) */
-    static async getUserSessions(): Promise<UserSessionGroup[]> {
-        const allLogs = await usageRepo.find({}, { since: Date.now() - MONTH });
+    /** Get usage grouped by user with continuous sessions (gap < gapMinutes, split by modelAlias) */
+    static async getUserSessions(gapMinutes?: number, since?: number): Promise<UserSessionGroup[]> {
+        const allLogs = await usageRepo.find({}, { since: since ?? Date.now() - MONTH });
         const tierMap = await getTierMap(allLogs);
-        const SESSION_GAP = 30 * 60 * 1000; // 30 minutes
+        const SESSION_GAP = (gapMinutes || 30) * 60 * 1000;
 
         // Group by accountId
         const byAccount = new Map<string, UsageLogEntity[]>();
@@ -197,32 +198,51 @@ export class UsageService {
             // Sort by time ASC
             logs.sort((a, b) => a.create_time - b.create_time);
 
+            // Split logs by modelAlias first, then merge within each model
+            const byModel = new Map<string, UsageLogEntity[]>();
+            for (const log of logs) {
+                const key = log.modelAlias;
+                if (!byModel.has(key)) byModel.set(key, []);
+                byModel.get(key)!.push(log);
+            }
+
             const sessions: UserSession[] = [];
-            let currentSession: UsageLogEntity[] = [logs[0]];
 
-            for (let i = 1; i < logs.length; i++) {
-                const prev = logs[i - 1];
-                const curr = logs[i];
-                const gap = curr.create_time - prev.create_time;
+            for (const [, modelLogs] of byModel) {
+                let currentSession: UsageLogEntity[] = [modelLogs[0]];
 
-                if (gap < SESSION_GAP && curr.modelAlias === prev.modelAlias) {
-                    currentSession.push(curr);
-                } else {
+                for (let i = 1; i < modelLogs.length; i++) {
+                    const prev = modelLogs[i - 1];
+                    const curr = modelLogs[i];
+                    const gap = curr.create_time - prev.create_time;
+
+                    if (gap < SESSION_GAP) {
+                        currentSession.push(curr);
+                    } else {
+                        sessions.push(buildSession(currentSession, tierMap));
+                        currentSession = [curr];
+                    }
+                }
+                if (currentSession.length > 0) {
                     sessions.push(buildSession(currentSession, tierMap));
-                    currentSession = [curr];
                 }
             }
-            if (currentSession.length > 0) {
-                sessions.push(buildSession(currentSession, tierMap));
-            }
+
+            // Sort sessions by startTime descending
+            sessions.sort((a, b) => b.startTime - a.startTime);
 
             const totalTokens = sessions.reduce((sum, s) => sum + s.inputTokens + s.outputTokens, 0);
+            const totalRequests = sessions.reduce((sum, s) => sum + s.requestCount, 0);
 
-            groups.push({ accountId, accountName: accountId, sessions, totalTokens });
+            groups.push({ accountId, accountName: accountId, sessions, totalTokens, totalRequests });
         }
 
-        // Sort by totalTokens DESC
-        groups.sort((a, b) => b.totalTokens - a.totalTokens);
+        // Sort by latest session startTime DESC
+        groups.sort((a, b) => {
+            const aMax = Math.max(...a.sessions.map(s => s.startTime));
+            const bMax = Math.max(...b.sessions.map(s => s.startTime));
+            return bMax - aMax;
+        });
 
         return groups;
     }

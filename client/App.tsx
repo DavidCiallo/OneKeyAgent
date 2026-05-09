@@ -68,7 +68,7 @@ const TitleUpdater = () => {
     const location = useLocation();
     useEffect(() => {
         const pageName = TITLE_MAP[location.pathname];
-        document.title = pageName ? `HEX.AI - ${pageName}` : "HEX.AI";
+        document.title = pageName ? `EHEX - ${pageName}` : "EHEX";
     }, [location.pathname]);
     return null;
 };

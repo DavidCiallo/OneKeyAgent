@@ -9,9 +9,33 @@ import {
 } from "../../../shared/modules/usage/usage.interface";
 import { UsageRouter } from "../../api/instance";
 import { Locale } from "../../methods/locale";
-import { Tabs, Tab } from "@heroui/react";
+import { Tabs, Tab, Select, SelectItem, Button, ButtonGroup } from "@heroui/react";
 import { UsageTable } from "./components/UsageTable";
 import { UsageSessions } from "./components/UsageSessions";
+
+const GAP_OPTIONS = [
+    { value: 30, label: "30min" },
+    { value: 180, label: "3h" },
+    { value: 360, label: "6h" },
+    { value: 720, label: "12h" },
+];
+
+const TIME_PRESETS = [
+    { value: 0, label: "Today" },
+    { value: 1, label: "24h" },
+    { value: 3, label: "3d" },
+    { value: 7, label: "7d" },
+] as const;
+
+function computeSince(preset: number): number {
+    const now = Date.now();
+    if (preset === 0) {
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        return d.getTime();
+    }
+    return now - preset * 86400000;
+}
 
 export default function UsagePage() {
     const locale = Locale("UsagePage");
@@ -23,6 +47,8 @@ export default function UsagePage() {
     const [page, setPage] = useState(1);
 
     const [groups, setGroups] = useState<UserSessionGroup[]>([]);
+    const [gapMinutes, setGapMinutes] = useState(30);
+    const [timePreset, setTimePreset] = useState<number>(7);
 
     const [loading, setLoading] = useState(true);
 
@@ -39,9 +65,10 @@ export default function UsagePage() {
         setLoading(false);
     }, []);
 
-    const fetchSessions = useCallback(async () => {
+    const fetchSessions = useCallback(async (gap: number, preset: number) => {
         setLoading(true);
-        const req = new UsageSessionsRequest({ auth: getToken() });
+        const since = computeSince(preset);
+        const req = new UsageSessionsRequest({ auth: getToken(), gapMinutes: gap, since });
         const res = await UsageRouter.sessions(req);
         if (res.success && res.data) {
             setGroups(res.data);
@@ -53,9 +80,9 @@ export default function UsagePage() {
         if (viewMode === "history") {
             fetchList(page);
         } else {
-            fetchSessions();
+            fetchSessions(gapMinutes, timePreset);
         }
-    }, [viewMode, page, fetchList, fetchSessions]);
+    }, [viewMode, page, gapMinutes, timePreset, fetchList, fetchSessions]);
 
     return (
         <div className="max-w-screen flex flex-col min-h-screen">
@@ -80,7 +107,36 @@ export default function UsagePage() {
                 ) : viewMode === "history" ? (
                     <UsageTable list={list} total={total} page={page} onPageChange={setPage} />
                 ) : (
-                    <UsageSessions groups={groups} />
+                    <div className="flex flex-col gap-3">
+                        <div className="flex flex-wrap items-center gap-3">
+                            <Select
+                                size="sm"
+                                className="w-28"
+                                selectedKeys={[String(gapMinutes)]}
+                                onSelectionChange={(keys) => {
+                                    const val = Number(Array.from(keys)[0]);
+                                    if (val) setGapMinutes(val);
+                                }}
+                                aria-label="Aggregation interval"
+                            >
+                                {GAP_OPTIONS.map((opt) => (
+                                    <SelectItem key={String(opt.value)}>{opt.label}</SelectItem>
+                                ))}
+                            </Select>
+                            <ButtonGroup size="sm" variant="flat">
+                                {TIME_PRESETS.map((p) => (
+                                    <Button
+                                        key={p.value}
+                                        color={timePreset === p.value ? "primary" : "default"}
+                                        onPress={() => setTimePreset(p.value)}
+                                    >
+                                        {p.label}
+                                    </Button>
+                                ))}
+                            </ButtonGroup>
+                        </div>
+                        <UsageSessions groups={groups} />
+                    </div>
                 )}
             </div>
         </div>

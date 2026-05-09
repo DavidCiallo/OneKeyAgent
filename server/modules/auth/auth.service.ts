@@ -88,10 +88,10 @@ export async function registerUser(name: string, email: string, password: string
     const domainError = checkAllowedDomain(email);
     if (domainError) { throw domainError; }
     const exist = await accountRepository.findIgnoreDelete({ email });
-    if (exist) { return {}; }
+    if (exist && !exist.delete_time) { return {}; }
     password = hashGenerate(password);
     const apiKey = generateApiKey();
-    const account = await accountRepository.insert({ name, email, password, apiKey, is_admin: isAdmin });
+    const account = await AccountService.create({ name, email, password, apiKey, is_admin: isAdmin });
     if (!account) return {};
     if (!isAdmin) {
         await AccountRoleService.assignPermissions(account.id, [

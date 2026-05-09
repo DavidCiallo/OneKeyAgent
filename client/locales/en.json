@@ -117,15 +117,15 @@
     },
 
     "HomePage": {
-        "MainText": "HEX",
+        "MainText": "EHEX",
         "Slogan1": "Plain words,",
         "Slogan2": "profound intelligence.",
         "ViewSource": "View Source Code",
         "StartFree": "Get Started",
         "TryChat": "Try Online",
-        "FeatureTitle": "Why HEX",
+        "FeatureTitle": "Why EHEX",
         "Feature1Title": "Powerful Performance",
-        "Feature1Desc": "HEX series models deliver strong results across multiple benchmarks, balancing inference speed with generation quality for production workloads.",
+        "Feature1Desc": "EHEX series models deliver strong results across multiple benchmarks, balancing inference speed with generation quality for production workloads.",
         "Feature2Title": "Open & Compatible",
         "Feature2Desc": "Natively compatible with the OpenAI API format. Integrate seamlessly with your existing toolchain and platform with zero migration cost.",
         "Feature3Title": "Clear & Transparent",
@@ -264,7 +264,9 @@
         "Actions": "Actions",
         "Edit": "Edit",
         "EditTitle": "Edit Plan",
-        "NoData": "No data"
+        "NoData": "No data",
+        "GenerateBtn": "Gift Card",
+        "GenerateGiftCard": "Generate gift card"
     },
 
     "TermsPage": {
