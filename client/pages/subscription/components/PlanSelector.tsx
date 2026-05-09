@@ -27,7 +27,7 @@ export default function PlanSelector({ plans, currentPlan, onSelect, onGiftCardA
     const currentPrice = plans.find((p) => p.name === currentPlan)?.price ?? 0;
 
     const handleContactService = () => {
-        window.open("https://t.me/xxx", "_blank");
+        window.open(`https://t.me/${process.env.TG_USER_ID}`, "_blank");
     };
 
     const handleGiftCardActivated = () => {

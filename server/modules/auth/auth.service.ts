@@ -4,6 +4,7 @@ import Repository from "../../lib/repository";
 import { generateApiKey } from "../ai/ai.auth";
 import { RoleService, AccountRoleService } from "../role/role.service";
 import { sendEmail, buildVerificationEmail } from "../email/email.service";
+import { AccountService } from "../account/account.service";
 
 const ALL_MENUS = ["model", "usage", "account", "profile"];
 const accountRepository: Repository<AccountEntity> = Repository.instance("Account");
