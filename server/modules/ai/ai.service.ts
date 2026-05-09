@@ -12,6 +12,7 @@ import { UsageService } from "../usage/usage.service";
 import { AccountService } from "../account/account.service";
 import { AccountRoleService } from "../role/role.service";
 import { SubscriptionService } from "../subscription/subscription.service";
+import { toAnthropicBody, anthropicToOpenAI, antMessagesToOpenAI, openAIToAntMessages, openAIToAntStream, antStreamToOpenAI } from "./ai.trans";
 
 const DEFAULT_MONTHLY_LIMIT = 90_000_000; // 90M tokens default (free plan)
 
@@ -34,50 +35,6 @@ function buildAuthHeader(apiKey: string | undefined, authType?: string): string 
     if (!apiKey) return "";
     if (authType === "custom") return apiKey;
     return `Bearer ${apiKey}`;
-}
-
-/** Convert OpenAI-format chat body to Anthropic format */
-function toAnthropicBody(body: Record<string, any>): Record<string, any> {
-    const messages = body.messages || [];
-    const systemMsg = messages.filter((m: any) => m.role === "system");
-    const chatMessages = messages.filter((m: any) => m.role !== "system");
-
-    const anthropicMessages = chatMessages.map((m: any) => ({
-        role: m.role,
-        content: [{ type: "text", text: m.content }],
-    }));
-
-    const result: Record<string, any> = {
-        model: body.model,
-        max_tokens: body.max_tokens || 4096,
-        messages: anthropicMessages,
-        stream: body.stream,
-    };
-
-    if (systemMsg.length > 0) {
-        result.system = systemMsg.map((m: any) => ({ type: "text", text: m.content }));
-    }
-
-    return result;
-}
-
-/** Convert Anthropic non-stream response to OpenAI-compatible format */
-function anthropicToOpenAI(data: any, model: string): any {
-    const content = data.content?.find((c: any) => c.type === "text")?.text || "";
-    return {
-        id: data.id,
-        model,
-        choices: [{
-            index: 0,
-            message: { role: "assistant", content },
-            finish_reason: data.stop_reason === "end_turn" ? "stop" : data.stop_reason,
-        }],
-        usage: {
-            prompt_tokens: data.usage?.input_tokens || 0,
-            completion_tokens: data.usage?.output_tokens || 0,
-            total_tokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
-        },
-    };
 }
 
 /** Build request headers and URL path based on api type */
@@ -192,7 +149,13 @@ async function tryProviderStream(
             res.on("data", (chunk: Buffer) => writer.write(chunk));
             res.on("end", () => writer.close());
             res.on("error", () => writer.close());
-            resolve(ts.readable);
+
+            // Normalize Anthropic SSE to OpenAI SSE so downstream always gets OpenAI format
+            if (apiType === "anthropic") {
+                resolve(antStreamToOpenAI(ts.readable));
+            } else {
+                resolve(ts.readable);
+            }
         });
         req.on("error", () => resolve(null));
         req.on("timeout", () => { req.destroy(); resolve(null); });
@@ -299,10 +262,12 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
     await requireModelAccess(accountId, requestedAlias);
     await checkUsageLimit(accountId);
 
+    console.log("[chatHexStream] alias:", requestedAlias, "accountId:", accountId);
     const providers = await ProviderService.getProvidersByAlias(requestedAlias);
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
 
     for (const provider of providers) {
+        console.log("[chatHexStream] trying provider:", provider.id, "apiType:", provider.apiType, "model:", provider.model, "baseURL:", provider.baseURL);
         const requestBody: Record<string, any> = {
             ...body,
             stream: true,
@@ -320,18 +285,42 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
             provider.apiType
         );
         if (!bodyStream) {
+            console.log("[chatHexStream] provider", provider.id, "returned null, trying next");
             ProviderService.recordFail(provider.id);
             continue;
         }
 
+        console.log("[chatHexStream] provider", provider.id, "connected successfully, streaming...");
         ProviderService.recordSuccess(provider.id);
 
         const t0 = Date.now();
         const [upstreamForward, parseStream] = (bodyStream.tee() as [ReadableStream<Uint8Array>, ReadableStream<Uint8Array>]);
 
+        // Log raw data from upstream to debug
+        const logStream = new TransformStream<Uint8Array, Uint8Array>();
+        (async () => {
+            const r = upstreamForward.getReader();
+            const w = logStream.writable.getWriter();
+            let totalBytes = 0;
+            let chunks: string[] = [];
+            while (true) {
+                const { done, value } = await r.read();
+                if (done) {
+                    console.log("[chatHexStream] forward stream done, total bytes:", totalBytes, "chunks:", chunks.length);
+                    if (chunks.length > 0) console.log("[chatHexStream] first chunk:", chunks[0].substring(0, 200));
+                    break;
+                }
+                totalBytes += value.length;
+                const text = new TextDecoder().decode(value);
+                chunks.push(text.substring(0, 100));
+                await w.write(value);
+            }
+            await w.close();
+        })();
+
         const ts = new TransformStream<Uint8Array, Uint8Array>();
         const forwardStream = ts.readable;
-        safePipe(upstreamForward.getReader(), ts.writable.getWriter());
+        safePipe(logStream.readable.getReader(), ts.writable.getWriter());
 
         // Background parse usage
         (async () => {
@@ -495,7 +484,13 @@ function requestStream(urlStr: string, apiKey: string | undefined, postBody: str
             res.on("data", (chunk: Buffer) => writer.write(chunk));
             res.on("end", () => writer.close());
             res.on("error", () => writer.close());
-            resolve(ts.readable);
+
+            // Normalize Anthropic SSE to OpenAI SSE so downstream always gets OpenAI format
+            if (apiType === "anthropic") {
+                resolve(antStreamToOpenAI(ts.readable));
+            } else {
+                resolve(ts.readable);
+            }
         });
         req.on("error", () => resolve(null));
         req.on("timeout", () => { req.destroy(); resolve(null); });
@@ -569,5 +564,19 @@ export class AiService {
             });
         }
         return { data };
+    }
+
+    /** Anthropic /v1/messages non-streaming: convert request → call chatHex → convert response back */
+    static async antMessages(data: Record<string, any>, accountId: string): Promise<Record<string, any>> {
+        const openaiBody = antMessagesToOpenAI(data);
+        const result = await chatHex(openaiBody, accountId);
+        return openAIToAntMessages(result, data.model);
+    }
+
+    /** Anthropic /v1/messages streaming: convert request → call chatHexStream → convert SSE stream */
+    static async antMessagesStream(data: Record<string, any>, accountId: string): Promise<ReadableStream<Uint8Array>> {
+        const openaiBody = antMessagesToOpenAI(data);
+        const upstream = await chatHexStream(openaiBody, accountId);
+        return openAIToAntStream(upstream);
     }
 }

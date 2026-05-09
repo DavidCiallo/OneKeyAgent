@@ -87,4 +87,60 @@ export const aiController = new AiRouterInstance(inject, {
         const data = await AiService.listModels(accountId);
         return new ModelsResponse(data);
     },
+
+    async v1messages(request): Promise<any> {
+        console.log("[v1messages] received request:", JSON.stringify({ model: request.model, stream: request.stream, msgCount: request.messages?.length, lastMsg: request.messages?.[request.messages?.length - 1]?.content?.substring?.(0, 100) }));
+        const apiKey = request.auth || "";
+        if (!validateApiKey(apiKey) || !(await verifyApiKeyInDb(apiKey))) {
+            throw new Error("Invalid API Key");
+        }
+        const accountId = await getAccountIdByApiKey(apiKey);
+        if (!accountId) throw new Error("Invalid API Key");
+
+        if (request.stream) {
+            console.log("[v1messages] streaming mode, calling antMessagesStream");
+            try {
+                const stream = await AiService.antMessagesStream(request, accountId);
+                return new Response(stream as any, {
+                    headers: {
+                        "Content-Type": "text/event-stream",
+                        "Cache-Control": "no-cache",
+                        Connection: "keep-alive",
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                        "Access-Control-Allow-Headers": "Content-Type, token, Authorization, x-api-key",
+                    },
+                });
+            } catch (e: any) {
+                console.error("[v1messages] streaming error:", e);
+                // Return SSE-formatted error so Claude Code doesn't get JSON parse error
+                const errorStream = new ReadableStream({
+                    start(controller) {
+                        const errEvent = {
+                            type: "error",
+                            error: { type: "api_error", message: e.message || "Stream failed" },
+                        };
+                        controller.enqueue(new TextEncoder().encode(`event: error\ndata: ${JSON.stringify(errEvent)}\n\n`));
+                        controller.enqueue(new TextEncoder().encode("event: message_stop\n\n"));
+                        controller.close();
+                    },
+                });
+                return new Response(errorStream, {
+                    headers: {
+                        "Content-Type": "text/event-stream",
+                        "Cache-Control": "no-cache",
+                        Connection: "keep-alive",
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                        "Access-Control-Allow-Headers": "Content-Type, token, Authorization, x-api-key",
+                    },
+                });
+            }
+        }
+
+        console.log("[v1messages] non-streaming mode, calling antMessages");
+        const result = await AiService.antMessages(request, accountId);
+        console.log("[v1messages] response:", JSON.stringify({ id: result.id, stop_reason: result.stop_reason, usage: result.usage }));
+        return result;
+    },
 });

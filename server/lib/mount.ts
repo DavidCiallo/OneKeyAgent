@@ -12,7 +12,7 @@ export async function mounthttp(req: Request, controllers: BaseRouterInstance[])
             const fullPath = `${base}${prefix}${path}`;
 
             if (pathName === fullPath) {
-                const auth = req.headers.get("token") || req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
+                const auth = req.headers.get("token") || req.headers.get("x-api-key") || req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
                 let requestBody: Record<string, any> | null = {};
                 try {
                     const contentType = req.headers.get("content-type") || "";
@@ -83,7 +83,7 @@ export async function mounthttp(req: Request, controllers: BaseRouterInstance[])
             headers: {
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type, token",
+                "Access-Control-Allow-Headers": "Content-Type, token, Authorization, x-api-key",
             },
         });
     }
