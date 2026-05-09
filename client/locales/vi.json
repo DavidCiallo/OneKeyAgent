@@ -117,15 +117,15 @@
     },
 
     "HomePage": {
-        "MainText": "HEX",
+        "MainText": "EHEX",
         "Slogan1": "Ngôn từ giản dị,",
         "Slogan2": "trí tuệ sâu sắc.",
         "ViewSource": "Xem mã nguồn",
         "StartFree": "Bắt đầu",
         "TryChat": "Dùng thử",
-        "FeatureTitle": "Tại sao chọn HEX",
+        "FeatureTitle": "Tại sao chọn EHEX",
         "Feature1Title": "Hiệu năng mạnh mẽ",
-        "Feature1Desc": "Dòng mô hình HEX đạt kết quả cao trên nhiều chuẩn đánh giá, cân bằng tốc độ suy luận và chất lượng sinh cho khối lượng công việc sản xuất.",
+        "Feature1Desc": "Dòng mô hình EHEX đạt kết quả cao trên nhiều chuẩn đánh giá, cân bằng tốc độ suy luận và chất lượng sinh cho khối lượng công việc sản xuất.",
         "Feature2Title": "Mở & Tương thích",
         "Feature2Desc": "Tương thích gốc với định dạng API OpenAI. Tích hợp liền mạch với công cụ và nền tảng hiện có mà không tốn chi phí di chuyển.",
         "Feature3Title": "Rõ ràng & Minh bạch",

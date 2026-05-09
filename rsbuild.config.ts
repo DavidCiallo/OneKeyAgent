@@ -3,7 +3,7 @@ import { pluginReact } from "@rsbuild/plugin-react";
 
 export default defineConfig({
     html: {
-        title: "HEX.AI",
+        title: "EHEX",
         favicon: "./public/favicon.svg",
     },
     plugins: [pluginReact()],

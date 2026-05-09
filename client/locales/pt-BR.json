@@ -120,15 +120,15 @@
     },
 
     "HomePage": {
-        "MainText": "HEX",
+        "MainText": "EHEX",
         "Slogan1": "Palavras simples,",
         "Slogan2": "inteligência profunda.",
         "ViewSource": "Ver código-fonte",
         "StartFree": "Começar",
         "TryChat": "Experimentar online",
-        "FeatureTitle": "Por que HEX",
+        "FeatureTitle": "Por que EHEX",
         "Feature1Title": "Alto desempenho",
-        "Feature1Desc": "Os modelos HEX entregam resultados excelentes em múltiplos benchmarks, equilibrando velocidade de inferência e qualidade de geração para cargas de trabalho de produção.",
+        "Feature1Desc": "Os modelos EHEX entregam resultados excelentes em múltiplos benchmarks, equilibrando velocidade de inferência e qualidade de geração para cargas de trabalho de produção.",
         "Feature2Title": "Aberto e compatível",
         "Feature2Desc": "Compatível nativamente com o formato de API OpenAI. Integre-se perfeitamente com suas ferramentas existentes sem custo de migração.",
         "Feature3Title": "Claro e transparente",
