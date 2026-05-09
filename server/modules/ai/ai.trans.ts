@@ -69,7 +69,6 @@ export function toAnthropicBody(body: Record<string, any>): Record<string, any> 
 
 /** Convert Anthropic /v1/messages request to internal OpenAI-format body */
 export function antMessagesToOpenAI(body: Record<string, any>): Record<string, any> {
-    console.log("[antMessagesToOpenAI] input model:", body.model, "stream:", body.stream, "msgCount:", body.messages?.length);
     const antMessages = body.messages || [];
     const messages: Array<Record<string, any>> = [];
 
@@ -264,7 +263,6 @@ export function anthropicToOpenAI(data: any, model: string): any {
  * Handles both text content and tool_calls in the stream.
  */
 export function openAIToAntStream(upstream: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
-    console.log("Converting OpenAI SSE stream to Anthropic SSE stream");
     const ts = new TransformStream<Uint8Array, Uint8Array>();
     const writer = ts.writable.getWriter();
     const decoder = new TextDecoder();
@@ -285,21 +283,6 @@ export function openAIToAntStream(upstream: ReadableStream<Uint8Array>): Readabl
             let finished = false;
 
             // Anthropic stream must start with message_start event
-            let modelName = "";
-            const msgStartEvent = {
-                type: "message_start",
-                message: {
-                    id: crypto.randomUUID(),
-                    type: "message",
-                    role: "assistant",
-                    content: [],
-                    model: modelName,
-                    stop_reason: null,
-                    stop_sequence: null,
-                    usage: { input_tokens: 0, output_tokens: 0 },
-                },
-            };
-            // We'll emit message_start after first chunk to get model name
             let msgStartEmitted = false;
 
             async function emitContentBlockStart(index: number, block: Record<string, any>) {
@@ -335,12 +318,22 @@ export function openAIToAntStream(upstream: ReadableStream<Uint8Array>): Readabl
 
                     try {
                         const openaiChunk = JSON.parse(payload);
-                        console.log("[openAIToAntStream] chunk choices:", openaiChunk.choices?.length, "finish_reason:", openaiChunk.choices?.[0]?.finish_reason);
 
                         // Emit message_start on first chunk with model name
                         if (!msgStartEmitted) {
-                            modelName = openaiChunk.model || modelName;
-                            msgStartEvent.message.model = modelName;
+                            const msgStartEvent = {
+                                type: "message_start",
+                                message: {
+                                    id: crypto.randomUUID(),
+                                    type: "message",
+                                    role: "assistant",
+                                    content: [],
+                                    model: openaiChunk.model || "",
+                                    stop_reason: null,
+                                    stop_sequence: null,
+                                    usage: { input_tokens: 0, output_tokens: 0 },
+                                },
+                            };
                             await writer.write(encoder.encode(`event: message_start\ndata: ${JSON.stringify(msgStartEvent)}\n\n`));
                             msgStartEmitted = true;
                         }
@@ -353,7 +346,6 @@ export function openAIToAntStream(upstream: ReadableStream<Uint8Array>): Readabl
 
                             // Text content handling
                             if (content) {
-                                console.log("[openAIToAntStream] text content detected, textBlockStarted:", textBlockStarted, "content:", content.substring(0, 50));
                                 hasTextContent = true;
                                 if (!textBlockStarted) {
                                     await emitContentBlockStart(textBlockIndex, { type: "text", text: content });
@@ -361,8 +353,6 @@ export function openAIToAntStream(upstream: ReadableStream<Uint8Array>): Readabl
                                 } else {
                                     await emitContentBlockDelta(textBlockIndex, { type: "text_delta", text: content });
                                 }
-                            } else {
-                                console.log("[openAIToAntStream] no text content in this chunk, delta keys:", Object.keys(delta).join(","));
                             }
 
                             // Tool calls handling
@@ -446,7 +436,7 @@ export function openAIToAntStream(upstream: ReadableStream<Uint8Array>): Readabl
                 await writer.write(encoder.encode(`event: message_delta\ndata: ${JSON.stringify(stopEvent)}\n\n`));
             }
 
-            await writer.write(encoder.encode("event: message_stop\n\n"));
+            await writer.write(encoder.encode("event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"));
             await writer.close();
         } catch { writer.close(); }
     })();
@@ -455,10 +445,6 @@ export function openAIToAntStream(upstream: ReadableStream<Uint8Array>): Readabl
 }
 
 /**
- * Convert Anthropic SSE stream to OpenAI SSE stream
- * Anthropic format: event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"text":"..."}}\n\n
- * OpenAI format: data: {"choices":[{"index":0,"delta":{"content":"..."}}]}\n\n
- *
  * Handles text content blocks and tool_use blocks.
  */
 export function antStreamToOpenAI(upstream: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
@@ -618,8 +604,8 @@ export function antStreamToOpenAI(upstream: ReadableStream<Uint8Array>): Readabl
                                 await writer.write(encoder.encode("data: [DONE]\n\n"));
                                 continue;
                             }
-                        } catch (e) {
-                            console.error("[antStreamToOpenAI] parse error:", e);
+                        } catch {
+                            // skip malformed SSE events
                         }
                         pendingData = "";
                         currentEvent = "";
@@ -640,8 +626,7 @@ export function antStreamToOpenAI(upstream: ReadableStream<Uint8Array>): Readabl
             }
 
             await writer.close();
-        } catch (e) {
-            console.error("[antStreamToOpenAI] error:", e);
+        } catch {
             writer.close();
         }
     })();

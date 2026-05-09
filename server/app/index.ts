@@ -37,6 +37,10 @@ Bun.serve({
     async fetch(req: Request) {
         const url = new URL(req.url);
         const pathName = url.pathname;
+        const method = req.method;
+        if (pathName.startsWith("/api")) {
+            console.log(`[REQ] ${method} ${pathName} content-type:${req.headers.get("content-type") || "-"}`);
+        }
         const apiResponse = await mounthttp(req, [
             authController,
             aiController,
