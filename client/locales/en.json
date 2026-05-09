@@ -264,7 +264,9 @@
         "Actions": "Actions",
         "Edit": "Edit",
         "EditTitle": "Edit Plan",
-        "NoData": "No data"
+        "NoData": "No data",
+        "GenerateBtn": "Gift Card",
+        "GenerateGiftCard": "Generate gift card"
     },
 
     "TermsPage": {

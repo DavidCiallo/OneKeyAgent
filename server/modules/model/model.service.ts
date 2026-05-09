@@ -15,6 +15,14 @@ export class ModelService {
     }
 
     static async create(data: Partial<ModelEntity>): Promise<ModelEntity> {
+        // If a soft-deleted model with the same alias exists, restore it
+        if (data.alias) {
+            const existing = await modelRepository.findIgnoreDelete({ alias: data.alias });
+            if (existing && existing.delete_time) {
+                await modelRepository.update({ id: existing.id }, { ...data, id: existing.id, delete_time: null as any });
+                return (await modelRepository.findOne({ id: existing.id }))!;
+            }
+        }
         return await modelRepository.insert(data);
     }
 

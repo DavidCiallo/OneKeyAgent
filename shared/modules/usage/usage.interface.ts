@@ -163,6 +163,7 @@ export interface UserSession {
     startTime: number;
     endTime: number;
     modelAlias: string;
+    requestCount: number;
     inputTokens: number;
     outputTokens: number;
     providerUsage: ProviderUsage[];
@@ -173,14 +174,19 @@ export interface UserSessionGroup {
     accountName: string;
     sessions: UserSession[];
     totalTokens: number;
+    totalRequests: number;
 }
 
 export class UsageSessionsRequest implements BaseRequest {
     public auth?: string;
+    public gapMinutes?: number;
+    public since?: number;
 
     constructor(origin: Partial<UsageSessionsRequest>) {
         if (false) throw new Error("Unexpected error");
         origin.auth && (this.auth = origin.auth);
+        origin.gapMinutes && (this.gapMinutes = origin.gapMinutes);
+        origin.since && (this.since = origin.since);
     }
     static self(unsafe: UsageSessionsRequest) {
         return new UsageSessionsRequest(unsafe);

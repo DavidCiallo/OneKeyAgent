@@ -79,9 +79,6 @@ async function create(request: AccountCreateRequest): Promise<AccountCreateRespo
     }
     await requireAdmin(request.auth);
 
-    const existing = await AccountService.findByEmail(request.account.email);
-    if (existing) throw "email already exists";
-
     const { account } = await registerUser(request.account.name, request.account.email, request.account.password, request.account.is_admin);
     if (!account) throw "create failed";
     const data = new AccountDTO(account);

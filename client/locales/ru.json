@@ -253,7 +253,9 @@
         "Actions": "Действия",
         "Edit": "Редактировать",
         "EditTitle": "Редактировать тариф",
-        "NoData": "Нет данных"
+        "NoData": "Нет данных",
+        "GenerateBtn": "Подарочная карта",
+        "GenerateGiftCard": "Сгенерировать карту"
     },
 
     "TermsPage": {

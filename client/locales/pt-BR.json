@@ -253,7 +253,9 @@
         "Actions": "Ações",
         "Edit": "Editar",
         "EditTitle": "Editar plano",
-        "NoData": "Sem dados"
+        "NoData": "Sem dados",
+        "GenerateBtn": "Cartão presente",
+        "GenerateGiftCard": "Gerar cartão presente"
     },
 
     "TermsPage": {

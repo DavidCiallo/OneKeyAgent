@@ -250,7 +250,9 @@
         "Actions": "การดำเนินการ",
         "Edit": "แก้ไข",
         "EditTitle": "แก้ไขแพ็กเกจ",
-        "NoData": "ไม่มีข้อมูล"
+        "NoData": "ไม่มีข้อมูล",
+        "GenerateBtn": "บัตรของขวัญ",
+        "GenerateGiftCard": "สร้างบัตรของขวัญ"
     },
 
     "TermsPage": {

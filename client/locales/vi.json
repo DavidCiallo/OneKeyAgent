@@ -250,7 +250,9 @@
         "Actions": "Thao tác",
         "Edit": "Sửa",
         "EditTitle": "Sửa gói",
-        "NoData": "Không có dữ liệu"
+        "NoData": "Không có dữ liệu",
+        "GenerateBtn": "Thẻ quà tặng",
+        "GenerateGiftCard": "Tạo thẻ quà tặng"
     },
 
     "TermsPage": {
