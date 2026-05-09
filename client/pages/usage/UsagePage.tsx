@@ -14,10 +14,12 @@ import { UsageTable } from "./components/UsageTable";
 import { UsageSessions } from "./components/UsageSessions";
 
 const GAP_OPTIONS = [
+    { value: 15, label: "15min" },
     { value: 30, label: "30min" },
-    { value: 180, label: "3h" },
+    { value: 60, label: "1h" },
     { value: 360, label: "6h" },
     { value: 720, label: "12h" },
+    { value: 1440, label: "1d" },
 ];
 
 const TIME_PRESETS = [
@@ -48,7 +50,7 @@ export default function UsagePage() {
 
     const [groups, setGroups] = useState<UserSessionGroup[]>([]);
     const [gapMinutes, setGapMinutes] = useState(30);
-    const [timePreset, setTimePreset] = useState<number>(7);
+    const [timePreset, setTimePreset] = useState<number>(1);
 
     const [loading, setLoading] = useState(true);
 

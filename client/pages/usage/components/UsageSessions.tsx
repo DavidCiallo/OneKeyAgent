@@ -4,7 +4,7 @@ import {
 } from "recharts";
 import { Select, SelectItem } from "@heroui/react";
 import { UserSessionGroup } from "../../../../shared/modules/usage/usage.interface";
-import { stringToColor, fmtM, format24Time, stripEmail } from "./utils";
+import { stringToColor, fmtM, stripEmail } from "./utils";
 
 type Props = {
     groups: UserSessionGroup[];
@@ -39,7 +39,7 @@ function buildChartData(
 ): Record<string, number | string>[] {
     return sessions.map((s) => {
         const row: Record<string, number | string> = {
-            timeLabel: format24Time(s.startTime),
+            timeLabel: s.windowLabel,
             modelAlias: s.modelAlias,
             startTime: s.startTime,
         };
@@ -168,8 +168,11 @@ export function UsageSessions({ groups }: Props) {
                                 borderRadius: 8,
                                 fontSize: 12,
                             }}
-                            formatter={(value: number, name: string) => [fmtM(value), name]}
-                            labelFormatter={(label: string) => label}
+                            formatter={(value: any, name: any) => [fmtM(Number(value) || 0), String(name)]}
+                            labelFormatter={(label: any, payload: readonly any[]) => {
+                                const model = payload?.[0]?.payload?.modelAlias;
+                                return `${String(label)}${model ? ` | ${model}` : ""}`;
+                            }}
                         />
                         <Legend
                             formatter={(value: string) => (

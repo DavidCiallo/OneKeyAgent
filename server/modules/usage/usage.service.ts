@@ -1,10 +1,12 @@
 import Repository from "../../lib/repository";
 import { ModelEntity } from "../../../shared/modules/model/model.entity";
+import { ProviderEntity } from "../../../shared/modules/provider/provider.entity";
 import { UsageLogEntity } from "../../../shared/modules/usage/usage.entity";
 import { UsageStatsPeriod, UsageStatsResult, UsageAmountData, UserSession, UserSessionGroup, ProviderUsage } from "../../../shared/modules/usage/usage.interface";
 
 const usageRepo = Repository.instance<UsageLogEntity>("UsageLog");
 const modelRepo = Repository.instance<ModelEntity>("Model");
+const providerRepo = Repository.instance<ProviderEntity>("Provider");
 
 const TEN_MIN = 10 * 60 * 1000;
 const DAY = 86400000;
@@ -37,6 +39,18 @@ async function getTierMap(logs: UsageLogEntity[]): Promise<Map<string, number>> 
     return tierMap;
 }
 
+function getRawInputTokens(log: UsageLogEntity): number {
+    return log.inputTokens || 0;
+}
+
+function getRawOutputTokens(log: UsageLogEntity): number {
+    return log.outputTokens || 0;
+}
+
+function getRawTotalTokens(log: UsageLogEntity): number {
+    return getRawInputTokens(log) + getRawOutputTokens(log);
+}
+
 function getBilledInputTokens(log: UsageLogEntity, tierMap: Map<string, number>): number {
     if (log.tierSnapshot == null) return log.inputTokens || 0;
     return (log.inputTokens || 0) * (log.tierSnapshot || tierMap.get(log.modelAlias) || 1);
@@ -60,7 +74,7 @@ function buildPeriod(logs: UsageLogEntity[], periodStart: number, periodEnd: num
 
     for (const log of logs) {
         const h = tenMinStart(log.create_time);
-        const tokens = getBilledTotalTokens(log, tierMap);
+        const tokens = getRawTotalTokens(log); // raw tokens, no tier multiplier
         bucketMap.set(h, (bucketMap.get(h) || 0) + tokens);
     }
 
@@ -74,35 +88,6 @@ function buildPeriod(logs: UsageLogEntity[], periodStart: number, periodEnd: num
 
     const total = amounts.length > 0 ? amounts[amounts.length - 1].amount : 0;
     return { total, amounts };
-}
-
-/** Build a UserSession from a list of consecutive usage logs (same modelAlias, gap < 15 min) */
-function buildSession(logs: UsageLogEntity[], tierMap: Map<string, number>): UserSession {
-    let inputTokens = 0;
-    let outputTokens = 0;
-    const providerMap = new Map<string, ProviderUsage>();
-
-    for (const log of logs) {
-        inputTokens += getBilledInputTokens(log, tierMap);
-        outputTokens += getBilledOutputTokens(log, tierMap);
-        const key = log.providerId || "unknown";
-        if (!providerMap.has(key)) {
-            providerMap.set(key, { providerName: key, inputTokens: 0, outputTokens: 0 });
-        }
-        const p = providerMap.get(key)!;
-        p.inputTokens += getBilledInputTokens(log, tierMap);
-        p.outputTokens += getBilledOutputTokens(log, tierMap);
-    }
-
-    return {
-        startTime: logs[0].create_time,
-        endTime: logs[logs.length - 1].create_time,
-        modelAlias: logs[0].modelAlias,
-        requestCount: logs.length,
-        inputTokens,
-        outputTokens,
-        providerUsage: Array.from(providerMap.values()),
-    };
 }
 
 export class UsageService {
@@ -144,12 +129,11 @@ export class UsageService {
         const nowTenMin = tenMinStart(now);
 
         const allLogs = await usageRepo.find({ accountId }, { since: now - MONTH });
-        const tierMap = await getTierMap(allLogs);
         const todayLogs = allLogs.filter(l => l.create_time >= todayStart && l.create_time < nowTenMin + TEN_MIN);
         const weekLogs = allLogs.filter(l => l.create_time >= weekStart && l.create_time < nowTenMin + TEN_MIN);
 
         const sum = (logs: UsageLogEntity[]) =>
-            logs.reduce((acc, l) => acc + getBilledTotalTokens(l, tierMap), 0);
+            logs.reduce((acc, l) => acc + getRawTotalTokens(l), 0);
 
         return {
             today: sum(todayLogs),
@@ -179,11 +163,39 @@ export class UsageService {
         return thisWeekLogs.reduce((acc, l) => acc + getBilledTotalTokens(l, tierMap), 0);
     }
 
-    /** Get usage grouped by user with continuous sessions (gap < gapMinutes, split by modelAlias) */
+    static windowStart(ts: number, gapMs: number): number {
+        const localMidnight = localDayStart(ts);
+        const offset = ts - localMidnight;
+        const rounded = Math.floor(offset / gapMs) * gapMs;
+        return localMidnight + rounded;
+    }
+
+    static formatWindowLabel(ts: number, gapMs: number): string {
+        const d = new Date(ts);
+        const MM = String(d.getMonth() + 1).padStart(2, "0");
+        const DD = String(d.getDate()).padStart(2, "0");
+        const hh = String(d.getHours()).padStart(2, "0");
+        const mm = String(d.getMinutes()).padStart(2, "0");
+        const end = new Date(ts + gapMs);
+        const ehh = String(end.getHours()).padStart(2, "0");
+        const emm = String(end.getMinutes()).padStart(2, "0");
+
+        if (gapMs >= 86400000) {
+            // 1d: just show the date
+            return `${MM}/${DD}`;
+        }
+        if (gapMs >= 3600000) {
+            // >= 1h: show as hh:00-hh:00
+            return `${MM}/${DD} ${hh}:00-${ehh}:00`;
+        }
+        // < 1h (15min, 30min): show as hh:mm-hh:mm
+        return `${MM}/${DD} ${hh}:${mm}-${ehh}:${emm}`;
+    }
+
     static async getUserSessions(gapMinutes?: number, since?: number): Promise<UserSessionGroup[]> {
         const allLogs = await usageRepo.find({}, { since: since ?? Date.now() - MONTH });
         const tierMap = await getTierMap(allLogs);
-        const SESSION_GAP = (gapMinutes || 30) * 60 * 1000;
+        const gapMs = (gapMinutes || 30) * 60 * 1000;
 
         // Group by accountId
         const byAccount = new Map<string, UsageLogEntity[]>();
@@ -198,34 +210,49 @@ export class UsageService {
             // Sort by time ASC
             logs.sort((a, b) => a.create_time - b.create_time);
 
-            // Split logs by modelAlias first, then merge within each model
-            const byModel = new Map<string, UsageLogEntity[]>();
+            // Group by (modelAlias, windowStart)
+            type WindowKey = string; // `${modelAlias}|${windowStart}`
+            const byWindow = new Map<WindowKey, UsageLogEntity[]>();
+
             for (const log of logs) {
-                const key = log.modelAlias;
-                if (!byModel.has(key)) byModel.set(key, []);
-                byModel.get(key)!.push(log);
+                const wStart = this.windowStart(log.create_time, gapMs);
+                const key = `${log.modelAlias || "default"}|${wStart}`;
+                if (!byWindow.has(key)) byWindow.set(key, []);
+                byWindow.get(key)!.push(log);
             }
 
             const sessions: UserSession[] = [];
 
-            for (const [, modelLogs] of byModel) {
-                let currentSession: UsageLogEntity[] = [modelLogs[0]];
+            for (const [key, windowLogs] of byWindow) {
+                const modelAlias = windowLogs[0].modelAlias;
+                const wStart = Number(key.split("|")[1]);
+                let inputTokens = 0;
+                let outputTokens = 0;
+                const providerMap = new Map<string, ProviderUsage>();
 
-                for (let i = 1; i < modelLogs.length; i++) {
-                    const prev = modelLogs[i - 1];
-                    const curr = modelLogs[i];
-                    const gap = curr.create_time - prev.create_time;
-
-                    if (gap < SESSION_GAP) {
-                        currentSession.push(curr);
-                    } else {
-                        sessions.push(buildSession(currentSession, tierMap));
-                        currentSession = [curr];
+                for (const log of windowLogs) {
+                    inputTokens += getRawInputTokens(log);
+                    outputTokens += getRawOutputTokens(log);
+                    const key = log.providerId || "unknown";
+                    if (!providerMap.has(key)) {
+                        providerMap.set(key, { providerName: key, inputTokens: 0, outputTokens: 0 });
                     }
+                    const p = providerMap.get(key)!;
+                    p.inputTokens += getRawInputTokens(log);
+                    p.outputTokens += getRawOutputTokens(log);
                 }
-                if (currentSession.length > 0) {
-                    sessions.push(buildSession(currentSession, tierMap));
-                }
+
+                sessions.push({
+                    startTime: wStart,
+                    endTime: wStart + gapMs,
+                    modelAlias,
+                    requestCount: windowLogs.length,
+                    inputTokens,
+                    outputTokens,
+                    tierSnapshot: windowLogs[0]?.tierSnapshot ?? tierMap.get(modelAlias) ?? 1,
+                    providerUsage: Array.from(providerMap.values()),
+                    windowLabel: this.formatWindowLabel(wStart, gapMs),
+                });
             }
 
             // Sort sessions by startTime descending
@@ -244,6 +271,22 @@ export class UsageService {
             return bMax - aMax;
         });
 
-        return groups;
+        // Filter out sessions whose provider or model has been deleted
+        const [activeProviders, activeModels] = await Promise.all([
+            providerRepo.find({}),
+            modelRepo.find({}),
+        ]);
+        const activeProviderIds = new Set(activeProviders.map(p => p.id));
+        const activeModelAliases = new Set(activeModels.map(m => m.alias));
+
+        return groups.map(g => ({
+            ...g,
+            sessions: g.sessions
+                .map(s => ({
+                    ...s,
+                    providerUsage: s.providerUsage.filter(pu => activeProviderIds.has(pu.providerName)),
+                }))
+                .filter(s => s.providerUsage.length > 0 && activeModelAliases.has(s.modelAlias)),
+        })).filter(g => g.sessions.length > 0);
     }
 }

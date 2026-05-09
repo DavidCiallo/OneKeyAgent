@@ -108,7 +108,6 @@ async function sessions(request: UsageSessionsRequest): Promise<UsageSessionsRes
     );
     const accountMap = new Map(accounts.map(a => [a.id, a.name]));
 
-    // Resolve provider names (include soft-deleted ones for history display)
     const allProviderIds = [...new Set(groups.flatMap(g => g.sessions.flatMap(s => s.providerUsage.map(p => p.providerName))))];
     const providerService = await import("../provider/provider.service").then(m => m.ProviderService);
     const providers = await Promise.all(

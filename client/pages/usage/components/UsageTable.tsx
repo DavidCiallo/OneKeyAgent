@@ -32,7 +32,7 @@ export function UsageTable({ list, total, page, onPageChange }: Props) {
                         <TableColumn align="center">{locale.ProviderName}</TableColumn>
                         <TableColumn align="center">{locale.InputTokens}</TableColumn>
                         <TableColumn align="center">{locale.OutputTokens}</TableColumn>
-                        <TableColumn align="center">Requests</TableColumn>
+                        <TableColumn align="center">Tier</TableColumn>
                         <TableColumn align="center">{locale.Time}</TableColumn>
                     </TableHeader>
                     <TableBody emptyContent={locale.NoData}>
@@ -43,7 +43,7 @@ export function UsageTable({ list, total, page, onPageChange }: Props) {
                                 <TableCell>{item.providerName || "—"}</TableCell>
                                 <TableCell>{item.inputTokens}</TableCell>
                                 <TableCell>{item.outputTokens}</TableCell>
-                                <TableCell>1</TableCell>
+                                <TableCell>{item.tierSnapshot ?? "—"}</TableCell>
                                 <TableCell>{item.create_time ? new Date(item.create_time).toLocaleString() : "—"}</TableCell>
                             </TableRow>
                         ))}

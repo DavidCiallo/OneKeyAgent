@@ -58,6 +58,7 @@ export class UsageDTO {
     public providerName?: string;
     public inputTokens: number;
     public outputTokens: number;
+    public tierSnapshot?: number | null;
     public create_time: number;
 
     private isTypeSafe: symbol = Symbol();
@@ -71,6 +72,7 @@ export class UsageDTO {
         this.providerName = origin.providerName;
         this.inputTokens = origin.inputTokens;
         this.outputTokens = origin.outputTokens;
+        this.tierSnapshot = origin.tierSnapshot;
         this.create_time = origin.create_time;
     }
 }
@@ -166,7 +168,9 @@ export interface UserSession {
     requestCount: number;
     inputTokens: number;
     outputTokens: number;
+    tierSnapshot: number;
     providerUsage: ProviderUsage[];
+    windowLabel: string;
 }
 
 export interface UserSessionGroup {

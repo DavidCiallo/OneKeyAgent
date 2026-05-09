@@ -22,7 +22,7 @@ export default function CurrentPlanCard({ plan }: { plan: PlanInfo }) {
             <CardBody className="px-6 py-4 space-y-3">
                 <div className="flex items-center gap-3">
                     <span className="text-sm text-gray-500 w-24">{locale.PlanName}</span>
-                    <Chip size="sm" color={planColor} variant="flat">
+                    <Chip size="sm" color={planColor} variant="flat" className="mx-1">
                         {plan.name.toUpperCase()}
                     </Chip>
                 </div>
