@@ -79,6 +79,14 @@
           "notNull": false,
           "autoincrement": false
         },
+        "topup_tokens": {
+          "name": "topup_tokens",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
         "create_time": {
           "name": "create_time",
           "type": "integer",
@@ -668,6 +676,22 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'subscription'"
+        },
+        "token_amount": {
+          "name": "token_amount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         },
         "create_time": {
           "name": "create_time",

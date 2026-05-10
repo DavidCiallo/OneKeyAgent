@@ -82,13 +82,13 @@ export default function AccountInfoCard({
                                 <div className="flex justify-between text-xs mb-1">
                                     <span className="text-gray-500">{locale.Today}</span>
                                     <span className="font-semibold text-primary">
-                                        {fmt(usage.today)}/{fmt(monthLimit / 12)}
+                                        {fmt(usage.today)}/{fmt(monthLimit / 20)}
                                     </span>
                                 </div>
                                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                                     <div
                                         className="h-full bg-primary rounded-full transition-all"
-                                        style={{ width: `${Math.min((usage.today / (monthLimit / 12)) * 100, 100)}%` }}
+                                        style={{ width: `${Math.min((usage.today / (monthLimit / 20)) * 100, 100)}%` }}
                                     />
                                 </div>
                             </div>

@@ -5,9 +5,9 @@ const planRepo = Repository.instance<SubscriptionPlanEntity>("SubscriptionPlan")
 
 const DEFAULT_PLANS = [
     { name: "free", monthly_limit: 60_000_000, price: 0, duration_days: 0 },
-    { name: "base", monthly_limit: 240_000_000, price: 200, duration_days: 30 },
-    { name: "pro", monthly_limit: 1500_000_000, price: 1000, duration_days: 30 },
-    { name: "max", monthly_limit: 3600_000_000, price: 2000, duration_days: 30 },
+    { name: "base", monthly_limit: 120_000_000, price: 200, duration_days: 30 },
+    { name: "pro", monthly_limit: 320_000_000, price: 1000, duration_days: 30 },
+    { name: "max", monthly_limit: 720_000_000, price: 2000, duration_days: 30 },
 ];
 
 export async function seedDefaultPlans() {

@@ -10,4 +10,5 @@ export interface AccountEntity extends BaseEntity {
     plan_expires_at: number | null;
     sub_wallet_address: string | null;
     tg_chat_id: string | null;
+    topup_tokens: number; // raw tokens purchased via top-up packs, deducted after monthly limit
 }

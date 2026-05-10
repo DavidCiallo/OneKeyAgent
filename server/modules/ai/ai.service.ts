@@ -16,7 +16,7 @@ import { toAnthropicBody, anthropicToOpenAI, antMessagesToOpenAI, openAIToAntMes
 
 const DEFAULT_MONTHLY_LIMIT = 90_000_000; // 90M tokens default (free plan)
 
-/** Check monthly usage limit, throw 429 if exceeded */
+/** Check monthly usage limit, deduct from topup_tokens if exceeded */
 async function checkUsageLimit(accountId: string): Promise<void> {
     const account = await AccountService.findOne(accountId);
     if (!account) return;
@@ -26,6 +26,13 @@ async function checkUsageLimit(accountId: string): Promise<void> {
     const billed = await UsageService.monthlyBilledTokens(accountId);
 
     if (billed >= limit) {
+        // Monthly limit exceeded — check topup_tokens
+        const exceeded = billed - limit;
+        if ((account.topup_tokens || 0) > exceeded) {
+            // Deduct the exceeded amount from topup_tokens
+            await AccountService.update(accountId, { topup_tokens: account.topup_tokens - exceeded });
+            return; // allow the request
+        }
         throw new Error("429 Too Many Requests. Monthly usage limit exceeded");
     }
 }

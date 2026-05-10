@@ -8,6 +8,7 @@ import {
 import {
     SubscriptionRecordListRequest, SubscriptionRecordListResponse,
     SubscriptionCreatePaymentRequest, SubscriptionCreatePaymentResponse,
+    SubscriptionTopupRequest, SubscriptionTopupResponse,
     SubscriptionRecordDTO,
     PaymentCurrency,
 } from "../../../shared/modules/subscription_record/subscription_record.interface";
@@ -17,6 +18,7 @@ import { inject } from "../../lib/inject";
 import { getIdentifyByVerify, getAccountByEmail } from "../auth/auth.service";
 import { SubscriptionService } from "./subscription.service";
 import { createInvoice } from "./nowpayments.service";
+import { AccountService } from "../account/account.service";
 
 async function requireAdmin(auth?: string): Promise<void> {
     if (!auth) throw "Authorization failed";
@@ -180,6 +182,72 @@ async function createpayment(request: SubscriptionCreatePaymentRequest): Promise
 }
 
 /**
+ * Create a top-up pack invoice.
+ * User purchases raw tokens at the unit price of their current plan,
+ * rounded down to the nearest cent.
+ */
+async function createtopup(request: SubscriptionTopupRequest): Promise<SubscriptionTopupResponse> {
+    request = SubscriptionTopupRequest.self(request);
+    const account = await resolveAccount(request.auth || "");
+
+    // Rate limit: max 6 requests per minute per account
+    if (!(await checkRateLimit(`createtopup:${account.id}`))) {
+        return new SubscriptionTopupResponse({
+            success: false,
+            message: "Too many requests, please try again later",
+            data: { invoice_url: "", payment_id: "", token_amount: 0, price_cents: 0 },
+        });
+    }
+
+    const tokenAmount = request.token_amount || 0;
+    if (tokenAmount <= 0) throw new Error("token_amount must be positive");
+
+    let unitPrice: number;
+    const plan = await SubscriptionService.findPlanByName(account.plan || "free");
+    if (plan && plan.price > 0 && plan.monthly_limit > 0) {
+        // Paid plan: use own unit price
+        unitPrice = plan.price / plan.monthly_limit;
+    } else {
+        // Free plan: use base plan unit price * 1.05
+        const basePlan = await SubscriptionService.findPlanByName("base");
+        if (!basePlan || basePlan.price <= 0 || basePlan.monthly_limit <= 0) {
+            throw new Error("No paid plan found for unit price calculation");
+        }
+        unitPrice = (basePlan.price / basePlan.monthly_limit) * 1.05;
+    }
+
+    const finalPrice = Math.floor(tokenAmount * unitPrice);
+
+    if (finalPrice <= 0) throw new Error("Calculated price is too low, try a larger amount");
+
+    const payCurrency = (request.pay_currency as PaymentCurrency) || "USDTERC20";
+    const { invoice_url, payment_id, invoice_id } = await createInvoice(
+        "topup",
+        finalPrice,
+        account.id,
+        payCurrency,
+    );
+
+    // Create a pending record with type="topup"
+    await SubscriptionService.createRecord({
+        account_id: account.id,
+        plan_name: "topup",
+        txid: invoice_id,
+        amount: finalPrice,
+        confirmations: 0,
+        status: "pending",
+        type: "topup",
+        token_amount: tokenAmount,
+    });
+
+    return new SubscriptionTopupResponse({
+        success: true,
+        message: "success",
+        data: { invoice_url, payment_id, token_amount: tokenAmount, price_cents: finalPrice },
+    });
+}
+
+/**
  * Handle NowPayments IPN (Instant Payment Notification) webhook.
  * NowPayments POSTs here when payment status changes.
  */
@@ -205,20 +273,38 @@ async function ipnwebhook(request: Record<string, unknown>): Promise<{ success: 
         }
 
         if (paymentStatus === "finished" || paymentStatus === "confirmed") {
-            const plan = await SubscriptionService.findPlanByName(record.plan_name);
-            if (!plan) throw new Error("Plan not found");
+            if (record.type === "topup") {
+                // Top-up pack: add tokens to account
+                const tokenAmount = record.token_amount || 0;
+                const account = await AccountService.findOne(record.account_id);
+                if (account) {
+                    await AccountService.update(record.account_id, {
+                        topup_tokens: (account.topup_tokens || 0) + tokenAmount,
+                    });
+                }
 
-            // Mark as confirmed
-            await SubscriptionService.updateRecordByTxid(record.txid, {
-                payment_id: paymentId,
-                status: "confirmed",
-                confirmations: 1,
-            });
+                await SubscriptionService.updateRecordByTxid(record.txid, {
+                    payment_id: paymentId,
+                    status: "confirmed",
+                    confirmations: 1,
+                });
 
-            // Upgrade account
-            await SubscriptionService.upgradeAccount(record.account_id, record.plan_name, plan.duration_days);
+                console.log(`[IPN] Account ${record.account_id} topped up ${tokenAmount} tokens`);
+            } else {
+                // Subscription: upgrade account plan
+                const plan = await SubscriptionService.findPlanByName(record.plan_name);
+                if (!plan) throw new Error("Plan not found");
 
-            console.log(`[IPN] Account ${record.account_id} upgraded to ${record.plan_name}`);
+                await SubscriptionService.updateRecordByTxid(record.txid, {
+                    payment_id: paymentId,
+                    status: "confirmed",
+                    confirmations: 1,
+                });
+
+                await SubscriptionService.upgradeAccount(record.account_id, record.plan_name, plan.duration_days);
+
+                console.log(`[IPN] Account ${record.account_id} upgraded to ${record.plan_name}`);
+            }
         } else if (paymentStatus === "failed" || paymentStatus === "expired" || paymentStatus === "refunded") {
             await SubscriptionService.updateRecordByTxid(record.txid, { status: "expired" });
         }
@@ -242,5 +328,6 @@ export const subscriptionPlanController = new SubscriptionPlanRouterInstance(inj
 export const subscriptionRecordController = new SubscriptionRecordRouterInstance(inject, {
     records,
     createpayment,
+    createtopup,
     ipnwebhook,
 });

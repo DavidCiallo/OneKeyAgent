@@ -15,9 +15,10 @@ interface PlanSelectorProps {
     currentPlan: string;
     onSelect: (plan: Plan) => void;
     onGiftCardActivated?: () => void;
+    children?: React.ReactNode;
 }
 
-export default function PlanSelector({ plans, currentPlan, onSelect, onGiftCardActivated }: PlanSelectorProps) {
+export default function PlanSelector({ plans, currentPlan, onSelect, onGiftCardActivated, children }: PlanSelectorProps) {
     const t = Locale("SubscriptionPage");
     const giftCardModal = useDisclosure();
 
@@ -110,6 +111,11 @@ export default function PlanSelector({ plans, currentPlan, onSelect, onGiftCardA
                             </Button>
                         </div>
                     </div>
+                {children && (
+                        <div className="border-t border-gray-100 pt-3 mt-3">
+                            {children}
+                        </div>
+                    )}
                 </CardBody>
             </Card>
 

@@ -9,6 +9,7 @@ CREATE TABLE `account` (
 	`plan_expires_at` integer,
 	`sub_wallet_address` text,
 	`tg_chat_id` text,
+	`topup_tokens` integer DEFAULT 0 NOT NULL,
 	`create_time` integer NOT NULL,
 	`update_time` integer,
 	`delete_time` integer
@@ -102,6 +103,8 @@ CREATE TABLE `subscription_record` (
 	`txid` text NOT NULL,
 	`amount` integer NOT NULL,
 	`confirmations` integer DEFAULT 0 NOT NULL,
+	`type` text DEFAULT 'subscription' NOT NULL,
+	`token_amount` integer DEFAULT 0 NOT NULL,
 	`status` text DEFAULT 'pending' NOT NULL,
 	`payment_id` text,
 	`create_time` integer NOT NULL,

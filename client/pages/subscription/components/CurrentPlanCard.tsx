@@ -5,6 +5,7 @@ interface PlanInfo {
     name: string;
     monthly_limit: number;
     plan_expires_at: number | null;
+    topup_tokens?: number;
 }
 
 export default function CurrentPlanCard({ plan }: { plan: PlanInfo }) {
@@ -14,6 +15,7 @@ export default function CurrentPlanCard({ plan }: { plan: PlanInfo }) {
 
     const planColor = plan.name === "free" ? "default" : plan.name === "pro" ? "primary" : "warning";
     const isExpired = plan.plan_expires_at && plan.plan_expires_at < Date.now();
+    const hasTopup = (plan.topup_tokens || 0) > 0;
 
     return (
         <Card>
@@ -29,6 +31,11 @@ export default function CurrentPlanCard({ plan }: { plan: PlanInfo }) {
                 <div className="flex items-center gap-3">
                     <span className="text-sm text-gray-500 w-24">{locale.MonthlyLimit}</span>
                     <span className="text-sm font-medium pl-2">{toM(plan.monthly_limit)}</span>
+                    {hasTopup && (
+                        <Chip size="sm" color="primary" variant="flat">
+                            +{toM(plan.topup_tokens!)} {locale.TopupPack}
+                        </Chip>
+                    )}
                 </div>
                 <div className="flex items-center gap-3">
                     <span className="text-sm text-gray-500 w-24">{locale.Expires}</span>

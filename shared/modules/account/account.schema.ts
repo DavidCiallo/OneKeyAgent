@@ -11,6 +11,7 @@ export const accountTable = sqliteTable("account", {
     plan_expires_at: integer("plan_expires_at"),
     sub_wallet_address: text("sub_wallet_address"),
     tg_chat_id: text("tg_chat_id"),
+    topup_tokens: integer("topup_tokens").notNull().default(0),
     create_time: integer("create_time").notNull(),
     update_time: integer("update_time"),
     delete_time: integer("delete_time"),

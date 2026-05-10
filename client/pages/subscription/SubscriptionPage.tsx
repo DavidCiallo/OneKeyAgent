@@ -10,6 +10,7 @@ import CurrentPlanCard from "./components/CurrentPlanCard";
 import PlanSelector from "./components/PlanSelector";
 import PaymentModal from "./components/PaymentModal";
 import TransactionHistory from "./components/TransactionHistory";
+import TopupPack from "./components/TopupPack";
 
 interface Plan {
     id: string;
@@ -36,6 +37,7 @@ export default function SubscriptionPage() {
         name: string;
         plan: string;
         plan_expires_at: number | null;
+        topup_tokens?: number;
     } | null>(null);
 
     const [plans, setPlans] = useState<Plan[]>([]);
@@ -121,6 +123,7 @@ export default function SubscriptionPage() {
                             name: account.plan,
                             monthly_limit: plans.find(p => p.name === account.plan)?.monthly_limit ?? 90_000_000,
                             plan_expires_at: account.plan_expires_at,
+                            topup_tokens: account.topup_tokens || 0,
                         }} />
                     )}
 
@@ -129,7 +132,28 @@ export default function SubscriptionPage() {
                         currentPlan={account?.plan || "free"}
                         onSelect={handleSelectPlan}
                         onGiftCardActivated={handleRefresh}
-                    />
+                    >
+                        {account && (() => {
+                            const currentPlan = plans.find(p => p.name === account.plan);
+                            return currentPlan && currentPlan.price > 0 ? (
+                                <TopupPack
+                                    planName={currentPlan.name}
+                                    planPrice={currentPlan.price}
+                                    planMonthlyLimit={currentPlan.monthly_limit}
+                                    allPlans={plans}
+                                    onSuccess={handleRefresh}
+                                />
+                            ) : plans.length > 0 ? (
+                                <TopupPack
+                                    planName="free"
+                                    planPrice={0}
+                                    planMonthlyLimit={0}
+                                    allPlans={plans}
+                                    onSuccess={handleRefresh}
+                                />
+                            ) : null;
+                        })()}
+                    </PlanSelector>
 
                     {selectedPlan && (
                         <PaymentModal

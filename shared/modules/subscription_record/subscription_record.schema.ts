@@ -9,6 +9,8 @@ export const subscriptionRecordTable = sqliteTable("subscription_record", {
     confirmations: integer("confirmations").notNull().default(0),
     status: text("status").notNull().default("pending"),
     payment_id: text("payment_id"),
+    type: text("type").notNull().default("subscription"),
+    token_amount: integer("token_amount").notNull().default(0),
     create_time: integer("create_time").notNull(),
     update_time: integer("update_time"),
     delete_time: integer("delete_time"),

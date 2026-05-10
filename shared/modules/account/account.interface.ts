@@ -15,6 +15,7 @@ export class AccountDTO {
     public is_admin: number;
     public plan: string;
     public plan_expires_at: number | null;
+    public topup_tokens: number;
     public sub_wallet_address: string | null;
     public tg_chat_id: string | null;
 
@@ -28,6 +29,7 @@ export class AccountDTO {
         this.is_admin = origin.is_admin;
         this.plan = origin.plan || "free";
         this.plan_expires_at = origin.plan_expires_at || null;
+        this.topup_tokens = origin.topup_tokens ?? 0;
         this.sub_wallet_address = origin.sub_wallet_address || null;
         this.tg_chat_id = origin.tg_chat_id || null;
     }

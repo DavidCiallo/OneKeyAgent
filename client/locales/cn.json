@@ -254,7 +254,15 @@
         "GiftCardTitle": "激活礼品卡",
         "GiftCardPlaceholder": "请输入礼品卡号",
         "GiftCardActivateSuccess": "礼品卡激活成功",
-        "GiftCardActivateFailed": "礼品卡激活失败"
+        "GiftCardActivateFailed": "礼品卡激活失败",
+        "TopupPack": "加量包",
+        "TopupPackDesc": "用量不足时自动消耗，长期有效。先扣除月度额度，再扣除加量包。",
+        "TopupTokens": "加量 Token",
+        "TopupPrice": "预计价格",
+        "TopupPlaceholder": "输入 Token 数量",
+        "TopupBuy": "购买加量包",
+        "TopupUnitPrice": "单价",
+        "TopupPriceHint": "价格以 $5 为间隔向下取整"
     },
 
     "PlanPage": {

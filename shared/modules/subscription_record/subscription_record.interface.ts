@@ -114,3 +114,36 @@ export class SubscriptionIpnWebhookBody {
         Object.assign(this, origin);
     }
 }
+
+export class SubscriptionTopupRequest implements BaseRequest {
+    public auth?: string;
+    public token_amount?: number; // how many raw tokens to purchase
+    public pay_currency?: string;
+
+    constructor(origin: Partial<SubscriptionTopupRequest>) {
+        if (false) throw new Error("Unexpected error");
+        origin.auth && (this.auth = origin.auth);
+        origin.token_amount && (this.token_amount = origin.token_amount);
+        origin.pay_currency && (this.pay_currency = origin.pay_currency);
+    }
+    static self(unsafe: SubscriptionTopupRequest) {
+        return new SubscriptionTopupRequest(unsafe);
+    }
+}
+
+export class SubscriptionTopupResponse implements BaseResponse<{ invoice_url: string; payment_id: string; token_amount: number; price_cents: number }> {
+    public success: boolean;
+    public message: string;
+    public data: {
+        invoice_url: string;
+        payment_id: string;
+        token_amount: number;
+        price_cents: number;
+    };
+
+    constructor(origin: SubscriptionTopupResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+        this.data = origin.data;
+    }
+}
