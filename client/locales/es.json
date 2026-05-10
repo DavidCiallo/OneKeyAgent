@@ -241,7 +241,15 @@
         "GiftCardTitle": "Activar tarjeta de regalo",
         "GiftCardPlaceholder": "Ingrese el código de la tarjeta",
         "GiftCardActivateSuccess": "Tarjeta de regalo activada exitosamente",
-        "GiftCardActivateFailed": "Error al activar la tarjeta de regalo"
+        "GiftCardActivateFailed": "Error al activar la tarjeta de regalo",
+        "TopupPack": "Paquete de recarga",
+        "TopupPackDesc": "Se consume automáticamente cuando se agota el límite, sin vencimiento. Primero se descuenta el límite mensual, luego el paquete de recarga.",
+        "TopupTokens": "Tokens de recarga",
+        "TopupPrice": "Precio estimado",
+        "TopupPlaceholder": "Ingrese cantidad de tokens",
+        "TopupBuy": "Comprar paquete de recarga",
+        "TopupUnitPrice": "Precio unitario",
+        "TopupPriceHint": "El precio se redondea hacia abajo en intervalos de $5"
     },
 
     "PlanPage": {

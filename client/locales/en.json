@@ -252,7 +252,15 @@
         "GiftCardTitle": "Activate Gift Card",
         "GiftCardPlaceholder": "Enter gift card code",
         "GiftCardActivateSuccess": "Gift card activated successfully",
-        "GiftCardActivateFailed": "Gift card activation failed"
+        "GiftCardActivateFailed": "Gift card activation failed",
+        "TopupPack": "Top-Up Pack",
+        "TopupPackDesc": "Auto-consumed when usage runs out, no expiration. Monthly limit is deducted first, then the top-up pack.",
+        "TopupTokens": "Top-Up Tokens",
+        "TopupPrice": "Estimated Price",
+        "TopupPlaceholder": "Enter token amount",
+        "TopupBuy": "Buy Top-Up Pack",
+        "TopupUnitPrice": "Unit Price",
+        "TopupPriceHint": "Price is rounded down to $5 intervals"
     },
 
     "PlanPage": {

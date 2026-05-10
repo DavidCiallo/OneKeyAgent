@@ -238,7 +238,15 @@
         "GiftCardTitle": "เปิดใช้งานบัตรของขวัญ",
         "GiftCardPlaceholder": "ป้อนรหัสบัตรของขวัญ",
         "GiftCardActivateSuccess": "เปิดใช้งานบัตรของขวัญสำเร็จ",
-        "GiftCardActivateFailed": "เปิดใช้งานบัตรของขวัญล้มเหลว"
+        "GiftCardActivateFailed": "เปิดใช้งานบัตรของขวัญล้มเหลว",
+        "TopupPack": "แพ็กเกจเติมเงิน",
+        "TopupPackDesc": "ใช้งานอัตโนมัติเมื่อการใช้หมด ไม่มีวันหมดอายุ โดยหักจากวงเงินรายเดือนก่อน แล้วจึงหักจากแพ็กเกจเติมเงิน",
+        "TopupTokens": "โทเค็นเติมเงิน",
+        "TopupPrice": "ราคาประมาณ",
+        "TopupPlaceholder": "ป้อนจำนวนโทเค็น",
+        "TopupBuy": "ซื้อแพ็กเกจเติมเงิน",
+        "TopupUnitPrice": "ราคาต่อหน่วย",
+        "TopupPriceHint": "ราคาถูกปัดลงในช่วง $5"
     },
 
     "PlanPage": {

@@ -241,7 +241,15 @@
         "GiftCardTitle": "ギフトカードを有効化",
         "GiftCardPlaceholder": "ギフトカードコードを入力",
         "GiftCardActivateSuccess": "ギフトカードが正常に有効化されました",
-        "GiftCardActivateFailed": "ギフトカードの有効化に失敗しました"
+        "GiftCardActivateFailed": "ギフトカードの有効化に失敗しました",
+        "TopupPack": "トップアップパック",
+        "TopupPackDesc": "利用枠が不足した際に自動消費されます。期限はありません。毎月の制限枠が先に消費され、その後トップアップパックが消費されます。",
+        "TopupTokens": "トップアップトークン",
+        "TopupPrice": "推定価格",
+        "TopupPlaceholder": "トークン数を入力",
+        "TopupBuy": "トップアップパックを購入",
+        "TopupUnitPrice": "単価",
+        "TopupPriceHint": "価格は$5単位で切り捨てられます"
     },
 
     "PlanPage": {

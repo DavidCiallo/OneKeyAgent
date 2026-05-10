@@ -238,7 +238,15 @@
         "GiftCardTitle": "Kích hoạt thẻ quà tặng",
         "GiftCardPlaceholder": "Nhập mã thẻ quà tặng",
         "GiftCardActivateSuccess": "Kích hoạt thẻ quà tặng thành công",
-        "GiftCardActivateFailed": "Kích hoạt thẻ quà tặng thất bại"
+        "GiftCardActivateFailed": "Kích hoạt thẻ quà tặng thất bại",
+        "TopupPack": "Gói nạp thêm",
+        "TopupPackDesc": "Tự động tiêu thụ khi hết hạn mức, không có thời hạn. Khấu trừ hạn mức tháng trước, sau đó khấu trừ gói nạp thêm.",
+        "TopupTokens": "Token nạp thêm",
+        "TopupPrice": "Giá ước tính",
+        "TopupPlaceholder": "Nhập số lượng token",
+        "TopupBuy": "Mua gói nạp thêm",
+        "TopupUnitPrice": "Đơn giá",
+        "TopupPriceHint": "Giá được làm tròn xuống theo khoảng $5"
     },
 
     "PlanPage": {

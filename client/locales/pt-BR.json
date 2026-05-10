@@ -241,7 +241,15 @@
         "GiftCardTitle": "Ativar cartão-presente",
         "GiftCardPlaceholder": "Digite o código do cartão-presente",
         "GiftCardActivateSuccess": "Cartão-presente ativado com sucesso",
-        "GiftCardActivateFailed": "Falha ao ativar o cartão-presente"
+        "GiftCardActivateFailed": "Falha ao ativar o cartão-presente",
+        "TopupPack": "Pacote de recarga",
+        "TopupPackDesc": "Consumido automaticamente quando o uso acaba, sem expiração. O limite mensal é deduzido primeiro, depois o pacote de recarga.",
+        "TopupTokens": "Tokens de recarga",
+        "TopupPrice": "Preço estimado",
+        "TopupPlaceholder": "Insira a quantidade de tokens",
+        "TopupBuy": "Comprar pacote de recarga",
+        "TopupUnitPrice": "Preço unitário",
+        "TopupPriceHint": "O preço é arredondado para baixo em intervalos de $5"
     },
 
     "PlanPage": {
