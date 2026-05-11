@@ -1,6 +1,10 @@
 import { config } from "dotenv";
 config();
 
+import { PAYMENT_CURRENCIES } from "../../../shared/modules/subscription_record/subscription_record.interface";
+import type { PaymentCurrency } from "../../../shared/modules/subscription_record/subscription_record.interface";
+export { PAYMENT_CURRENCIES };
+
 const NOWPAYMENTS_API_URL = "https://api.nowpayments.io/v1";
 function getApiKey(): string {
     const key = process.env.NOWPAYMENTS_API_KEY;
@@ -22,26 +26,36 @@ interface NowPaymentsInvoiceResponse {
 }
 
 /**
+ * Build the request body for NowPayments invoice creation.
+ * Extracted as a standalone function so it can be used/tested independently.
+ */
+export function buildPaymentBody(params: {
+    priceDollars: number;
+    accountId: string;
+    payCurrency: PaymentCurrency;
+}): Record<string, unknown> {
+    return {
+        price_amount: params.priceDollars,
+        price_currency: params.payCurrency,
+        pay_currency: params.payCurrency,
+        order_id: params.accountId,
+        order_description: "ehex token topup",
+        ipn_callback_url: `${process.env.IPN_CALLBACK_URL || ""}/api/subscription/ipnwebhook`,
+        is_fixed_rate: false,
+    };
+}
+
+/**
  * Create a payment invoice via NowPayments.
  * Returns the invoice URL (user pays here) and payment ID (for status tracking).
  */
 export async function createInvoice(
-    planName: string,
-    priceCents: number,
+    priceDollars: number,
     accountId: string,
+    payCurrency: PaymentCurrency = "USDTERC20",
 ): Promise<{ invoice_url: string; payment_id: string; invoice_id: string }> {
     const apiKey = getApiKey();
-    const priceInUsd = priceCents / 100;
-    const body = {
-        price_amount: priceInUsd,
-        price_currency: "usd",
-        pay_currency: "USDTERC20",
-        order_id: accountId,
-        order_description: `ehex ${planName} plan subscription`,
-        ipn_callback_url: process.env.IPN_CALLBACK_URL + "/api/subscription/ipnwebhook",
-        is_fixed_rate: false,
-    };
-    console.log("priceInUsd", body)
+    const body = buildPaymentBody({ priceDollars, accountId, payCurrency });
 
     const resp = await fetch(`${NOWPAYMENTS_API_URL}/invoice`, {
         method: "POST",
@@ -102,8 +116,7 @@ export async function checkPaymentStatus(paymentId: string): Promise<{
             status = "pending";
     }
 
-    const actuallyPaid = json.actually_paid ? Math.round(parseFloat(json.actually_paid) * 100) : null;
+    const actuallyPaid = json.actually_paid ? parseFloat(parseFloat(json.actually_paid).toFixed(2)) : null;
 
     return { status, actuallyPaid };
 }
-

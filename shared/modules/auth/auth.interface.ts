@@ -8,8 +8,6 @@ export class LoginBody {
     public email: string;
     public password: string;
 
-    private isTypeSafe: symbol = Symbol();
-
     constructor(origin: Pick<AccountEntity, "email" | "password">) {
         if (!origin.email || !origin.password) {
             throw new Error("Email and password are required");
@@ -30,8 +28,6 @@ export class RegisterBody {
     public name: string;
     public email: string;
     public password: string;
-
-    private isTypeSafe: symbol = Symbol();
 
     constructor(origin: any) {
         if (!origin.name || !origin.email || !origin.password) {
@@ -60,13 +56,14 @@ export class RegisterRequest implements BaseRequest {
     }
 }
 
-export class RegisterResponse implements BaseResponse<{ token: string; is_admin?: number; roles?: { name: string; type: string }[] }> {
+export class RegisterResponse implements BaseResponse<{ token: string; is_admin?: number; roles?: { name: string; type: string }[]; needs_verification?: boolean }> {
     public success: boolean;
     public message: string;
     public data: {
         token: string;
         is_admin?: number;
         roles?: { name: string; type: string }[];
+        needs_verification?: boolean;
     };
 
     constructor(origin: RegisterResponse) {
@@ -119,12 +116,57 @@ export class AliveRequest implements BaseRequest {
     }
 }
 
+export class AuthConfigRequest implements BaseRequest {
+    constructor() {}
+    static self(_unsafe: AuthConfigRequest) {
+        return new AuthConfigRequest();
+    }
+}
+
+export class AuthConfigResponse implements BaseResponse<{ allowed_domains: string[] }> {
+    public success: boolean;
+    public message: string;
+    public data: { allowed_domains: string[] };
+
+    constructor(origin: AuthConfigResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+        this.data = origin.data;
+    }
+}
+
 export class AliveResponse implements BaseResponse<{ is_admin?: number; roles?: { name: string; type: string }[] }> {
     public success: boolean;
     public message: string;
     public data: { is_admin?: number; roles?: { name: string; type: string }[] };
 
     constructor(origin: AliveResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+        this.data = origin.data;
+    }
+}
+
+export class VerifyEmailRequest implements BaseRequest {
+    public auth?: string;
+    public token: string;
+
+    constructor(origin: Partial<VerifyEmailRequest>) {
+        console.log(origin);
+        if (!origin.token) throw new Error("Token is required");
+        this.token = origin.token;
+    }
+    static self(unsafe: VerifyEmailRequest) {
+        return new VerifyEmailRequest(unsafe);
+    }
+}
+
+export class VerifyEmailResponse implements BaseResponse<{}> {
+    public success: boolean;
+    public message: string;
+    public data: {};
+
+    constructor(origin: VerifyEmailResponse) {
         this.success = origin.success;
         this.message = origin.message;
         this.data = origin.data;

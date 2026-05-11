@@ -35,17 +35,17 @@ export function UsageChart({ today, last24h, last7Days }: Props) {
 
     const todayData = today.amounts.map((d) => ({
         hour: formatTodayMin(d.ts),
-        amount: d.amount,
+        amount: d.amount < 0.01 ? null : d.amount,
     }));
 
     const last24hData = last24h.amounts.map((d) => ({
         hour: formatTodayMin(d.ts),
-        amount: d.amount,
+        amount: d.amount < 0.01 ? null : d.amount,
     }));
 
     const weekData = last7Days.amounts.map((d) => ({
         hour: formatWeekDay(d.ts),
-        amount: d.amount,
+        amount: d.amount < 0.01 ? null : d.amount,
     }));
 
     return (
@@ -60,7 +60,7 @@ export function UsageChart({ today, last24h, last7Days }: Props) {
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="hour" tick={{ fontSize: 11 }} interval={10} />
                         <YAxis tick={{ fontSize: 11 }} unit=" M" />
-                        <Tooltip formatter={(v) => Number(v).toFixed(2) + " M"} />
+                        <Tooltip formatter={(v) => v === null ? "0.00 M" : Number(v).toFixed(2) + " M"} />
                         <Line
                             type="monotone"
                             dataKey="amount"
@@ -68,6 +68,7 @@ export function UsageChart({ today, last24h, last7Days }: Props) {
                             stroke="#3b82f6"
                             strokeWidth={2}
                             dot={false}
+                            connectNulls={false}
                         />
                     </LineChart>
                 </ResponsiveContainer>
@@ -83,7 +84,7 @@ export function UsageChart({ today, last24h, last7Days }: Props) {
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="hour" tick={{ fontSize: 11 }} interval={10} />
                         <YAxis tick={{ fontSize: 11 }} unit=" M" />
-                        <Tooltip formatter={(v) => Number(v).toFixed(2) + " M"} />
+                        <Tooltip formatter={(v) => v === null ? "0.00 M" : Number(v).toFixed(2) + " M"} />
                         <Line
                             type="monotone"
                             dataKey="amount"
@@ -91,6 +92,7 @@ export function UsageChart({ today, last24h, last7Days }: Props) {
                             stroke="#f59e0b"
                             strokeWidth={2}
                             dot={false}
+                            connectNulls={false}
                         />
                     </LineChart>
                 </ResponsiveContainer>
@@ -106,7 +108,7 @@ export function UsageChart({ today, last24h, last7Days }: Props) {
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="hour" tick={{ fontSize: 11 }} interval={120} />
                         <YAxis tick={{ fontSize: 11 }} unit=" M" />
-                        <Tooltip formatter={(v) => Number(v).toFixed(2) + " M"} />
+                        <Tooltip formatter={(v) => v === null ? "0.00 M" : Number(v).toFixed(2) + " M"} />
                         <Line
                             type="monotone"
                             dataKey="amount"
@@ -114,6 +116,7 @@ export function UsageChart({ today, last24h, last7Days }: Props) {
                             stroke="#10b981"
                             strokeWidth={2}
                             dot={false}
+                            connectNulls={false}
                         />
                     </LineChart>
                 </ResponsiveContainer>

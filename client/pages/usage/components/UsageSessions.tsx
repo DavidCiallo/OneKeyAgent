@@ -1,67 +1,179 @@
-import { Accordion, AccordionItem, Chip } from "@heroui/react";
-import { UserSessionGroup } from "../../../../shared/modules/usage/usage.interface";
-import { Locale } from "../../../methods/locale";
-import { ProviderBar, ProviderChip } from "./ProviderBar";
-import { fmtM, fmtK, format24Time, stripEmail } from "./utils";
+import { useMemo } from "react";
+import {
+    BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid,
+} from "recharts";
+import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell } from "@heroui/react";
+import { UsageSessionTotals, UserSessionGroup, UserSession } from "../../../../shared/modules/usage/usage.interface";
+import { stringToColor, fmtM, fmtK, format24Time, stripEmail } from "./utils";
 
 type Props = {
     groups: UserSessionGroup[];
+    totals: UsageSessionTotals;
+    recentSessions: UserSession[];
+    gapMinutes?: number;
 };
 
-export function UsageSessions({ groups }: Props) {
-    const locale = Locale("UsagePage");
+function getActiveProviders(
+    groups: UserSessionGroup[],
+): string[] {
+    const totals = new Map<string, number>();
+    for (const g of groups) {
+        for (const s of g.sessions) {
+            for (const pu of s.providerUsage) {
+                totals.set(pu.providerName, (totals.get(pu.providerName) || 0) + pu.inputTokens + pu.outputTokens);
+            }
+        }
+    }
+    return Array.from(totals.entries())
+        .filter(([, v]) => v > 0)
+        .map(([k]) => k)
+        .sort();
+}
+
+function formatChartLabel(ts: number, showDate: boolean): string {
+    const d = new Date(ts);
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    if (!showDate) return `${hh}:${mm}`;
+    const M = String(d.getMonth() + 1).padStart(2, "0");
+    const DD = String(d.getDate()).padStart(2, "0");
+    return `${M}/${DD} ${hh}:${mm}`;
+}
+
+function buildChartData(
+    sessions: UserSessionGroup["sessions"],
+    providers: string[],
+    showDate: boolean,
+): Record<string, number | string>[] {
+    return sessions.map((s) => {
+        const row: Record<string, number | string> = {
+            timeLabel: formatChartLabel(s.startTime, showDate),
+            startTime: s.startTime,
+            cost: s.cost,
+        };
+        const providerMap = new Map<string, number>();
+        for (const pu of s.providerUsage) {
+            providerMap.set(pu.providerName, (providerMap.get(pu.providerName) || 0) + pu.inputTokens + pu.outputTokens);
+        }
+        for (const p of providers) {
+            row[p] = providerMap.get(p) || 0;
+        }
+        return row;
+    });
+}
+
+export function UsageSessions({ groups, totals, recentSessions, gapMinutes }: Props) {
+    const showDate = (gapMinutes ?? 60) >= 60;
+
+    const providers = useMemo(() => getActiveProviders(groups), [groups]);
+
+    const chartSessions = useMemo(() => {
+        const all = groups.flatMap(g => g.sessions);
+        all.sort((a, b) => a.startTime - b.startTime);
+        return all;
+    }, [groups]);
+
+    const chartData = useMemo(() => {
+        return buildChartData(chartSessions, providers, showDate);
+    }, [chartSessions, providers, showDate]);
 
     if (groups.length === 0) {
-        return <div className="text-center text-default-400 py-12">{locale.NoData}</div>;
+        return <div className="text-center text-default-400 py-12">No data</div>;
     }
 
     return (
-        <Accordion variant="splitted" selectionMode="multiple">
-            {groups.map((group) => (
-                <AccordionItem
-                    key={group.accountId}
-                    title={
-                        <div className="flex flex-row items-center gap-3">
-                            <span className="font-bold truncate">
-                                <span className="sm:hidden">{stripEmail(group.accountName || "").replace(/ .*/, "")}</span>
-                                <span className="hidden sm:inline">{stripEmail(group.accountName || "")}</span>
-                            </span>
-                            <Chip size="sm" variant="flat" className="shrink-0 text-xs">
-                                {fmtM(group.totalTokens)}
-                            </Chip>
-                        </div>
-                    }
-                >
-                    <Accordion variant="splitted" selectionMode="multiple" className="mb-4">
-                        {group.sessions.reverse().map((session, idx) => (
-                            <AccordionItem
-                                key={`${session.startTime}-${idx}`}
-                                title={
-                                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 min-w-0">
-                                        <span className="whitespace-nowrap font-mono md:text-base text-sm">
-                                            {format24Time(session.startTime)} — {format24Time(session.endTime)}
-                                        </span>
-                                        <span className="font-semibold text-xl truncate">
-                                            {session.modelAlias}
-                                        </span>
-                                        <span className="text-default-500 text-xs sm:ml-auto whitespace-nowrap">
-                                            {fmtM(session.inputTokens)}↑ {fmtK(session.outputTokens)}↓
-                                        </span>
-                                    </div>
-                                }
-                                textValue={`${format24Time(session.startTime)} ${session.modelAlias}`}
-                            >
-                                <ProviderBar session={session} />
-                                <div className="flex flex-wrap gap-1.5 mt-2 mb-3">
-                                    {session.providerUsage.map((pu) => (
-                                        <ProviderChip key={pu.providerName} pu={pu} />
-                                    ))}
-                                </div>
-                            </AccordionItem>
+        <div className="flex flex-col gap-4">
+            {/* Total stats summary */}
+            <div className="flex flex-wrap gap-4 text-sm">
+                <div className="flex items-center gap-1">
+                    <span className="text-default-500">Requests:</span>
+                    <span className="font-semibold font-mono">{totals.totalRequests}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                    <span className="text-default-500">Total Tokens:</span>
+                    <span className="font-semibold font-mono">{fmtM(totals.totalTokens)}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                    <span className="text-default-500">Total Cost:</span>
+                    <span className="font-semibold font-mono">${totals.totalCost.toFixed(4)}</span>
+                </div>
+            </div>
+            {/* Stacked bar chart */}
+            {chartData.length === 0 ? (
+                <div className="text-center text-default-400 py-12">No data</div>
+            ) : (
+                <ResponsiveContainer width="100%" height={400}>
+                    <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--heroui-default-200))" />
+                        <XAxis
+                            dataKey="timeLabel"
+                            tick={{ fontSize: 11, fontStyle: "normal" }}
+                            interval="preserveStartEnd"
+                            angle={-20}
+                            textAnchor="end"
+                            height={50}
+                        />
+                        <YAxis tickFormatter={(v: number) => fmtM(v)} tick={{ fontSize: 11 }} />
+                        <Tooltip
+                            contentStyle={{
+                                background: "hsl(var(--heroui-content1))",
+                                border: "1px solid hsl(var(--heroui-default-200))",
+                                borderRadius: 8,
+                                fontSize: 12,
+                            }}
+                            formatter={(value: any, name: any) => [fmtM(Number(value) || 0), String(name)]}
+                            labelFormatter={(label: any, payload: readonly any[]) => {
+                                const cost = payload?.[0]?.payload?.cost != null ? `$${Number(payload[0].payload.cost).toFixed(4)}` : "";
+                                return `${String(label)}${cost ? ` | ${cost}` : ""}`;
+                            }}
+                        />
+                        <Legend
+                            formatter={(value: string) => (
+                                <span style={{ fontSize: 12, color: "hsl(var(--heroui-foreground))" }}>{value}</span>
+                            )}
+                        />
+                        {providers.map((provider) => (
+                            <Bar
+                                key={provider}
+                                dataKey={provider}
+                                stackId="a"
+                                fill={stringToColor(provider)}
+                                isAnimationActive={false}
+                            />
                         ))}
-                    </Accordion>
-                </AccordionItem>
-            ))}
-        </Accordion>
+                    </BarChart>
+                </ResponsiveContainer>
+            )}
+
+            {/* Recent sessions table */}
+            <div className="overflow-auto">
+                <Table aria-label="Recent sessions" className="min-w-max">
+                    <TableHeader>
+                        <TableColumn align="center">Time</TableColumn>
+                        <TableColumn align="center" className="hidden md:table-cell">Account</TableColumn>
+                        <TableColumn align="center">Model</TableColumn>
+                        <TableColumn align="center" className="hidden md:table-cell">Input</TableColumn>
+                        <TableColumn align="center" className="hidden md:table-cell">Output</TableColumn>
+                        <TableColumn align="center">Cost</TableColumn>
+                    </TableHeader>
+                    <TableBody emptyContent="No sessions">
+                        {recentSessions.map((session, idx) => (
+                            <TableRow key={`${session.startTime}-${idx}`}>
+                                <TableCell className="whitespace-nowrap font-mono text-sm text-center">
+                                    {format24Time(session.startTime)}
+                                </TableCell>
+                                <TableCell className="max-w-32 truncate text-center hidden md:table-cell">
+                                    {stripEmail(session.accountName || "")}
+                                </TableCell>
+                                <TableCell className="font-semibold text-center max-w-28 truncate">{session.modelAliases.join(", ")}</TableCell>
+                                <TableCell className="hidden md:table-cell text-center font-mono">{fmtM(session.inputTokens)}</TableCell>
+                                <TableCell className="hidden md:table-cell text-center font-mono">{fmtK(session.outputTokens)}</TableCell>
+                                <TableCell className="text-center font-mono">${session.cost?.toFixed(4) || "0"}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
+        </div>
     );
 }

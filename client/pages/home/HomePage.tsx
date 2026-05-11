@@ -1,5 +1,5 @@
 import { Locale } from "../../methods/locale";
-import { AuthStatus, getAuthStatus } from "../../methods/auth";
+import { getAuthStatus } from "../../methods/auth";
 import SiteHeader from "./components/SiteHeader";
 import HeroSection from "./components/HeroSection";
 import StatsSection from "./components/StatsSection";

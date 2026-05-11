@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "5762fa12-1955-47ba-b4c7-c579226f1bed",
+  "id": "23bd784a-2f6a-4996-885f-d6216a2f226a",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "account": {
@@ -50,31 +50,9 @@
           "autoincrement": false,
           "default": 0
         },
-        "plan": {
-          "name": "plan",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'free'"
-        },
-        "plan_expires_at": {
-          "name": "plan_expires_at",
+        "last_daily_time": {
+          "name": "last_daily_time",
           "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "sub_wallet_address": {
-          "name": "sub_wallet_address",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "tg_chat_id": {
-          "name": "tg_chat_id",
-          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -124,13 +102,21 @@
           "notNull": true,
           "autoincrement": false
         },
-        "tier": {
-          "name": "tier",
+        "input_price": {
+          "name": "input_price",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 1
+          "default": 0
+        },
+        "output_price": {
+          "name": "output_price",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         },
         "is_public": {
           "name": "is_public",
@@ -213,6 +199,22 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "input_price": {
+          "name": "input_price",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "output_price": {
+          "name": "output_price",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         },
         "create_time": {
           "name": "create_time",
@@ -533,76 +535,8 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "subscription_plan": {
-      "name": "subscription_plan",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "monthly_limit": {
-          "name": "monthly_limit",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "price": {
-          "name": "price",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "duration_days": {
-          "name": "duration_days",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 30
-        },
-        "create_time": {
-          "name": "create_time",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "update_time": {
-          "name": "update_time",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "delete_time": {
-          "name": "delete_time",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "subscription_record": {
-      "name": "subscription_record",
+    "transaction": {
+      "name": "transaction",
       "columns": {
         "id": {
           "name": "id",
@@ -613,13 +547,6 @@
         },
         "account_id": {
           "name": "account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "plan_name": {
-          "name": "plan_name",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -662,6 +589,14 @@
           "notNull": false,
           "autoincrement": false
         },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'topup'"
+        },
         "create_time": {
           "name": "create_time",
           "type": "integer",
@@ -685,10 +620,92 @@
         }
       },
       "indexes": {
-        "subscription_record_txid_unique": {
-          "name": "subscription_record_txid_unique",
+        "transaction_txid_unique": {
+          "name": "transaction_txid_unique",
           "columns": [
             "txid"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "gift_card": {
+      "name": "gift_card",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "token_amount": {
+          "name": "token_amount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'unused'"
+        },
+        "redeemed_by": {
+          "name": "redeemed_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "redeemed_at": {
+          "name": "redeemed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "create_time": {
+          "name": "create_time",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "update_time": {
+          "name": "update_time",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "delete_time": {
+          "name": "delete_time",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "gift_card_code_unique": {
+          "name": "gift_card_code_unique",
+          "columns": [
+            "code"
           ],
           "isUnique": true
         }

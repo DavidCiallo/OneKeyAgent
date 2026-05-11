@@ -13,12 +13,8 @@ export class AccountDTO {
     public email: string;
     public apiKey: string;
     public is_admin: number;
-    public plan: string;
-    public plan_expires_at: number | null;
-    public sub_wallet_address: string | null;
     public tg_chat_id: string | null;
-
-    private isTypeSafe: symbol = Symbol();
+    public balance: number;
 
     constructor(origin: AccountEntity) {
         this.id = origin.id;
@@ -26,10 +22,8 @@ export class AccountDTO {
         this.email = origin.email;
         this.apiKey = origin.apiKey || "";
         this.is_admin = origin.is_admin;
-        this.plan = origin.plan || "free";
-        this.plan_expires_at = origin.plan_expires_at || null;
-        this.sub_wallet_address = origin.sub_wallet_address || null;
         this.tg_chat_id = origin.tg_chat_id || null;
+        this.balance = 0;
     }
 }
 
@@ -43,8 +37,6 @@ export class AccountQueryBody {
     public id?: string;
     public name?: string;
     public email?: string;
-
-    private isTypeSafe: symbol = Symbol();
 
     constructor(origin: Partial<AccountEntity>) {
         if (false) throw new Error("Unexpected error");
@@ -64,8 +56,6 @@ export class AccountCreateBody {
     public password: string;
     public apiKey: string;
     public is_admin: number;
-
-    private isTypeSafe: symbol = Symbol();
 
     constructor(origin: Pick<AccountEntity, "name" | "email" | "password"> & Partial<Pick<AccountEntity, "apiKey" | "is_admin">>) {
         if (!origin.name || !origin.email || !origin.password) {
@@ -88,23 +78,15 @@ export class AccountUpdateBody {
     public email?: string;
     public password?: string;
     public is_admin?: number;
-    public plan?: string;
-    public plan_expires_at?: number | null;
-    public sub_wallet_address?: string | null;
-
-    private isTypeSafe: symbol = Symbol();
 
     constructor(origin: Partial<AccountEntity> = {}) {
-        if (!origin.name && !origin.email && !origin.password && origin.is_admin === undefined && origin.plan === undefined && origin.plan_expires_at === undefined && origin.sub_wallet_address === undefined) {
+        if (!origin.name && !origin.email && !origin.password && origin.is_admin === undefined) {
             throw new Error("At least one field is required");
         }
         origin.name && (this.name = origin.name);
         origin.email && (this.email = origin.email);
         origin.password && (this.password = origin.password);
         origin.is_admin !== undefined && (this.is_admin = origin.is_admin);
-        origin.plan !== undefined && (this.plan = origin.plan);
-        origin.plan_expires_at !== undefined && (this.plan_expires_at = origin.plan_expires_at);
-        origin.sub_wallet_address !== undefined && (this.sub_wallet_address = origin.sub_wallet_address);
     }
 
     static self(unsafe: AccountUpdateBody) {
@@ -270,7 +252,9 @@ export class AccountProfileResponse implements BaseResponse<AccountDTO> {
     public success: boolean;
     public message: string;
     public data: {
-        account: AccountDTO | null
+        account: AccountDTO | null;
+        weeklyUsage: number;
+        balance: number;
     };
 
     constructor(origin: AccountProfileResponse) {
@@ -300,6 +284,72 @@ export class AccountRegenerateResponse implements BaseResponse<AccountDTO> {
     };
 
     constructor(origin: AccountRegenerateResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+        this.data = origin.data;
+    }
+}
+
+// ========== Export / Import ==========
+
+export interface ExportData {
+    version: number;
+    exported_at: number;
+    data: {
+        accounts?: any[];
+        models?: any[];
+        providers?: any[];
+        roles?: any[];
+        account_roles?: any[];
+        transactions?: any[];
+        tasks?: any[];
+        usage_logs?: any[];
+        gift_cards?: any[];
+    };
+}
+
+export class AccountExportRequest implements BaseRequest {
+    public auth?: string;
+    constructor(origin: Partial<AccountExportRequest>) {
+        origin.auth && (this.auth = origin.auth);
+    }
+    static self(unsafe: AccountExportRequest) {
+        return new AccountExportRequest(unsafe);
+    }
+}
+
+export class AccountExportResponse implements BaseResponse<any> {
+    public success: boolean;
+    public message: string;
+    public data?: ExportData;
+
+    constructor(origin: AccountExportResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+        this.data = origin.data;
+    }
+}
+
+export class AccountImportRequest implements BaseRequest {
+    public auth?: string;
+    public data: ExportData;
+
+    constructor(origin: Partial<AccountImportRequest>) {
+        if (!origin.data) throw new Error("data is required");
+        origin.auth && (this.auth = origin.auth);
+        this.data = origin.data;
+    }
+    static self(unsafe: AccountImportRequest) {
+        return new AccountImportRequest(unsafe);
+    }
+}
+
+export class AccountImportResponse implements BaseResponse<{ imported: Record<string, number> }> {
+    public success: boolean;
+    public message: string;
+    public data?: { imported: Record<string, number> };
+
+    constructor(origin: AccountImportResponse) {
         this.success = origin.success;
         this.message = origin.message;
         this.data = origin.data;

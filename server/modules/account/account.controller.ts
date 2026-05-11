@@ -15,12 +15,17 @@ import {
     AccountProfileResponse,
     AccountRegenerateRequest,
     AccountRegenerateResponse,
+    AccountExportRequest,
+    AccountExportResponse,
+    AccountImportRequest,
+    AccountImportResponse,
 } from "../../../shared/modules/account/account.interface";
 import { AccountRouterInstance } from "../../../shared/modules/account/account.router"
 import { inject } from "../../lib/inject";
-import { getIdentifyByVerify, getAccountByEmail, registerUser } from "../auth/auth.service";
+import { getIdentifyByVerify, getAccountByEmail } from "../auth/auth.service";
 import { AccountService } from "./account.service";
 import { generateApiKey } from "../ai/ai.auth";
+import Repository from "../../lib/repository";
 
 async function requireAdmin(auth?: string): Promise<void> {
     if (!auth) throw "Authorization failed";
@@ -40,7 +45,11 @@ async function list(request: AccountListRequest): Promise<AccountListResponse> {
     if (request.filter?.email) search.email = request.filter.email;
 
     const { list: data, total } = await AccountService.find(page, search);
-    const list = data.map(item => new AccountDTO(item));
+    const list = await Promise.all(data.map(async item => {
+        const dto = new AccountDTO(item);
+        dto.balance = await AccountService.getBalance(item.id);
+        return dto;
+    }));
 
     return new AccountListResponse({
         success: true,
@@ -74,10 +83,16 @@ async function create(request: AccountCreateRequest): Promise<AccountCreateRespo
     }
     await requireAdmin(request.auth);
 
-    const existing = await AccountService.findByEmail(request.account.email);
-    if (existing) throw "email already exists";
-
-    const { account } = await registerUser(request.account.name, request.account.email, request.account.password, request.account.is_admin);
+    const apiKey = generateApiKey();
+    const { hashGenerate } = await import("../auth/auth.utils");
+    const { AccountService } = await import("./account.service");
+    const account = await AccountService.create({
+        name: request.account.name,
+        email: request.account.email,
+        password: hashGenerate(request.account.password),
+        apiKey,
+        is_admin: request.account.is_admin || 0,
+    });
     if (!account) throw "create failed";
     const data = new AccountDTO(account);
     return new AccountCreateResponse({
@@ -127,10 +142,20 @@ async function profile(request: AccountProfileRequest): Promise<AccountProfileRe
     if (!email) throw new Error("Unauthorized");
     const account = await getAccountByEmail(email);
     if (!account) throw new Error("Account not found");
+
+    // Calculate weekly usage cost
+    const since = Date.now() - 7 * 86400000;
+    const usageRepo = Repository.instance<any>("UsageLog");
+    const logs = await usageRepo.find({ accountId: account.id }, { since });
+
     return new AccountProfileResponse({
         success: true,
         message: "success",
-        data: { account: new AccountDTO(account) },
+        data: {
+            account: new AccountDTO(account),
+            weeklyUsage: AccountService.computeUsageCost(logs),
+            balance: await AccountService.getBalance(account.id),
+        },
     });
 }
 
@@ -149,4 +174,145 @@ async function regenerate(request: AccountRegenerateRequest): Promise<AccountReg
     });
 }
 
-export const accountController = new AccountRouterInstance(inject, { list, detail, create, update, delete: del, profile, regenerate });
+// ========== Export / Import ==========
+
+async function exportData(request: AccountExportRequest): Promise<AccountExportResponse> {
+    await requireAdmin(request.auth);
+
+    const accountRepo = Repository.instance<any>("Account");
+    const modelRepo = Repository.instance<any>("Model");
+    const providerRepo = Repository.instance<any>("Provider");
+    const roleRepo = Repository.instance<any>("Role");
+    const accountRoleRepo = Repository.instance<any>("AccountRole");
+    const recordRepo = Repository.instance<any>("Transaction");
+    const taskRepo = Repository.instance<any>("Task");
+    const usageRepo = Repository.instance<any>("UsageLog");
+    const giftCardRepo = Repository.instance<any>("GiftCard");
+
+    const [accounts, models, providers, roles, accountRoles, records, tasks, usageLogs, giftCards] = await Promise.all([
+        accountRepo.findAllIgnoreDelete(),
+        modelRepo.findAllIgnoreDelete(),
+        providerRepo.findAllIgnoreDelete(),
+        roleRepo.findAllIgnoreDelete(),
+        accountRoleRepo.findAllIgnoreDelete(),
+        recordRepo.findAllIgnoreDelete(),
+        taskRepo.findAllIgnoreDelete(),
+        usageRepo.findAllIgnoreDelete(),
+        giftCardRepo.findAllIgnoreDelete(),
+    ]);
+
+    return new AccountExportResponse({
+        success: true,
+        message: "success",
+        data: {
+            version: 1,
+            exported_at: Date.now(),
+            data: {
+                accounts: (accounts as any[] || []),
+                models: models as any[] || [],
+                providers: providers as any[] || [],
+                roles: roles as any[] || [],
+                account_roles: accountRoles as any[] || [],
+                transactions: records as any[] || [],
+                tasks: tasks as any[] || [],
+                usage_logs: usageLogs as any[] || [],
+                gift_cards: giftCards as any[] || [],
+            },
+        },
+    });
+}
+
+async function exportUsage(request: AccountExportRequest): Promise<AccountExportResponse> {
+    await requireAdmin(request.auth);
+
+    const usageRepo = Repository.instance<any>("UsageLog");
+    const logs = await usageRepo.findAllIgnoreDelete();
+
+    return new AccountExportResponse({
+        success: true,
+        message: "success",
+        data: {
+            version: 1,
+            exported_at: Date.now(),
+            data: {
+                usage_logs: (logs as any[] || []),
+            },
+        },
+    });
+}
+
+async function exportTasks(request: AccountExportRequest): Promise<AccountExportResponse> {
+    await requireAdmin(request.auth);
+
+    const taskRepo = Repository.instance<any>("Task");
+    const tasks = await taskRepo.findAllIgnoreDelete();
+
+    return new AccountExportResponse({
+        success: true,
+        message: "success",
+        data: {
+            version: 1,
+            exported_at: Date.now(),
+            data: {
+                tasks: (tasks as any[] || []),
+            },
+        },
+    });
+}
+
+async function importData(request: AccountImportRequest): Promise<AccountImportResponse> {
+    await requireAdmin(request.auth);
+
+    const { data } = request.data;
+    const imported: Record<string, number> = {};
+
+    const accountRepo = Repository.instance<any>("Account");
+    const modelRepo = Repository.instance<any>("Model");
+    const providerRepo = Repository.instance<any>("Provider");
+    const roleRepo = Repository.instance<any>("Role");
+    const accountRoleRepo = Repository.instance<any>("AccountRole");
+    const recordRepo = Repository.instance<any>("Transaction");
+    const taskRepo = Repository.instance<any>("Task");
+    const usageRepo = Repository.instance<any>("UsageLog");
+    const giftCardRepo = Repository.instance<any>("GiftCard");
+
+    type TableDef = { repo: Repository<any>; items: any[] | undefined; name: string };
+    const tables: TableDef[] = [
+        { repo: roleRepo, items: data.roles, name: "roles" },
+        { repo: accountRepo, items: data.accounts, name: "accounts" },
+        { repo: accountRoleRepo, items: data.account_roles, name: "account_roles" },
+        { repo: modelRepo, items: data.models, name: "models" },
+        { repo: providerRepo, items: data.providers, name: "providers" },
+        { repo: taskRepo, items: data.tasks, name: "tasks" },
+        { repo: usageRepo, items: data.usage_logs, name: "usage_logs" },
+        { repo: recordRepo, items: data.transactions, name: "transactions" },
+        { repo: giftCardRepo, items: data.gift_cards, name: "gift_cards" },
+    ];
+
+    async function importTable(repo: Repository<any>, items: any[] | undefined, name: string) {
+        if (!items || items.length === 0) return;
+        let count = 0;
+        for (const item of items) {
+            await repo.insert(item);
+            count++;
+        }
+        imported[name] = count;
+    }
+
+    // Only hard-delete and import tables with non-empty arrays
+    for (const { repo, items, name } of tables) {
+        if (!items || items.length === 0) {
+            continue;
+        }
+        await repo.hardDelete({});
+        await importTable(repo, items, name);
+    }
+
+    return new AccountImportResponse({
+        success: true,
+        message: "import completed",
+        data: { imported },
+    });
+}
+
+export const accountController = new AccountRouterInstance(inject, { list, detail, create, update, delete: del, profile, regenerate, export: exportData, export_usage: exportUsage, export_tasks: exportTasks, import: importData });

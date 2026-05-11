@@ -1,4 +1,4 @@
-import { Button } from "@heroui/react";
+import { Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/react";
 import { MenuComp } from "./Menu";
 
 type params = {
@@ -6,31 +6,41 @@ type params = {
 };
 
 export const Header = ({ name }: params) => {
-    function changeLan() {
-        const lanList = ["cn", "en"];
-        const locale = localStorage.getItem("locale") || "en";
-        const index = lanList.indexOf(locale);
-        const nextIndex = (index + 1) % lanList.length;
-        localStorage.setItem("locale", lanList[nextIndex]);
-        window.location.reload();
-    }
     function Language() {
         const locale = localStorage.getItem("locale") || "en";
-        let lan = "";
-        switch (locale) {
-            case "cn":
-                lan = "EN";
-                break;
-            case "en":
-                lan = "中";
-                break;
-            default:
-                lan = "中";
-        }
+        const lanMap: Record<string, string> = {
+            cn: "ZH",
+            en: "EN",
+            ru: "RU",
+            ja: "JA",
+            es: "ES",
+            "pt-BR": "PT",
+            vi: "VI",
+            th: "TH",
+        };
+
+        const handleSelect = (key: string) => {
+            localStorage.setItem("locale", key);
+            window.location.reload();
+        };
+
         return (
-            <Button size="sm" variant="bordered" className="text-xs text-gray-500 w-16" onClick={changeLan}>
-                {lan}
-            </Button>
+            <Dropdown>
+                <DropdownTrigger>
+                    <Button size="sm" variant="bordered" className="text-xs text-gray-500 w-16">
+                        {lanMap[locale] || "EN"}
+                    </Button>
+                </DropdownTrigger>
+                <DropdownMenu
+                    selectedKeys={new Set([locale])}
+                    selectionMode="single"
+                    onAction={(key) => handleSelect(key as string)}
+                >
+                    {Object.entries(lanMap).map(([key, label]) => (
+                        <DropdownItem key={key}>{label}</DropdownItem>
+                    ))}
+                </DropdownMenu>
+            </Dropdown>
         );
     }
     return (

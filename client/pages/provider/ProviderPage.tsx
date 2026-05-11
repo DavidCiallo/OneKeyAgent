@@ -34,7 +34,6 @@ type ProviderForm = {
 };
 
 export default function ProviderPage() {
-    const locale = Locale("ProviderPage");
 
     const [list, setList] = useState<ProviderDTO[]>([]);
     const [total, setTotal] = useState(0);

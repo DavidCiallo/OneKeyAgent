@@ -15,8 +15,6 @@ type AccountForm = {
     email: string;
     password: string;
     is_admin: number;
-    plan: string;
-    plan_expires_at: string; // ISO string or empty
     permissions: string[]; // "menu:model" format
 };
 
@@ -33,7 +31,7 @@ export default function AccountPage() {
     const { isOpen: isFormOpen, onOpen: onFormOpen, onClose: onFormClose, onOpenChange: onFormOpenChange } = useDisclosure();
     const [formMode, setFormMode] = useState<"create" | "edit">("create");
     const [editId, setEditId] = useState<string>("");
-    const [form, setForm] = useState<AccountForm>({ name: "", email: "", password: "", is_admin: 0, plan: "free", plan_expires_at: "", permissions: [] });
+    const [form, setForm] = useState<AccountForm>({ name: "", email: "", password: "", is_admin: 0, permissions: [] });
 
     const getToken = () => localStorage.getItem("access_token") || "";
 
@@ -56,7 +54,7 @@ export default function AccountPage() {
 
     const openCreate = () => {
         setFormMode("create");
-        setForm({ name: "", email: "", password: "", is_admin: 0, plan: "free", plan_expires_at: "", permissions: [] });
+        setForm({ name: "", email: "", password: "", is_admin: 0, permissions: [] });
         onFormOpen();
     };
 
@@ -76,7 +74,7 @@ export default function AccountPage() {
             } catch { /* ignore */ }
         }
 
-        setForm({ name: item.name, email: item.email, password: "", is_admin: item.is_admin, plan: item.plan || "free", plan_expires_at: item.plan_expires_at ? new Date(item.plan_expires_at).toISOString().slice(0, 10) : "", permissions });
+        setForm({ name: item.name, email: item.email, password: "", is_admin: item.is_admin, permissions });
         onFormOpen();
     };
 
@@ -119,12 +117,6 @@ export default function AccountPage() {
             if (form.email) updateData.email = form.email;
             if (form.password) updateData.password = form.password;
             updateData.is_admin = form.is_admin;
-            updateData.plan = form.plan;
-            if (form.plan_expires_at) {
-                updateData.plan_expires_at = new Date(form.plan_expires_at).getTime();
-            } else {
-                updateData.plan_expires_at = null;
-            }
 
             const req = new AccountUpdateRequest({
                 id: editId,
