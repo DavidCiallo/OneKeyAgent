@@ -30,18 +30,16 @@ interface NowPaymentsInvoiceResponse {
  * Extracted as a standalone function so it can be used/tested independently.
  */
 export function buildPaymentBody(params: {
-    planName: string;
-    priceCents: number;
+    priceDollars: number;
     accountId: string;
     payCurrency: PaymentCurrency;
 }): Record<string, unknown> {
-    const priceInUsd = params.priceCents / 100;
     return {
-        price_amount: priceInUsd,
+        price_amount: params.priceDollars,
         price_currency: params.payCurrency,
         pay_currency: params.payCurrency,
         order_id: params.accountId,
-        order_description: `ehex ${params.planName} plan subscription`,
+        order_description: "ehex token topup",
         ipn_callback_url: `${process.env.IPN_CALLBACK_URL || ""}/api/subscription/ipnwebhook`,
         is_fixed_rate: false,
     };
@@ -52,13 +50,12 @@ export function buildPaymentBody(params: {
  * Returns the invoice URL (user pays here) and payment ID (for status tracking).
  */
 export async function createInvoice(
-    planName: string,
-    priceCents: number,
+    priceDollars: number,
     accountId: string,
     payCurrency: PaymentCurrency = "USDTERC20",
 ): Promise<{ invoice_url: string; payment_id: string; invoice_id: string }> {
     const apiKey = getApiKey();
-    const body = buildPaymentBody({ planName, priceCents, accountId, payCurrency });
+    const body = buildPaymentBody({ priceDollars, accountId, payCurrency });
 
     const resp = await fetch(`${NOWPAYMENTS_API_URL}/invoice`, {
         method: "POST",
@@ -119,7 +116,7 @@ export async function checkPaymentStatus(paymentId: string): Promise<{
             status = "pending";
     }
 
-    const actuallyPaid = json.actually_paid ? Math.round(parseFloat(json.actually_paid) * 100) : null;
+    const actuallyPaid = json.actually_paid ? parseFloat(parseFloat(json.actually_paid).toFixed(2)) : null;
 
     return { status, actuallyPaid };
 }
