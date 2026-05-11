@@ -7,7 +7,7 @@ import fs from "fs";
 
 const _filename = fileURLToPath(import.meta.url);
 const SERVER_DIR = path.resolve(path.dirname(_filename), ".."); // server/
-const DB_DIR = path.join(SERVER_DIR, "data");
+const DB_DIR = path.join(path.resolve(SERVER_DIR, ".."), "data");
 const DB_FILE = "onekey.db";
 
 if (!fs.existsSync(DB_DIR)) {
