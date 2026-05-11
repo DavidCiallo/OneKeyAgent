@@ -129,16 +129,24 @@ export interface ProviderUsage {
     outputTokens: number;
 }
 
+export interface ModelUsage {
+    modelAlias: string;
+    inputTokens: number;
+    outputTokens: number;
+}
+
 export interface UserSession {
     startTime: number;
     endTime: number;
-    modelAlias: string;
+    modelAliases: string[];
     requestCount: number;
     inputTokens: number;
     outputTokens: number;
     cost: number;
     providerUsage: ProviderUsage[];
+    modelUsage: ModelUsage[];
     windowLabel: string;
+    accountName?: string;
 }
 
 export interface UserSessionGroup {
@@ -153,28 +161,38 @@ export class UsageSessionsRequest implements BaseRequest {
     public auth?: string;
     public gapMinutes?: number;
     public since?: number;
-    public accountId?: string;
+    public accountIds?: string[];
 
     constructor(origin: Partial<UsageSessionsRequest>) {
         if (false) throw new Error("Unexpected error");
         origin.auth && (this.auth = origin.auth);
         origin.gapMinutes && (this.gapMinutes = origin.gapMinutes);
         origin.since && (this.since = origin.since);
-        origin.accountId && (this.accountId = origin.accountId);
+        origin.accountIds && (this.accountIds = origin.accountIds);
     }
     static self(unsafe: UsageSessionsRequest) {
         return new UsageSessionsRequest(unsafe);
     }
 }
 
+export interface UsageSessionTotals {
+    totalTokens: number;
+    totalCost: number;
+    totalRequests: number;
+}
+
 export class UsageSessionsResponse implements BaseResponse<UserSessionGroup> {
     public success: boolean;
     public message: string;
     public data: UserSessionGroup[];
+    public totals: UsageSessionTotals;
+    public recentSessions?: UserSession[];
 
     constructor(origin: UsageSessionsResponse) {
         this.success = origin.success;
         this.message = origin.message;
         this.data = origin.data;
+        this.totals = origin.totals;
+        this.recentSessions = origin.recentSessions;
     }
 }
