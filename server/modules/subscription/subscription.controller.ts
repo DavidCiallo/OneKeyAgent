@@ -2,6 +2,7 @@ import {
     TransactionListRequest, TransactionListResponse,
     SubscriptionTopupRequest, SubscriptionTopupResponse,
     TransactionDTO,
+    StatementRequest, StatementResponse, StatementItem,
     PaymentCurrency,
 } from "../../../shared/modules/subscription_record/subscription_record.interface";
 import { TransactionRouterInstance } from "../../../shared/modules/subscription_record/subscription_record.router";
@@ -10,6 +11,7 @@ import { getIdentifyByVerify, getAccountByEmail } from "../auth/auth.service";
 import { SubscriptionService } from "./subscription.service";
 import { createInvoice } from "./nowpayments.service";
 import { AccountService } from "../account/account.service";
+import Repository from "../../lib/repository";
 
 async function resolveAccount(auth: string) {
     const email = getIdentifyByVerify(auth);
@@ -113,6 +115,106 @@ async function createtopup(request: SubscriptionTopupRequest): Promise<Subscript
     });
 }
 
+// ─── Statement (unified balance history) ───
+
+async function statement(request: StatementRequest): Promise<StatementResponse> {
+    request = StatementRequest.self(request);
+    const account = await resolveAccount(request.auth || "");
+
+    // 1. Confirmed topup transactions
+    const txRepo = Repository.instance<any>("Transaction");
+    const txs = await txRepo.find({ account_id: account.id, status: "confirmed", delete_time: null });
+
+    // 2. Redeemed gift cards (bonus & redeemed codes)
+    const cardRepo = Repository.instance<any>("GiftCard");
+    const cards = await cardRepo.find({ redeemed_by: account.id, status: "redeemed" });
+
+    // 3. Usage logs (AI call costs) — grouped by day + model
+    const usageRepo = Repository.instance<any>("UsageLog");
+    const usageLogs = await usageRepo.find({ accountId: account.id, delete_time: null });
+
+    // Group by "day|modelAlias"
+    const dailyModelUsage = new Map<string, { logs: any[]; maxTimestamp: number }>();
+    for (const log of usageLogs) {
+        const day = new Date(log.create_time).toISOString().slice(0, 10); // "2026-05-12"
+        const model = log.modelAlias || "Unknown";
+        const key = `${day}|${model}`;
+        if (!dailyModelUsage.has(key)) {
+            dailyModelUsage.set(key, { logs: [], maxTimestamp: 0 });
+        }
+        const entry = dailyModelUsage.get(key)!;
+        entry.logs.push(log);
+        if (log.create_time > entry.maxTimestamp) entry.maxTimestamp = log.create_time;
+    }
+
+    const items: StatementItem[] = [];
+
+    for (const tx of txs) {
+        items.push(new StatementItem({
+            id: tx.id,
+            type: "topup",
+            amount: tx.amount,
+            description: "Topup",
+            remark: `#${tx.txid || tx.id?.slice(0, 8)}`,
+            create_time: tx.create_time,
+        }));
+    }
+
+    for (const card of cards) {
+        if (card.code.startsWith("daily_")) {
+            const ts = (card.redeemed_at || card.create_time).toString().slice(-10);
+            items.push(new StatementItem({
+                id: card.id,
+                type: "bonus",
+                amount: card.token_amount,
+                description: "Daily Bonus",
+                remark: `#${ts}`,
+                create_time: card.redeemed_at || card.create_time,
+            }));
+        } else if (card.code.startsWith("register_")) {
+            const ts = (card.redeemed_at || card.create_time).toString().slice(-10);
+            items.push(new StatementItem({
+                id: card.id,
+                type: "bonus",
+                amount: card.token_amount,
+                description: "Registration Bonus",
+                remark: `#${ts}`,
+                create_time: card.redeemed_at || card.create_time,
+            }));
+        } else {
+            items.push(new StatementItem({
+                id: card.id,
+                type: "gift_card",
+                amount: card.token_amount,
+                description: "Gift Card Redeemed",
+                create_time: card.redeemed_at || card.create_time,
+            }));
+        }
+    }
+
+    // One entry per day per model
+    for (const [key, entry] of dailyModelUsage) {
+        const model = key.split("|")[1];
+        items.push(new StatementItem({
+            id: `usage_${key}`,
+            type: "usage",
+            amount: AccountService.computeUsageCost(entry.logs),
+            description: "AI Usage",
+            remark: model,
+            create_time: entry.maxTimestamp,
+        }));
+    }
+
+    // Sort by time descending (most recent first)
+    items.sort((a, b) => b.create_time - a.create_time);
+
+    return new StatementResponse({
+        success: true,
+        message: "success",
+        data: { list: items },
+    });
+}
+
 /**
  * Handle NowPayments IPN (Instant Payment Notification) webhook.
  * NowPayments POSTs here when payment status changes.
@@ -139,8 +241,6 @@ async function ipnwebhook(request: Record<string, unknown>): Promise<{ success: 
         }
 
         if (paymentStatus === "finished" || paymentStatus === "confirmed") {
-            // Balance is computed from transaction records — no manual update needed
-
             await SubscriptionService.updateRecordByTxid(record.txid, {
                 payment_id: paymentId,
                 status: "confirmed",
@@ -165,4 +265,6 @@ export const subscriptionRecordController = new TransactionRouterInstance(inject
     records,
     createtopup,
     ipnwebhook,
+    statement,
 });
+

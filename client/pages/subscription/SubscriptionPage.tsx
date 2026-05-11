@@ -2,19 +2,18 @@ import { Header } from "../../components/header/Header";
 import { useEffect, useState, useCallback } from "react";
 import { AccountRouter, TransactionRouter } from "../../api/instance";
 import { AccountProfileRequest } from "../../../shared/modules/account/account.interface";
-import { TransactionListRequest } from "../../../shared/modules/subscription_record/subscription_record.interface";
+import { StatementRequest } from "../../../shared/modules/subscription_record/subscription_record.interface";
 import { Locale } from "../../methods/locale";
 import CurrentPlanCard from "./components/CurrentPlanCard";
 import PlanSelector from "./components/PlanSelector";
-import TransactionHistory from "./components/TransactionHistory";
+import Statement from "./components/Statement";
 import TopupPack from "./components/TopupPack";
 
-interface TxRecord {
+interface StatementRecord {
     id: string;
-    txid: string;
+    type: "topup" | "bonus" | "gift_card" | "usage";
     amount: number;
-    status: string;
-    type: string;
+    description: string;
     create_time: number;
 }
 
@@ -27,7 +26,7 @@ export default function SubscriptionPage() {
         balance?: number;
     } | null>(null);
 
-    const [records, setRecords] = useState<TxRecord[]>([]);
+    const [records, setRecords] = useState<StatementRecord[]>([]);
     const [refreshing, setRefreshing] = useState(false);
 
     const fetchProfile = useCallback(async () => {
@@ -38,9 +37,9 @@ export default function SubscriptionPage() {
     }, []);
 
     const fetchRecords = useCallback(async () => {
-        const res = await TransactionRouter.records(new TransactionListRequest({ auth: getToken() }));
+        const res = await TransactionRouter.statement(new StatementRequest({ auth: getToken() }));
         if (res.success && res.data) {
-            setRecords(res.data.list?.filter(r => r.status !== "expired" || Date.now() - r.create_time < 6 * 60 * 60 * 1000));
+            setRecords(res.data.list || []);
         }
     }, []);
 
@@ -69,7 +68,7 @@ export default function SubscriptionPage() {
                         <TopupPack onSuccess={handleRefresh} />
                     </PlanSelector>
 
-                    <TransactionHistory records={records} onRefresh={handleRefresh} refreshing={refreshing} />
+                    <Statement records={records} onRefresh={handleRefresh} refreshing={refreshing} />
                 </div>
             </div>
         </div>

@@ -66,6 +66,52 @@ export class TransactionListResponse implements BaseResponse<TransactionDTO> {
     }
 }
 
+// ─── Statement (unified balance history) ───
+
+export type StatementType = "topup" | "bonus" | "gift_card" | "usage";
+
+export class StatementItem {
+    public type: StatementType;
+    public amount: number;      // positive for income, negative for expense
+    public description: string; // "Topup", "Daily Bonus", "Gift Card Redeemed", "AI Usage"
+    public remark?: string;     // e.g. model name for usage
+    public create_time: number;
+    public id: string;
+
+    constructor(origin: StatementItem) {
+        this.type = origin.type;
+        this.amount = origin.amount;
+        this.description = origin.description;
+        origin.remark && (this.remark = origin.remark);
+        this.create_time = origin.create_time;
+        this.id = origin.id;
+    }
+}
+
+export class StatementRequest implements BaseRequest {
+    public auth?: string;
+
+    constructor(origin: Partial<StatementRequest>) {
+        if (false) throw new Error("Unexpected error");
+        origin.auth && (this.auth = origin.auth);
+    }
+    static self(unsafe: StatementRequest) {
+        return new StatementRequest(unsafe);
+    }
+}
+
+export class StatementResponse implements BaseResponse<{ list: StatementItem[] }> {
+    public success: boolean;
+    public message: string;
+    public data: { list: StatementItem[] };
+
+    constructor(origin: StatementResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+        this.data = origin.data;
+    }
+}
+
 export class SubscriptionIpnWebhookBody {
     public payment_id?: string;
     public payment_status?: string;

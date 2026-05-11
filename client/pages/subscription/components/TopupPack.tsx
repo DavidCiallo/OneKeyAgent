@@ -56,7 +56,7 @@ export default function TopupPack({ onSuccess }: TopupPackProps) {
                 <p className="text-sm font-medium">{locale.Recharge}</p>
                 <div className="flex justify-between items-start gap-4">
                     {/* Left: preset buttons + custom input */}
-                    <div className="space-y-2 w-72">
+                    <div className="space-y-2 w-76">
                         <div className="flex flex-wrap justify-between gap-1">
                             {PRESET_AMOUNTS.map((amount) => (
                                 <Button
