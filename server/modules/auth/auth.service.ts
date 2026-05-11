@@ -16,6 +16,22 @@ export async function loginUser(email: string, password: string): Promise<{ toke
         const roles = emailItem.is_admin
             ? ALL_MENUS.map(name => ({ name, type: "menu" }))
             : (await AccountRoleService.findByAccount(emailItem.id)).map(r => ({ name: r.name, type: r.type }));
+        // Daily login bonus: insert a redeemed gift card worth 0.2 tokens
+        const now = Date.now();
+        const lastDaily = emailItem.last_daily_time;
+        const isNewDay = !lastDaily || new Date(lastDaily).toDateString() !== new Date(now).toDateString();
+        if (isNewDay) {
+            await accountRepository.update({ id: emailItem.id }, { last_daily_time: now } as any);
+            const cardRepo = Repository.instance<any>("GiftCard");
+            await cardRepo.insert({
+                code: `daily_${emailItem.id}_${now}`,
+                token_amount: 0.2,
+                status: "redeemed",
+                redeemed_by: emailItem.id,
+                redeemed_at: now,
+                create_time: now,
+            } as any);
+        }
         return { token: genTokenForIdentify(email), is_admin: emailItem.is_admin, roles };
     } else {
         return {};
@@ -82,6 +98,17 @@ export async function completeRegistration(token: string): Promise<{ account?: A
         { name: "profile", type: "menu" },
         { name: "subscription", type: "menu" },
     ]);
+    // Registration bonus: insert a redeemed gift card worth 2 tokens
+    const now = Date.now();
+    const cardRepo = Repository.instance<any>("GiftCard");
+    await cardRepo.insert({
+        code: `register_${account.id}_${now}`,
+        token_amount: 2,
+        status: "redeemed",
+        redeemed_by: account.id,
+        redeemed_at: now,
+        create_time: now,
+    } as any);
     return { account, apiKey };
 }
 
@@ -99,6 +126,17 @@ export async function registerUser(name: string, email: string, password: string
             { name: "profile", type: "menu" },
             { name: "subscription", type: "menu" },
         ]);
+        // Registration bonus: insert a redeemed gift card worth 2 tokens
+        const now = Date.now();
+        const cardRepo = Repository.instance<any>("GiftCard");
+        await cardRepo.insert({
+            code: `register_${account.id}_${now}`,
+            token_amount: 2,
+            status: "redeemed",
+            redeemed_by: account.id,
+            redeemed_at: now,
+            create_time: now,
+        } as any);
     }
     return { account, apiKey };
 }
