@@ -85,7 +85,7 @@ export const TextEditorPromptProvider = ({ children }: { children: ReactNode }) 
                                                 ref={formRef}
                                                 onSubmit={async (e) => {
                                                     const submitData = Object.fromEntries(
-                                                        new FormData(e.currentTarget)
+                                                        new FormData(e.currentTarget) as unknown as Iterable<[string, string]>
                                                     );
                                                     handleSave(JSON.stringify(submitData));
                                                 }}
