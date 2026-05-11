@@ -1,4 +1,5 @@
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Switch } from "@heroui/react";
+import { useEffect, useState } from "react";
 import { Locale } from "../../../methods/locale";
 
 type ModelForm = {
@@ -21,6 +22,23 @@ export function ModelFormModal({ isOpen, onOpenChange, mode, form, onFormChange,
     const locale = Locale("ModelPage");
     const common = Locale("Common");
 
+    const [inputPriceStr, setInputPriceStr] = useState(String(form.input_price));
+    const [outputPriceStr, setOutputPriceStr] = useState(String(form.output_price));
+
+    // Sync from parent form when opening
+    useEffect(() => {
+        setInputPriceStr(String(form.input_price));
+        setOutputPriceStr(String(form.output_price));
+    }, [isOpen]);
+
+    const commitPrices = () => {
+        const ip = parseFloat(inputPriceStr);
+        const op = parseFloat(outputPriceStr);
+        if (!isNaN(ip) && !isNaN(op)) {
+            onFormChange({ ...form, input_price: ip, output_price: op });
+        }
+    };
+
     return (
         <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
             <ModalContent>
@@ -35,13 +53,19 @@ export function ModelFormModal({ isOpen, onOpenChange, mode, form, onFormChange,
                         />
                         <Input
                             label={locale.InputPrice || "Input Price"}
-                            value={String(form.input_price)}
-                            onChange={e => onFormChange({ ...form, input_price: Number(e.target.value) || 0 })}
+                            value={inputPriceStr}
+                            onValueChange={setInputPriceStr}
+                            onBlur={commitPrices}
+                            startContent={<span className="text-default-400 text-sm font-mono">$</span>}
+                            className="font-mono"
                         />
                         <Input
                             label={locale.OutputPrice || "Output Price"}
-                            value={String(form.output_price)}
-                            onChange={e => onFormChange({ ...form, output_price: Number(e.target.value) || 0 })}
+                            value={outputPriceStr}
+                            onValueChange={setOutputPriceStr}
+                            onBlur={commitPrices}
+                            startContent={<span className="text-default-400 text-sm font-mono">$</span>}
+                            className="font-mono"
                         />
                         <Switch
                             isSelected={form.is_public === 1}

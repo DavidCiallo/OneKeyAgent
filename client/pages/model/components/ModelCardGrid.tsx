@@ -101,8 +101,8 @@ export function ModelCardGrid({ list, onEdit, onDelete }: Props) {
 
                         {/* Prices */}
                         <div className="flex gap-3 text-xs text-default-500">
-                            <span>IN: <strong className="text-foreground">{item.input_price}</strong> /M</span>
-                            <span>OUT: <strong className="text-foreground">{item.output_price}</strong> /M</span>
+                            <span>IN: <strong className="text-foreground font-mono">${item.input_price.toFixed(3)}</strong> /M</span>
+                            <span>OUT: <strong className="text-foreground font-mono">${item.output_price.toFixed(3)}</strong> /M</span>
                         </div>
 
                         {/* Three mini charts */}
