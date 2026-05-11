@@ -1,5 +1,5 @@
 import { BaseRequest, BaseResponse } from "../../lib/default/decorator";
-import { SubscriptionRecordEntity, TxStatus } from "./subscription_record.entity";
+import { TransactionEntity, TxStatus, TxType } from "./subscription_record.entity";
 
 export const PAYMENT_CURRENCIES = [
     { token: "USDT", chain: "ETH", pay_currency: "USDTERC20", localeKey: "CurrencyETHUSDT", iconKey: "USDTERC20" },
@@ -18,81 +18,48 @@ export const PAYMENT_CURRENCIES = [
 
 export type PaymentCurrency = typeof PAYMENT_CURRENCIES[number]["pay_currency"];
 
-export class SubscriptionRecordDTO {
+export class TransactionDTO {
     public id: string;
     public account_id: string;
-    public plan_name: string;
     public txid: string;
     public amount: number;
     public status: TxStatus;
+    public type: TxType;
     public create_time: number;
     public payment_id: string;
 
-    private isTypeSafe: symbol = Symbol();
-
-    constructor(origin: SubscriptionRecordEntity) {
+    constructor(origin: TransactionEntity) {
         this.id = origin.id;
         this.account_id = origin.account_id;
-        this.plan_name = origin.plan_name;
         this.txid = origin.txid;
         this.amount = origin.amount;
         this.status = origin.status;
+        this.type = origin.type;
         this.create_time = origin.create_time;
         this.payment_id = origin.payment_id;
     }
 }
 
-export class SubscriptionRecordListRequest implements BaseRequest {
+export class TransactionListRequest implements BaseRequest {
     public auth?: string;
 
-    constructor(origin: Partial<SubscriptionRecordListRequest>) {
+    constructor(origin: Partial<TransactionListRequest>) {
         if (false) throw new Error("Unexpected error");
         origin.auth && (this.auth = origin.auth);
     }
-    static self(unsafe: SubscriptionRecordListRequest) {
-        return new SubscriptionRecordListRequest(unsafe);
+    static self(unsafe: TransactionListRequest) {
+        return new TransactionListRequest(unsafe);
     }
 }
 
-export class SubscriptionRecordListResponse implements BaseResponse<SubscriptionRecordDTO> {
+export class TransactionListResponse implements BaseResponse<TransactionDTO> {
     public success: boolean;
     public message: string;
     public data: {
-        list: SubscriptionRecordDTO[]
+        list: TransactionDTO[]
     };
 
-    constructor(origin: SubscriptionRecordListResponse) {
-        this.success = origin.success;
-        this.message = origin.message;
-        this.data = origin.data;
-    }
-}
-
-export class SubscriptionCreatePaymentRequest implements BaseRequest {
-    public auth?: string;
-    public plan_name?: string;
-    public pay_currency?: string;
-
-    constructor(origin: Partial<SubscriptionCreatePaymentRequest>) {
-        if (false) throw new Error("Unexpected error");
-        origin.auth && (this.auth = origin.auth);
-        origin.plan_name && (this.plan_name = origin.plan_name);
-        origin.pay_currency && (this.pay_currency = origin.pay_currency);
-    }
-    static self(unsafe: SubscriptionCreatePaymentRequest) {
-        return new SubscriptionCreatePaymentRequest(unsafe);
-    }
-}
-
-export class SubscriptionCreatePaymentResponse implements BaseResponse<{ invoice_url: string; payment_id: string }> {
-    public success: boolean;
-    public message: string;
-    public data: {
-        invoice_url: string;
-        payment_id: string;
-    };
-
-    constructor(origin: SubscriptionCreatePaymentResponse) {
+    constructor(origin: TransactionListResponse) {
         this.success = origin.success;
         this.message = origin.message;
         this.data = origin.data;
@@ -131,14 +98,14 @@ export class SubscriptionTopupRequest implements BaseRequest {
     }
 }
 
-export class SubscriptionTopupResponse implements BaseResponse<{ invoice_url: string; payment_id: string; token_amount: number; price_cents: number }> {
+export class SubscriptionTopupResponse implements BaseResponse<{ invoice_url: string; payment_id: string; token_amount: number; price_dollars: number }> {
     public success: boolean;
     public message: string;
     public data: {
         invoice_url: string;
         payment_id: string;
         token_amount: number;
-        price_cents: number;
+        price_dollars: number;
     };
 
     constructor(origin: SubscriptionTopupResponse) {
