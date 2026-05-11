@@ -5,7 +5,7 @@ const accountRepo = Repository.instance<AccountEntity>("Account");
 
 export function validateApiKey(key: string): boolean {
     if (!key || typeof key !== "string") return false;
-    return key.startsWith("hex-") || key.startsWith("sk-") && key.length === 40;
+    return key.startsWith("sk-") && key.length === 39;
 }
 
 export async function verifyApiKeyInDb(key: string): Promise<boolean> {

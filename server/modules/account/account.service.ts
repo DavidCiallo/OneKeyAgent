@@ -45,6 +45,15 @@ export class AccountService {
         await accountRepository.delete({ id });
     }
 
+    /** Sum usage costs for a set of logs using the same formula everywhere */
+    static computeUsageCost(logs: { inputTokens: number; outputTokens: number; inputPrice?: number; outputPrice?: number }[]): number {
+        let total = 0;
+        for (const log of logs) {
+            total += (log.inputTokens * (log.inputPrice || 0) + log.outputTokens * (log.outputPrice || 0)) / 1_000_000;
+        }
+        return Math.round(total * 1_000_000) / 1_000_000;
+    }
+
     /** Compute account balance from transactions + gift cards - usage costs */
     static async getBalance(accountId: string): Promise<number> {
         // SUM of confirmed topup/bonus transactions
@@ -60,11 +69,7 @@ export class AccountService {
         // SUM of usage costs
         const usageRepo = Repository.instance<any>("UsageLog");
         const usageLogs = await usageRepo.find({ accountId, delete_time: null });
-        const usageTotal = usageLogs.reduce((sum: number, log: any) => {
-            const cost = (log.inputTokens * (log.inputPrice || 0) + log.outputTokens * (log.outputPrice || 0)) / 1_000_000;
-            return sum + cost;
-        }, 0);
 
-        return Math.round((txTotal + gcTotal - usageTotal) * 1_000_000) / 1_000_000;
+        return txTotal + gcTotal - this.computeUsageCost(usageLogs);
     }
 }

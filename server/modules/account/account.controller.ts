@@ -22,7 +22,7 @@ import {
 } from "../../../shared/modules/account/account.interface";
 import { AccountRouterInstance } from "../../../shared/modules/account/account.router"
 import { inject } from "../../lib/inject";
-import { getIdentifyByVerify, getAccountByEmail, registerUser } from "../auth/auth.service";
+import { getIdentifyByVerify, getAccountByEmail } from "../auth/auth.service";
 import { AccountService } from "./account.service";
 import { generateApiKey } from "../ai/ai.auth";
 import Repository from "../../lib/repository";
@@ -83,7 +83,16 @@ async function create(request: AccountCreateRequest): Promise<AccountCreateRespo
     }
     await requireAdmin(request.auth);
 
-    const { account } = await registerUser(request.account.name, request.account.email, request.account.password, request.account.is_admin);
+    const apiKey = generateApiKey();
+    const { hashGenerate } = await import("../auth/auth.utils");
+    const { AccountService } = await import("./account.service");
+    const account = await AccountService.create({
+        name: request.account.name,
+        email: request.account.email,
+        password: hashGenerate(request.account.password),
+        apiKey,
+        is_admin: request.account.is_admin || 0,
+    });
     if (!account) throw "create failed";
     const data = new AccountDTO(account);
     return new AccountCreateResponse({
@@ -138,18 +147,13 @@ async function profile(request: AccountProfileRequest): Promise<AccountProfileRe
     const since = Date.now() - 7 * 86400000;
     const usageRepo = Repository.instance<any>("UsageLog");
     const logs = await usageRepo.find({ accountId: account.id }, { since });
-    let weeklyUsage = 0;
-    for (const log of logs) {
-        const cost = (log.inputTokens * (log.inputPrice || 0) + log.outputTokens * (log.outputPrice || 0)) / 1_000_000;
-        weeklyUsage += cost;
-    }
 
     return new AccountProfileResponse({
         success: true,
         message: "success",
         data: {
             account: new AccountDTO(account),
-            weeklyUsage: Math.round(weeklyUsage * 100) / 100,
+            weeklyUsage: AccountService.computeUsageCost(logs),
             balance: await AccountService.getBalance(account.id),
         },
     });
