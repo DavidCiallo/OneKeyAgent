@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button, Input, Form, Select, SelectItem } from "@heroui/react";
 import { AuthRouter } from "../../api/instance";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { toast } from "../../methods/notify";
 import { setAuthStatus, setUserInfo } from "../../methods/auth";
 import { Locale } from "../../methods/locale";
@@ -41,7 +41,7 @@ export default function Component() {
 
     const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        const { email, password } = Object.fromEntries(new FormData(event.currentTarget));
+        const { email, password } = Object.fromEntries(new FormData(event.currentTarget) as unknown as Iterable<[string, string]>);
         const { success, data, message } = await AuthRouter.login(new LoginRequest({
             identify: new LoginBody({
                 email: email.toString(),
@@ -63,7 +63,7 @@ export default function Component() {
 
     const handleRegister = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        const { name, password } = Object.fromEntries(new FormData(event.currentTarget));
+        const { name, password } = Object.fromEntries(new FormData(event.currentTarget) as unknown as Iterable<[string, string]>);
         const emailStr = `${emailLocal}@${emailDomain}`;
         const { success, data, message } = await AuthRouter.register(new RegisterRequest({
             identify: new RegisterBody({
