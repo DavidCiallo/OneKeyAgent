@@ -75,16 +75,11 @@ export class ProviderService {
         });
     }
 
-    /** Swap priority between two providers */
-    static async swapPriority(id1: string, id2: string): Promise<void> {
-        const [p1, p2] = await Promise.all([
-            providerRepository.findOne({ id: id1 }),
-            providerRepository.findOne({ id: id2 }),
-        ]);
-        if (!p1 || !p2) throw "Provider not found";
-        if (p1.modelAlias !== p2.modelAlias) throw "Cannot swap priority between providers with different model aliases";
-
-        await providerRepository.update({ id: id1 }, { priority: p2.priority } as any);
-        await providerRepository.update({ id: id2 }, { priority: p1.priority } as any);
+    /** Increase or decrease a provider's priority */
+    static async updatePriority(id: string, delta: number): Promise<void> {
+        const p = await providerRepository.findOne({ id });
+        if (!p) throw "Provider not found";
+        const newPriority = Math.max(1, p.priority + delta);
+        await providerRepository.update({ id }, { priority: newPriority } as any);
     }
 }
