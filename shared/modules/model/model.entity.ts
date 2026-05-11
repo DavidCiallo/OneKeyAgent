@@ -3,7 +3,8 @@ import { BaseEntity } from "../../lib/default/base.entity";
 export interface ModelEntity extends BaseEntity {
     id: string;
     alias: string;
-    tier: number;
+    input_price: number;
+    output_price: number;
     is_public: number;
     create_time: number;
     update_time: number;
@@ -13,7 +14,8 @@ export interface ModelEntity extends BaseEntity {
 export class ModelDTO {
     public id: string;
     public alias: string;
-    public tier: number;
+    public input_price: number;
+    public output_price: number;
     public is_public: number;
     public create_time: number;
     public update_time: number | null;
@@ -22,7 +24,8 @@ export class ModelDTO {
     constructor(origin: ModelEntity) {
         this.id = origin.id;
         this.alias = origin.alias;
-        this.tier = origin.tier;
+        this.input_price = origin.input_price;
+        this.output_price = origin.output_price;
         this.is_public = origin.is_public;
         this.create_time = origin.create_time;
         this.update_time = origin.update_time;
