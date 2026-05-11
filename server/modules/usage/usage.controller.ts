@@ -5,8 +5,6 @@ import {
     UsageDTO,
     UsageStatsRequest,
     UsageStatsResponse,
-    MyUsageRequest,
-    MyUsageResponse,
     UsageSessionsRequest,
     UsageSessionsResponse,
     UserSessionGroup,
@@ -46,11 +44,15 @@ async function list(request: UsageListRequest): Promise<UsageListResponse> {
     );
     const providerMap = new Map(providers.map(p => [p.id, p.name]));
 
-    const list = data.map(item => new UsageDTO({
-        ...item,
-        accountName: accountMap.get(item.accountId) || item.accountId,
-        providerName: item.providerId ? providerMap.get(item.providerId) || item.providerId : undefined,
-    }));
+    const list = data.map(item => {
+        const cost = (item.inputTokens * (item.inputPrice || 0) + item.outputTokens * (item.outputPrice || 0)) / 1_000_000;
+        return new UsageDTO({
+            ...item,
+            accountName: accountMap.get(item.accountId) || item.accountId,
+            providerName: item.providerId ? providerMap.get(item.providerId) || item.providerId : undefined,
+            cost: Math.round(cost * 1_000_000) / 1_000_000,
+        });
+    });
 
     return new UsageListResponse({
         success: true,
@@ -73,25 +75,6 @@ async function stats(request: UsageStatsRequest): Promise<UsageStatsResponse> {
     });
 }
 
-async function mystats(request: MyUsageRequest): Promise<MyUsageResponse> {
-    request = MyUsageRequest.self(request);
-    const { auth } = request;
-    if (!auth) throw "Authorization failed";
-    const email = getIdentifyByVerify(auth);
-    if (!email) throw "Authorization failed";
-
-    const account = await AccountService.findByEmail(email);
-    if (!account) throw "Account not found";
-
-    const data = await UsageService.myStats(account.id);
-
-    return new MyUsageResponse({
-        success: true,
-        message: "success",
-        data,
-    });
-}
-
 async function sessions(request: UsageSessionsRequest): Promise<UsageSessionsResponse> {
     request = UsageSessionsRequest.self(request);
     const { auth } = request;
@@ -99,7 +82,7 @@ async function sessions(request: UsageSessionsRequest): Promise<UsageSessionsRes
         throw "Authorization failed";
     }
 
-    const groups = await UsageService.getUserSessions(request.gapMinutes, request.since);
+    const groups = await UsageService.getUserSessions(request.gapMinutes, request.since, request.accountId);
 
     // Resolve account names
     const accountIds = [...new Set(groups.map(g => g.accountId))];
@@ -134,4 +117,4 @@ async function sessions(request: UsageSessionsRequest): Promise<UsageSessionsRes
     });
 }
 
-export const usageController = new UsageRouterInstance(inject, { list, stats, mystats, sessions });
+export const usageController = new UsageRouterInstance(inject, { list, stats, sessions });

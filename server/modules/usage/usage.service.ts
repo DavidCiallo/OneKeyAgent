@@ -25,20 +25,6 @@ function tenMinStart(ts: number): number {
     return localMidnight + rounded;
 }
 
-async function getTierMap(logs: UsageLogEntity[]): Promise<Map<string, number>> {
-    const aliases = [...new Set(logs.map(log => log.modelAlias).filter(Boolean))];
-    if (aliases.length === 0) return new Map();
-
-    const models = await modelRepo.find({ delete_time: null });
-    const tierMap = new Map<string, number>();
-    for (const model of models) {
-        if (!aliases.includes(model.alias)) continue;
-        const currentTier = tierMap.get(model.alias) ?? 0;
-        tierMap.set(model.alias, Math.max(currentTier, model.tier ?? 1));
-    }
-    return tierMap;
-}
-
 function getRawInputTokens(log: UsageLogEntity): number {
     return log.inputTokens || 0;
 }
@@ -51,21 +37,7 @@ function getRawTotalTokens(log: UsageLogEntity): number {
     return getRawInputTokens(log) + getRawOutputTokens(log);
 }
 
-function getBilledInputTokens(log: UsageLogEntity, tierMap: Map<string, number>): number {
-    if (log.tierSnapshot == null) return log.inputTokens || 0;
-    return (log.inputTokens || 0) * (log.tierSnapshot || tierMap.get(log.modelAlias) || 1);
-}
-
-function getBilledOutputTokens(log: UsageLogEntity, tierMap: Map<string, number>): number {
-    if (log.tierSnapshot == null) return log.outputTokens || 0;
-    return (log.outputTokens || 0) * (log.tierSnapshot || tierMap.get(log.modelAlias) || 1);
-}
-
-function getBilledTotalTokens(log: UsageLogEntity, tierMap: Map<string, number>): number {
-    return getBilledInputTokens(log, tierMap) + getBilledOutputTokens(log, tierMap);
-}
-
-function buildPeriod(logs: UsageLogEntity[], periodStart: number, periodEnd: number, tierMap: Map<string, number>): UsageStatsPeriod {
+function buildPeriod(logs: UsageLogEntity[], periodStart: number, periodEnd: number): UsageStatsPeriod {
     // Pre-generate all 10-min buckets in the period
     const bucketMap = new Map<number, number>();
     for (let t = periodStart; t < periodEnd; t += TEN_MIN) {
@@ -109,58 +81,15 @@ export class UsageService {
         if (modelAlias) filter.modelAlias = modelAlias;
 
         const allLogs = await usageRepo.find(filter, { since: now - MONTH });
-        const tierMap = await getTierMap(allLogs);
         const todayLogs = allLogs.filter(l => l.create_time >= todayStart && l.create_time < nowTenMin + TEN_MIN);
         const last24hLogs = allLogs.filter(l => l.create_time >= last24hStart && l.create_time < nowTenMin + TEN_MIN);
         const weekLogs = allLogs.filter(l => l.create_time >= weekStart && l.create_time < nowTenMin + TEN_MIN);
 
         return {
-            today: buildPeriod(todayLogs, todayStart, nowTenMin + TEN_MIN, tierMap),
-            last24h: buildPeriod(last24hLogs, last24hStart, nowTenMin + TEN_MIN, tierMap),
-            last7Days: buildPeriod(weekLogs, weekStart, nowTenMin + TEN_MIN, tierMap),
+            today: buildPeriod(todayLogs, todayStart, nowTenMin + TEN_MIN),
+            last24h: buildPeriod(last24hLogs, last24hStart, nowTenMin + TEN_MIN),
+            last7Days: buildPeriod(weekLogs, weekStart, nowTenMin + TEN_MIN),
         };
-    }
-
-    static async myStats(accountId: string): Promise<{ today: number; thisWeek: number; total: number }> {
-        const now = Date.now();
-
-        const todayStart = localDayStart(now);
-        const weekStart = todayStart - 7 * DAY;
-        const nowTenMin = tenMinStart(now);
-
-        const allLogs = await usageRepo.find({ accountId }, { since: now - MONTH });
-        const todayLogs = allLogs.filter(l => l.create_time >= todayStart && l.create_time < nowTenMin + TEN_MIN);
-        const weekLogs = allLogs.filter(l => l.create_time >= weekStart && l.create_time < nowTenMin + TEN_MIN);
-
-        const sum = (logs: UsageLogEntity[]) =>
-            logs.reduce((acc, l) => acc + getRawTotalTokens(l), 0);
-
-        return {
-            today: sum(todayLogs),
-            thisWeek: sum(weekLogs),
-            total: sum(allLogs),
-        };
-    }
-
-    /** Get total billed tokens for an account in the current month */
-    static async monthlyBilledTokens(accountId: string): Promise<number> {
-        const d = new Date();
-        const monthStartTs = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
-
-        const allLogs = await usageRepo.find({ accountId });
-        const tierMap = await getTierMap(allLogs);
-        const thisMonthLogs = allLogs.filter(l => l.create_time >= monthStartTs);
-        return thisMonthLogs.reduce((acc, l) => acc + getBilledTotalTokens(l, tierMap), 0);
-    }
-
-    /** Get total billed tokens for an account in the current week */
-    static async weeklyBilledTokens(accountId: string): Promise<number> {
-        const weekStart = localDayStart(Date.now()) - 7 * 86400000;
-
-        const allLogs = await usageRepo.find({ accountId });
-        const tierMap = await getTierMap(allLogs);
-        const thisWeekLogs = allLogs.filter(l => l.create_time >= weekStart);
-        return thisWeekLogs.reduce((acc, l) => acc + getBilledTotalTokens(l, tierMap), 0);
     }
 
     static windowStart(ts: number, gapMs: number): number {
@@ -192,9 +121,10 @@ export class UsageService {
         return `${MM}/${DD} ${hh}:${mm}-${ehh}:${emm}`;
     }
 
-    static async getUserSessions(gapMinutes?: number, since?: number): Promise<UserSessionGroup[]> {
-        const allLogs = await usageRepo.find({}, { since: since ?? Date.now() - MONTH });
-        const tierMap = await getTierMap(allLogs);
+    static async getUserSessions(gapMinutes?: number, since?: number, accountId?: string): Promise<UserSessionGroup[]> {
+        const filter: Partial<UsageLogEntity> = {};
+        if (accountId) filter.accountId = accountId;
+        const allLogs = await usageRepo.find(filter, { since: since ?? Date.now() - MONTH });
         const gapMs = (gapMinutes || 30) * 60 * 1000;
 
         // Group by accountId
@@ -242,6 +172,12 @@ export class UsageService {
                     p.outputTokens += getRawOutputTokens(log);
                 }
 
+                let cost = 0;
+                for (const log of windowLogs) {
+                    cost += (log.inputTokens * (log.inputPrice || 0) + log.outputTokens * (log.outputPrice || 0)) / 1_000_000;
+                }
+                cost = Math.round(cost * 1_000_000) / 1_000_000;
+
                 sessions.push({
                     startTime: wStart,
                     endTime: wStart + gapMs,
@@ -249,7 +185,7 @@ export class UsageService {
                     requestCount: windowLogs.length,
                     inputTokens,
                     outputTokens,
-                    tierSnapshot: windowLogs[0]?.tierSnapshot ?? tierMap.get(modelAlias) ?? 1,
+                    cost,
                     providerUsage: Array.from(providerMap.values()),
                     windowLabel: this.formatWindowLabel(wStart, gapMs),
                 });
@@ -271,6 +207,21 @@ export class UsageService {
             return bMax - aMax;
         });
 
+        // Flatten all sessions with group info, sort by time DESC, take latest 20
+        const allSessions: { groupIndex: number; sessionIndex: number; startTime: number }[] = [];
+        for (let gi = 0; gi < groups.length; gi++) {
+            for (let si = 0; si < groups[gi].sessions.length; si++) {
+                allSessions.push({ groupIndex: gi, sessionIndex: si, startTime: groups[gi].sessions[si].startTime });
+            }
+        }
+        allSessions.sort((a, b) => b.startTime - a.startTime);
+        const keepSessions = new Set(allSessions.slice(0, 20).map(s => `${s.groupIndex}:${s.sessionIndex}`));
+
+        // Filter out sessions not in the top 20, and remove empty groups
+        for (let gi = 0; gi < groups.length; gi++) {
+            groups[gi].sessions = groups[gi].sessions.filter((_, si) => keepSessions.has(`${gi}:${si}`));
+        }
+
         // Filter out sessions whose provider or model has been deleted
         const [activeProviders, activeModels] = await Promise.all([
             providerRepo.find({}),
@@ -279,7 +230,7 @@ export class UsageService {
         const activeProviderIds = new Set(activeProviders.map(p => p.id));
         const activeModelAliases = new Set(activeModels.map(m => m.alias));
 
-        return groups.map(g => ({
+        return groups.filter(g => g.sessions.length > 0).map(g => ({
             ...g,
             sessions: g.sessions
                 .map(s => ({
