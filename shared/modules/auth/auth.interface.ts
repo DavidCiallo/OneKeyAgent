@@ -8,8 +8,6 @@ export class LoginBody {
     public email: string;
     public password: string;
 
-    private isTypeSafe: symbol = Symbol();
-
     constructor(origin: Pick<AccountEntity, "email" | "password">) {
         if (!origin.email || !origin.password) {
             throw new Error("Email and password are required");
@@ -30,8 +28,6 @@ export class RegisterBody {
     public name: string;
     public email: string;
     public password: string;
-
-    private isTypeSafe: symbol = Symbol();
 
     constructor(origin: any) {
         if (!origin.name || !origin.email || !origin.password) {
@@ -122,7 +118,7 @@ export class AliveRequest implements BaseRequest {
 
 export class AuthConfigRequest implements BaseRequest {
     constructor() {}
-    static self(unsafe: AuthConfigRequest) {
+    static self(_unsafe: AuthConfigRequest) {
         return new AuthConfigRequest();
     }
 }
