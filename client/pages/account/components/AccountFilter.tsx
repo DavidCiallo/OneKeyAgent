@@ -1,7 +1,8 @@
-import { Input, Button } from "@heroui/react";
+import { Input, Button, useDisclosure } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
 import { isAdmin } from "../../../methods/auth";
 import { AccountRouter } from "../../../api/instance";
+import GiftCardManageModal from "./GiftCardManageModal";
 
 type Props = {
     filterName: string;
@@ -66,42 +67,53 @@ export function AccountFilter({ filterName, filterEmail, onNameChange, onEmailCh
     const locale = Locale("AccountPage");
     const common = Locale("Common");
     const admin = isAdmin();
+    const giftCardModal = useDisclosure();
 
     return (
-        <div className="px-4 flex flex-row gap-3 justify-between items-end flex-wrap">
-            <div className="flex flex-row gap-2">
-                <Input
-                    label={locale.Name}
-                    placeholder={locale.NamePlaceholder}
-                    value={filterName}
-                    onChange={e => onNameChange(e.target.value)}
-                    className="w-40"
-                    size="sm"
-                />
-                <Input
-                    label={locale.Email}
-                    placeholder={locale.EmailPlaceholder}
-                    value={filterEmail}
-                    onChange={e => onEmailChange(e.target.value)}
-                    className="w-64"
-                    size="sm"
-                />
+        <>
+            <div className="px-4 flex flex-row gap-3 justify-between items-end flex-wrap">
+                <div className="flex flex-row gap-2">
+                    <Input
+                        label={locale.Name}
+                        placeholder={locale.NamePlaceholder}
+                        value={filterName}
+                        onChange={e => onNameChange(e.target.value)}
+                        className="w-40"
+                        size="sm"
+                    />
+                    <Input
+                        label={locale.Email}
+                        placeholder={locale.EmailPlaceholder}
+                        value={filterEmail}
+                        onChange={e => onEmailChange(e.target.value)}
+                        className="w-64"
+                        size="sm"
+                    />
+                </div>
+                <div className="flex flex-row gap-2">
+                    {admin && (
+                        <>
+                            <Button color="secondary" size="sm" variant="flat" onPress={handleExport}>
+                                {locale.ExportData}
+                            </Button>
+                            <Button color="warning" size="sm" variant="flat" onPress={handleImport}>
+                                {locale.ImportData}
+                            </Button>
+                            <Button color="warning" size="sm" variant="flat" onPress={giftCardModal.onOpen}>
+                                {locale.GiftCard}
+                            </Button>
+                            <Button color="primary" size="sm" onPress={onAdd}>
+                                {common.ButtonAdd}
+                            </Button>
+                        </>
+                    )}
+                </div>
             </div>
-            <div className="flex flex-row gap-2">
-                {admin && (
-                    <>
-                        <Button color="secondary" size="sm" variant="flat" onPress={handleExport}>
-                            {locale.ExportData}
-                        </Button>
-                        <Button color="warning" size="sm" variant="flat" onPress={handleImport}>
-                            {locale.ImportData}
-                        </Button>
-                        <Button color="primary" size="sm" onPress={onAdd}>
-                            {common.ButtonAdd}
-                        </Button>
-                    </>
-                )}
-            </div>
-        </div>
+
+            <GiftCardManageModal
+                isOpen={giftCardModal.isOpen}
+                onOpenChange={giftCardModal.onOpenChange}
+            />
+        </>
     );
 }
