@@ -8,33 +8,58 @@ import {
 } from "../../../shared/modules/ai/ai.interface";
 import { getAllModels, logUsage } from "./ai.session";
 import { ProviderService } from "../provider/provider.service";
-import { UsageService } from "../usage/usage.service";
 import { AccountService } from "../account/account.service";
 import { AccountRoleService } from "../role/role.service";
-import { SubscriptionService } from "../subscription/subscription.service";
 import { toAnthropicBody, anthropicToOpenAI, antMessagesToOpenAI, openAIToAntMessages, openAIToAntStream, antStreamToOpenAI } from "./ai.trans";
+import Repository from "../../lib/repository";
 
-const DEFAULT_MONTHLY_LIMIT = 90_000_000; // 90M tokens default (free plan)
+/** Calculate cost in USDT for a request */
+function calculateCost(inputTokens: number, outputTokens: number, inputPrice: number, outputPrice: number): number {
+    // inputPrice/outputPrice are in dollars per 1M tokens
+    const cost = (inputTokens * inputPrice + outputTokens * outputPrice) / 1_000_000;
+    return Math.round(cost * 1_000_000) / 1_000_000; // 6 decimal precision
+}
 
-/** Check monthly usage limit, deduct from topup_tokens if exceeded */
-async function checkUsageLimit(accountId: string): Promise<void> {
-    const account = await AccountService.findOne(accountId);
-    if (!account) return;
+const WEEKLY_LIMIT = 100; // $100 per week
 
-    const plan = await SubscriptionService.findPlanByName(account.plan || "free");
-    const limit = plan?.monthly_limit || DEFAULT_MONTHLY_LIMIT;
-    const billed = await UsageService.monthlyBilledTokens(accountId);
-
-    if (billed >= limit) {
-        // Monthly limit exceeded — check topup_tokens
-        const exceeded = billed - limit;
-        if ((account.topup_tokens || 0) > exceeded) {
-            // Deduct the exceeded amount from topup_tokens
-            await AccountService.update(accountId, { topup_tokens: account.topup_tokens - exceeded });
-            return; // allow the request
-        }
-        throw new Error("429 Too Many Requests. Monthly usage limit exceeded");
+/** Get total weekly spending for an account */
+async function getWeeklySpending(accountId: string): Promise<number> {
+    const since = Date.now() - 7 * 86400000;
+    const repo = Repository.instance<any>("UsageLog");
+    const logs = await repo.find({ accountId }, { since });
+    let total = 0;
+    for (const log of logs) {
+        const cost = (log.inputTokens * (log.inputPrice || 0) + log.outputTokens * (log.outputPrice || 0)) / 1_000_000;
+        total += Math.round(cost * 1_000_000) / 1_000_000;
     }
+    return Math.round(total * 1_000_000) / 1_000_000;
+}
+
+/** Deduct balance from account, throw 429 if insufficient */
+async function deductBalance(accountId: string, cost: number): Promise<void> {
+    if (cost <= 0) return;
+
+    // Check weekly limit
+    const weeklySpent = await getWeeklySpending(accountId);
+    if (weeklySpent + cost > WEEKLY_LIMIT) {
+        throw new Error("429 Weekly spending limit reached");
+    }
+
+    const balance = await AccountService.getBalance(accountId);
+    if (balance < cost) {
+        throw new Error("429 Insufficient balance");
+    }
+    // Balance is computed from UsageLog — no manual deduction needed
+}
+
+/** Get model prices for an alias */
+async function getModelPrices(alias: string): Promise<{ inputPrice: number; outputPrice: number }> {
+    const models = await getAllModels();
+    const match = models.find(m => m.alias === alias);
+    return {
+        inputPrice: match?.input_price ?? 0,
+        outputPrice: match?.output_price ?? 0,
+    };
 }
 
 /** Build Authorization header value based on auth type */
@@ -171,13 +196,6 @@ async function tryProviderStream(
     });
 }
 
-/** Get model tier for an alias, defaults to 1 */
-async function getModelTier(alias: string): Promise<number> {
-    const models = await getAllModels();
-    const match = models.find(m => m.alias === alias);
-    return match?.tier ?? 1;
-}
-
 /** Get allowed model aliases for a non-admin account, null means no restriction */
 async function getAllowedModelAliases(accountId: string): Promise<string[] | null> {
     const account = await AccountService.findOne(accountId);
@@ -205,9 +223,9 @@ async function requireModelAccess(accountId: string, alias: string): Promise<voi
 async function chatHex(body: Record<string, any>, accountId: string): Promise<any> {
     const t0 = Date.now();
     const requestedAlias = body.model;
+    console.log("[chatHex] model:", requestedAlias, "accountId:", accountId, "stream:", body.stream);
 
     await requireModelAccess(accountId, requestedAlias);
-    await checkUsageLimit(accountId);
 
     const providers = await ProviderService.getProvidersByAlias(requestedAlias);
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
@@ -229,11 +247,14 @@ async function chatHex(body: Record<string, any>, accountId: string): Promise<an
         ProviderService.recordSuccess(provider.id);
 
         const ms = Date.now() - t0;
-        const tier = await getModelTier(requestedAlias);
+        const { inputPrice: input_price, outputPrice: output_price } = await getModelPrices(requestedAlias);
         const { usage } = data;
         // OpenAI format: prompt_tokens/completion_tokens; Anthropic format: input_tokens/output_tokens
         const rawInput = usage?.input_tokens ?? usage?.prompt_tokens ?? 0;
         const rawOutput = usage?.output_tokens ?? usage?.completion_tokens ?? 0;
+        // Deduct balance
+        const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
+        await deductBalance(accountId, cost);
 
         await logUsage({
             accountId,
@@ -241,9 +262,9 @@ async function chatHex(body: Record<string, any>, accountId: string): Promise<an
             providerId: provider.id,
             inputTokens: rawInput,
             outputTokens: rawOutput,
-            tierSnapshot: tier,
+            inputPrice: input_price,
+            outputPrice: output_price,
         });
-
         data.model = requestedAlias;
         return data;
     }
@@ -267,7 +288,6 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
     const requestedAlias = body.model;
 
     await requireModelAccess(accountId, requestedAlias);
-    await checkUsageLimit(accountId);
 
     console.log("[chatHexStream] alias:", requestedAlias, "accountId:", accountId);
     const providers = await ProviderService.getProvidersByAlias(requestedAlias);
@@ -313,8 +333,7 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
             while (true) {
                 const { done, value } = await r.read();
                 if (done) {
-                    console.log("[chatHexStream] forward stream done, total bytes:", totalBytes, "chunks:", chunks.length);
-                    if (chunks.length > 0) console.log("[chatHexStream] first chunk:", chunks[0].substring(0, 200));
+                    console.log("[chatHexStream] stream done, bytes:", totalBytes, "chunks:", chunks.length);
                     break;
                 }
                 totalBytes += value.length;
@@ -335,6 +354,7 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
                 const reader = parseStream.getReader();
                 const decoder = new TextDecoder();
                 let usageData: any = null;
+                let estimatedOutputChars = 0;
 
                 while (true) {
                     const { done, value } = await reader.read();
@@ -360,28 +380,43 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
                                         output_tokens: data.usage.output_tokens || 0,
                                     };
                                 }
+                                // Count output content for fallback estimation
+                                const content = data.choices?.[0]?.delta?.content || '';
+                                if (content) {
+                                    estimatedOutputChars += content.length;
+                                }
                             } catch { }
                             pendingAnthropic = false;
                         }
                     }
                 }
 
+                const { inputPrice: input_price, outputPrice: output_price } = await getModelPrices(requestedAlias);
+
+                let rawInput: number;
+                let rawOutput: number;
+
                 if (usageData) {
-                    const ms = Date.now() - t0;
-                    const tier = await getModelTier(requestedAlias);
-                    // OpenAI format: prompt_tokens/completion_tokens
-                    // Anthropic format: input_tokens/output_tokens
-                    const rawInput = usageData.input_tokens ?? usageData.prompt_tokens ?? 0;
-                    const rawOutput = usageData.output_tokens ?? usageData.completion_tokens ?? 0;
-                    await logUsage({
-                        accountId,
-                        modelAlias: requestedAlias,
-                        providerId: provider.id,
-                        inputTokens: rawInput,
-                        outputTokens: rawOutput,
-                        tierSnapshot: tier,
-                    });
+                    rawInput = usageData.input_tokens ?? usageData.prompt_tokens ?? 0;
+                    rawOutput = usageData.output_tokens ?? usageData.completion_tokens ?? 0;
+                } else {
+                    rawInput = 0;
+                    rawOutput = Math.max(1, Math.round(estimatedOutputChars / 4));
                 }
+
+                // Deduct balance
+                const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
+                await deductBalance(accountId, cost);
+
+                await logUsage({
+                    accountId,
+                    modelAlias: requestedAlias,
+                    providerId: provider.id,
+                    inputTokens: rawInput,
+                    outputTokens: rawOutput,
+                    inputPrice: input_price,
+                    outputPrice: output_price,
+                });
             } catch (err) {
             }
         })();
@@ -430,7 +465,6 @@ async function completeHex(body: Record<string, any>, accountId: string): Promis
     const requestedAlias = body.model;
 
     await requireModelAccess(accountId, requestedAlias);
-    await checkUsageLimit(accountId);
 
     const providers = await ProviderService.getProvidersByAlias(requestedAlias);
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
@@ -444,10 +478,14 @@ async function completeHex(body: Record<string, any>, accountId: string): Promis
 
         ProviderService.recordSuccess(provider.id);
         const ms = Date.now() - t0;
-        const tier = await getModelTier(requestedAlias);
+        const { inputPrice: input_price, outputPrice: output_price } = await getModelPrices(requestedAlias);
         // OpenAI format: prompt_tokens/completion_tokens; Anthropic format: input_tokens/output_tokens
         const rawInput = data.usage?.input_tokens ?? data.usage?.prompt_tokens ?? 0;
         const rawOutput = data.usage?.output_tokens ?? data.usage?.completion_tokens ?? 0;
+
+        // Deduct balance
+        const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
+        await deductBalance(accountId, cost);
 
         await logUsage({
             accountId,
@@ -455,7 +493,8 @@ async function completeHex(body: Record<string, any>, accountId: string): Promis
             providerId: provider.id,
             inputTokens: rawInput,
             outputTokens: rawOutput,
-            tierSnapshot: tier,
+            inputPrice: input_price,
+            outputPrice: output_price,
         });
         return data;
     }
@@ -510,7 +549,6 @@ async function completeHexStream(body: Record<string, any>, accountId: string): 
     const requestedAlias = body.model;
 
     await requireModelAccess(accountId, requestedAlias);
-    await checkUsageLimit(accountId);
 
     const providers = await ProviderService.getProvidersByAlias(requestedAlias);
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
@@ -524,9 +562,70 @@ async function completeHexStream(body: Record<string, any>, accountId: string): 
 
         ProviderService.recordSuccess(provider.id);
 
+        const [upstreamForward, parseStream] = (bodyStream.tee() as [ReadableStream<Uint8Array>, ReadableStream<Uint8Array>]);
+
         const ts = new TransformStream<Uint8Array, Uint8Array>();
         const forwardStream = ts.readable;
-        safePipe(bodyStream.getReader(), ts.writable.getWriter());
+        safePipe(upstreamForward.getReader(), ts.writable.getWriter());
+
+        // Background parse usage
+        (async () => {
+            try {
+                const reader = parseStream.getReader();
+                const decoder = new TextDecoder();
+                let usageData: any = null;
+                let estimatedOutputChars = 0;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const text = decoder.decode(value, { stream: true });
+                    const lines = text.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ') && !line.startsWith('data: [DONE]')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                if (data.usage) {
+                                    usageData = data.usage;
+                                }
+                                const content = data.choices?.[0]?.delta?.content || data.choices?.[0]?.text || '';
+                                if (content) {
+                                    estimatedOutputChars += content.length;
+                                }
+                            } catch { }
+                        }
+                    }
+                }
+
+                const { inputPrice: input_price, outputPrice: output_price } = await getModelPrices(requestedAlias);
+
+                let rawInput: number;
+                let rawOutput: number;
+
+                if (usageData) {
+                    rawInput = usageData.input_tokens ?? usageData.prompt_tokens ?? 0;
+                    rawOutput = usageData.output_tokens ?? usageData.completion_tokens ?? 0;
+                } else {
+                    rawInput = 0;
+                    rawOutput = Math.max(1, Math.round(estimatedOutputChars / 4));
+                }
+
+                const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
+                await deductBalance(accountId, cost);
+
+                await logUsage({
+                    accountId,
+                    modelAlias: requestedAlias,
+                    providerId: provider.id,
+                    inputTokens: rawInput,
+                    outputTokens: rawOutput,
+                    inputPrice: input_price,
+                    outputPrice: output_price,
+                });
+            } catch (err) {
+            }
+        })();
 
         return forwardStream;
     }
@@ -567,7 +666,8 @@ export class AiService {
                 object: "model",
                 created: m.create_time,
                 owned_by: "onekey",
-                tier: m.tier,
+                input_price: m.input_price,
+                output_price: m.output_price,
             });
         }
         return { data };
