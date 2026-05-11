@@ -4,7 +4,6 @@ import Repository from "../../lib/repository";
 import { generateApiKey } from "../ai/ai.auth";
 import { RoleService, AccountRoleService } from "../role/role.service";
 import { sendEmail, buildVerificationEmail } from "../email/email.service";
-import { AccountService } from "../account/account.service";
 
 const ALL_MENUS = ["model", "usage", "account", "profile"];
 const accountRepository: Repository<AccountEntity> = Repository.instance("Account");
@@ -16,6 +15,22 @@ export async function loginUser(email: string, password: string): Promise<{ toke
         const roles = emailItem.is_admin
             ? ALL_MENUS.map(name => ({ name, type: "menu" }))
             : (await AccountRoleService.findByAccount(emailItem.id)).map(r => ({ name: r.name, type: r.type }));
+        // Daily login bonus: insert a redeemed gift card worth 0.2 tokens
+        const now = Date.now();
+        const lastDaily = emailItem.last_daily_time;
+        const isNewDay = !lastDaily || new Date(lastDaily).toDateString() !== new Date(now).toDateString();
+        if (isNewDay) {
+            await accountRepository.update({ id: emailItem.id }, { last_daily_time: now } as any);
+            const cardRepo = Repository.instance<any>("GiftCard");
+            await cardRepo.insert({
+                code: `daily_${emailItem.id}_${now}`,
+                token_amount: 0.1,
+                status: "redeemed",
+                redeemed_by: emailItem.id,
+                redeemed_at: now,
+                create_time: now,
+            } as any);
+        }
         return { token: genTokenForIdentify(email), is_admin: emailItem.is_admin, roles };
     } else {
         return {};
@@ -79,27 +94,21 @@ export async function completeRegistration(token: string): Promise<{ account?: A
     if (!account) return null;
     // Assign default permissions
     await AccountRoleService.assignPermissions(account.id, [
+        { name: "usage", type: "menu" },
         { name: "profile", type: "menu" },
         { name: "subscription", type: "menu" },
     ]);
-    return { account, apiKey };
-}
-
-export async function registerUser(name: string, email: string, password: string, isAdmin: number = 0): Promise<{ account?: AccountEntity; apiKey?: string }> {
-    const domainError = checkAllowedDomain(email);
-    if (domainError) { throw domainError; }
-    const exist = await accountRepository.findIgnoreDelete({ email });
-    if (exist && !exist.delete_time) { return {}; }
-    password = hashGenerate(password);
-    const apiKey = generateApiKey();
-    const account = await AccountService.create({ name, email, password, apiKey, is_admin: isAdmin });
-    if (!account) return {};
-    if (!isAdmin) {
-        await AccountRoleService.assignPermissions(account.id, [
-            { name: "profile", type: "menu" },
-            { name: "subscription", type: "menu" },
-        ]);
-    }
+    // Registration bonus: insert a redeemed gift card worth 2 tokens
+    const now = Date.now();
+    const cardRepo = Repository.instance<any>("GiftCard");
+    await cardRepo.insert({
+        code: `register_${account.id}_${now}`,
+        token_amount: 1,
+        status: "redeemed",
+        redeemed_by: account.id,
+        redeemed_at: now,
+        create_time: now,
+    } as any);
     return { account, apiKey };
 }
 

@@ -1,30 +1,17 @@
 import {
-    SubscriptionPlanListRequest, SubscriptionPlanListResponse,
-    SubscriptionPlanCreateRequest, SubscriptionPlanCreateResponse,
-    SubscriptionPlanUpdateRequest, SubscriptionPlanUpdateResponse,
-    SubscriptionPlanDeleteRequest, SubscriptionPlanDeleteResponse,
-    SubscriptionPlanDTO,
-} from "../../../shared/modules/subscription_plan/subscription_plan.interface";
-import {
-    SubscriptionRecordListRequest, SubscriptionRecordListResponse,
-    SubscriptionCreatePaymentRequest, SubscriptionCreatePaymentResponse,
-    SubscriptionRecordDTO,
+    TransactionListRequest, TransactionListResponse,
+    SubscriptionTopupRequest, SubscriptionTopupResponse,
+    TransactionDTO,
+    StatementRequest, StatementResponse, StatementItem,
     PaymentCurrency,
 } from "../../../shared/modules/subscription_record/subscription_record.interface";
-import { SubscriptionPlanRouterInstance } from "../../../shared/modules/subscription_plan/subscription_plan.router";
-import { SubscriptionRecordRouterInstance } from "../../../shared/modules/subscription_record/subscription_record.router";
+import { TransactionRouterInstance } from "../../../shared/modules/subscription_record/subscription_record.router";
 import { inject } from "../../lib/inject";
 import { getIdentifyByVerify, getAccountByEmail } from "../auth/auth.service";
 import { SubscriptionService } from "./subscription.service";
 import { createInvoice } from "./nowpayments.service";
-
-async function requireAdmin(auth?: string): Promise<void> {
-    if (!auth) throw "Authorization failed";
-    const email = getIdentifyByVerify(auth);
-    if (!email) throw "Authorization failed";
-    const account = await getAccountByEmail(email);
-    if (!account || !account.is_admin) throw "Permission denied";
-}
+import { AccountService } from "../account/account.service";
+import Repository from "../../lib/repository";
 
 async function resolveAccount(auth: string) {
     const email = getIdentifyByVerify(auth);
@@ -67,62 +54,14 @@ setInterval(() => {
     }
 }, 120_000);
 
-// ─── Plan routes ───
+// ─── Record routes ───
 
-async function planList(request: SubscriptionPlanListRequest): Promise<SubscriptionPlanListResponse> {
-    request = SubscriptionPlanListRequest.self(request);
-    const data = await SubscriptionService.listPlans();
-    const list = data.map(item => new SubscriptionPlanDTO(item));
-    return new SubscriptionPlanListResponse({
-        success: true,
-        message: "success",
-        data: { list },
-    });
-}
-
-async function planCreate(request: SubscriptionPlanCreateRequest): Promise<SubscriptionPlanCreateResponse> {
-    request = SubscriptionPlanCreateRequest.self(request);
-    await requireAdmin(request.auth);
-    const data = await SubscriptionService.createPlan(request.plan);
-    const plan = new SubscriptionPlanDTO(data);
-    return new SubscriptionPlanCreateResponse({
-        success: true,
-        message: "success",
-        data: { plan },
-    });
-}
-
-async function planUpdate(request: SubscriptionPlanUpdateRequest): Promise<SubscriptionPlanUpdateResponse> {
-    request = SubscriptionPlanUpdateRequest.self(request);
-    await requireAdmin(request.auth);
-    const data = await SubscriptionService.updatePlan(request.id, request.plan);
-    if (!data) throw "Plan not found";
-    const plan = new SubscriptionPlanDTO(data);
-    return new SubscriptionPlanUpdateResponse({
-        success: true,
-        message: "success",
-        data: { plan },
-    });
-}
-
-async function planDelete(request: SubscriptionPlanDeleteRequest): Promise<SubscriptionPlanDeleteResponse> {
-    request = SubscriptionPlanDeleteRequest.self(request);
-    await requireAdmin(request.auth);
-    await SubscriptionService.deletePlan(request.id);
-    return new SubscriptionPlanDeleteResponse({
-        success: true,
-        message: "success",
-    });
-}
-
-// ─── Record / Payment routes ───
-
-async function records(request: SubscriptionRecordListRequest): Promise<SubscriptionRecordListResponse> {
-    request = SubscriptionRecordListRequest.self(request);
+async function records(request: TransactionListRequest): Promise<TransactionListResponse> {
+    request = TransactionListRequest.self(request);
     const account = await resolveAccount(request.auth || "");
     const data = await SubscriptionService.getRecordsByAccount(account.id);
-    const list = data.map(item => new SubscriptionRecordDTO(item));
-    return new SubscriptionRecordListResponse({
+    const list = data.map(item => new TransactionDTO(item));
+    return new TransactionListResponse({
         success: true,
         message: "success",
         data: { list },
@@ -130,34 +69,31 @@ async function records(request: SubscriptionRecordListRequest): Promise<Subscrip
 }
 
 /**
- * Create a NowPayments invoice for the selected plan.
- * Returns the invoice URL that the user should visit to pay.
+ * Create a top-up invoice.
+ * User purchases raw tokens at a flat rate (1 USD per token).
  */
-async function createpayment(request: SubscriptionCreatePaymentRequest): Promise<SubscriptionCreatePaymentResponse> {
-    request = SubscriptionCreatePaymentRequest.self(request);
-    console.log(request);
+async function createtopup(request: SubscriptionTopupRequest): Promise<SubscriptionTopupResponse> {
+    request = SubscriptionTopupRequest.self(request);
     const account = await resolveAccount(request.auth || "");
 
     // Rate limit: max 6 requests per minute per account
-    if (!(await checkRateLimit(`createpayment:${account.id}`))) {
-        return new SubscriptionCreatePaymentResponse({
+    if (!(await checkRateLimit(`createtopup:${account.id}`))) {
+        return new SubscriptionTopupResponse({
             success: false,
             message: "Too many requests, please try again later",
-            data: { invoice_url: "", payment_id: "" },
+            data: { invoice_url: "", payment_id: "", token_amount: 0, price_dollars: 0 },
         });
     }
 
-    if (!request.plan_name) throw new Error("plan_name is required");
+    const tokenAmount = request.token_amount || 0;
+    if (tokenAmount <= 0) throw new Error("token_amount must be positive");
 
-    const plan = await SubscriptionService.findPlanByName(request.plan_name);
-    if (!plan) throw new Error("Plan not found");
-    if (plan.price <= 0) throw new Error("This plan is free");
+    // 1 token = 1 USD
+    const finalPrice = tokenAmount;
 
-    // Create invoice via NowPayments
     const payCurrency = (request.pay_currency as PaymentCurrency) || "USDTERC20";
     const { invoice_url, payment_id, invoice_id } = await createInvoice(
-        request.plan_name,
-        plan.price,
+        finalPrice,
         account.id,
         payCurrency,
     );
@@ -165,17 +101,117 @@ async function createpayment(request: SubscriptionCreatePaymentRequest): Promise
     // Create a pending record
     await SubscriptionService.createRecord({
         account_id: account.id,
-        plan_name: request.plan_name,
         txid: invoice_id,
-        amount: plan.price,
+        amount: finalPrice,
         confirmations: 0,
         status: "pending",
+        type: "topup",
     });
 
-    return new SubscriptionCreatePaymentResponse({
+    return new SubscriptionTopupResponse({
         success: true,
         message: "success",
-        data: { invoice_url, payment_id },
+        data: { invoice_url, payment_id, token_amount: tokenAmount, price_dollars: finalPrice },
+    });
+}
+
+// ─── Statement (unified balance history) ───
+
+async function statement(request: StatementRequest): Promise<StatementResponse> {
+    request = StatementRequest.self(request);
+    const account = await resolveAccount(request.auth || "");
+
+    // 1. Confirmed topup transactions
+    const txRepo = Repository.instance<any>("Transaction");
+    const txs = await txRepo.find({ account_id: account.id, status: "confirmed", delete_time: null });
+
+    // 2. Redeemed gift cards (bonus & redeemed codes)
+    const cardRepo = Repository.instance<any>("GiftCard");
+    const cards = await cardRepo.find({ redeemed_by: account.id, status: "redeemed" });
+
+    // 3. Usage logs (AI call costs) — grouped by day + model
+    const usageRepo = Repository.instance<any>("UsageLog");
+    const usageLogs = await usageRepo.find({ accountId: account.id, delete_time: null });
+
+    // Group by "day|modelAlias"
+    const dailyModelUsage = new Map<string, { logs: any[]; maxTimestamp: number }>();
+    for (const log of usageLogs) {
+        const day = new Date(log.create_time).toISOString().slice(0, 10); // "2026-05-12"
+        const model = log.modelAlias || "Unknown";
+        const key = `${day}|${model}`;
+        if (!dailyModelUsage.has(key)) {
+            dailyModelUsage.set(key, { logs: [], maxTimestamp: 0 });
+        }
+        const entry = dailyModelUsage.get(key)!;
+        entry.logs.push(log);
+        if (log.create_time > entry.maxTimestamp) entry.maxTimestamp = log.create_time;
+    }
+
+    const items: StatementItem[] = [];
+
+    for (const tx of txs) {
+        items.push(new StatementItem({
+            id: tx.id,
+            type: "topup",
+            amount: tx.amount,
+            description: "Topup",
+            remark: `#${tx.txid || tx.id?.slice(0, 8)}`,
+            create_time: tx.create_time,
+        }));
+    }
+
+    for (const card of cards) {
+        if (card.code.startsWith("daily_")) {
+            const ts = (card.redeemed_at || card.create_time).toString().slice(-10);
+            items.push(new StatementItem({
+                id: card.id,
+                type: "bonus",
+                amount: card.token_amount,
+                description: "Daily Bonus",
+                remark: `#${ts}`,
+                create_time: card.redeemed_at || card.create_time,
+            }));
+        } else if (card.code.startsWith("register_")) {
+            const ts = (card.redeemed_at || card.create_time).toString().slice(-10);
+            items.push(new StatementItem({
+                id: card.id,
+                type: "bonus",
+                amount: card.token_amount,
+                description: "Registration Bonus",
+                remark: `#${ts}`,
+                create_time: card.redeemed_at || card.create_time,
+            }));
+        } else {
+            items.push(new StatementItem({
+                id: card.id,
+                type: "gift_card",
+                amount: card.token_amount,
+                description: "Gift Card Redeemed",
+                create_time: card.redeemed_at || card.create_time,
+            }));
+        }
+    }
+
+    // One entry per day per model
+    for (const [key, entry] of dailyModelUsage) {
+        const model = key.split("|")[1];
+        items.push(new StatementItem({
+            id: `usage_${key}`,
+            type: "usage",
+            amount: AccountService.computeUsageCost(entry.logs),
+            description: "AI Usage",
+            remark: model,
+            create_time: entry.maxTimestamp,
+        }));
+    }
+
+    // Sort by time descending (most recent first)
+    items.sort((a, b) => b.create_time - a.create_time);
+
+    return new StatementResponse({
+        success: true,
+        message: "success",
+        data: { list: items },
     });
 }
 
@@ -205,20 +241,13 @@ async function ipnwebhook(request: Record<string, unknown>): Promise<{ success: 
         }
 
         if (paymentStatus === "finished" || paymentStatus === "confirmed") {
-            const plan = await SubscriptionService.findPlanByName(record.plan_name);
-            if (!plan) throw new Error("Plan not found");
-
-            // Mark as confirmed
             await SubscriptionService.updateRecordByTxid(record.txid, {
                 payment_id: paymentId,
                 status: "confirmed",
                 confirmations: 1,
             });
 
-            // Upgrade account
-            await SubscriptionService.upgradeAccount(record.account_id, record.plan_name, plan.duration_days);
-
-            console.log(`[IPN] Account ${record.account_id} upgraded to ${record.plan_name}`);
+            console.log(`[IPN] Account ${record.account_id} topped up ${record.amount} tokens`);
         } else if (paymentStatus === "failed" || paymentStatus === "expired" || paymentStatus === "refunded") {
             await SubscriptionService.updateRecordByTxid(record.txid, { status: "expired" });
         }
@@ -232,15 +261,10 @@ async function ipnwebhook(request: Record<string, unknown>): Promise<{ success: 
 
 // ─── Export controllers ───
 
-export const subscriptionPlanController = new SubscriptionPlanRouterInstance(inject, {
-    list: planList,
-    create: planCreate,
-    update: planUpdate,
-    delete: planDelete,
+export const subscriptionRecordController = new TransactionRouterInstance(inject, {
+    records,
+    createtopup,
+    ipnwebhook,
+    statement,
 });
 
-export const subscriptionRecordController = new SubscriptionRecordRouterInstance(inject, {
-    records,
-    createpayment,
-    ipnwebhook,
-});

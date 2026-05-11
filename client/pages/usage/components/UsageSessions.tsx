@@ -1,26 +1,24 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid,
 } from "recharts";
-import { Select, SelectItem } from "@heroui/react";
-import { UserSessionGroup } from "../../../../shared/modules/usage/usage.interface";
-import { stringToColor, fmtM, format24Time, stripEmail } from "./utils";
+import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell } from "@heroui/react";
+import { UsageSessionTotals, UserSessionGroup, UserSession } from "../../../../shared/modules/usage/usage.interface";
+import { stringToColor, fmtM, fmtK, format24Time, stripEmail } from "./utils";
 
 type Props = {
     groups: UserSessionGroup[];
+    totals: UsageSessionTotals;
+    recentSessions: UserSession[];
+    gapMinutes?: number;
 };
 
-/** Collect all unique provider names that have non-zero total across chart data */
 function getActiveProviders(
     groups: UserSessionGroup[],
-    accountFilter: Set<string>,
-    modelFilter: Set<string>,
 ): string[] {
     const totals = new Map<string, number>();
     for (const g of groups) {
-        if (!accountFilter.has(g.accountId)) continue;
         for (const s of g.sessions) {
-            if (!modelFilter.has(s.modelAlias)) continue;
             for (const pu of s.providerUsage) {
                 totals.set(pu.providerName, (totals.get(pu.providerName) || 0) + pu.inputTokens + pu.outputTokens);
             }
@@ -32,21 +30,30 @@ function getActiveProviders(
         .sort();
 }
 
-/** Build chart data: each entry = one session with provider token values */
+function formatChartLabel(ts: number, showDate: boolean): string {
+    const d = new Date(ts);
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    if (!showDate) return `${hh}:${mm}`;
+    const M = String(d.getMonth() + 1).padStart(2, "0");
+    const DD = String(d.getDate()).padStart(2, "0");
+    return `${M}/${DD} ${hh}:${mm}`;
+}
+
 function buildChartData(
     sessions: UserSessionGroup["sessions"],
     providers: string[],
+    showDate: boolean,
 ): Record<string, number | string>[] {
     return sessions.map((s) => {
         const row: Record<string, number | string> = {
-            timeLabel: format24Time(s.startTime),
-            modelAlias: s.modelAlias,
+            timeLabel: formatChartLabel(s.startTime, showDate),
             startTime: s.startTime,
+            cost: s.cost,
         };
         const providerMap = new Map<string, number>();
         for (const pu of s.providerUsage) {
-            const prev = providerMap.get(pu.providerName) || 0;
-            providerMap.set(pu.providerName, prev + pu.inputTokens + pu.outputTokens);
+            providerMap.set(pu.providerName, (providerMap.get(pu.providerName) || 0) + pu.inputTokens + pu.outputTokens);
         }
         for (const p of providers) {
             row[p] = providerMap.get(p) || 0;
@@ -55,58 +62,20 @@ function buildChartData(
     });
 }
 
-export function UsageSessions({ groups }: Props) {
-    const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set());
-    const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
+export function UsageSessions({ groups, totals, recentSessions, gapMinutes }: Props) {
+    const showDate = (gapMinutes ?? 60) >= 60;
 
-    // Derive all unique accounts and models
-    const allAccounts = useMemo(
-        () => groups.map((g) => ({ id: g.accountId, name: stripEmail(g.accountName || g.accountId) })),
-        [groups],
-    );
-    const allModels = useMemo(() => {
-        const set = new Set<string>();
-        for (const g of groups) {
-            for (const s of g.sessions) {
-                set.add(s.modelAlias);
-            }
-        }
-        return Array.from(set).sort();
+    const providers = useMemo(() => getActiveProviders(groups), [groups]);
+
+    const chartSessions = useMemo(() => {
+        const all = groups.flatMap(g => g.sessions);
+        all.sort((a, b) => a.startTime - b.startTime);
+        return all;
     }, [groups]);
 
-    // Auto-select all when nothing selected
-    const activeAccounts = selectedAccounts.size > 0 ? selectedAccounts : new Set(allAccounts.map((a) => a.id));
-    const activeModels = selectedModels.size > 0 ? selectedModels : new Set(allModels);
-
-    // Filter groups by selected accounts
-    const filteredGroups = useMemo(
-        () => groups.filter((g) => activeAccounts.has(g.accountId)),
-        [groups, activeAccounts],
-    );
-
-    // Get all sessions across filtered groups, sorted by time ASC for the chart
-    const allSessions = useMemo(() => {
-        const s = filteredGroups.flatMap((g) => g.sessions);
-        s.sort((a, b) => a.startTime - b.startTime);
-        return s;
-    }, [filteredGroups]);
-
-    // Filter by model
-    const modelSessions = useMemo(
-        () => allSessions.filter((s) => activeModels.has(s.modelAlias)),
-        [allSessions, activeModels],
-    );
-
-    // Only show providers that have non-zero total in the filtered data
-    const providers = useMemo(
-        () => getActiveProviders(groups, activeAccounts, activeModels),
-        [groups, activeAccounts, activeModels],
-    );
-
-    const chartData = useMemo(
-        () => buildChartData(modelSessions, providers),
-        [modelSessions, providers],
-    );
+    const chartData = useMemo(() => {
+        return buildChartData(chartSessions, providers, showDate);
+    }, [chartSessions, providers, showDate]);
 
     if (groups.length === 0) {
         return <div className="text-center text-default-400 py-12">No data</div>;
@@ -114,47 +83,31 @@ export function UsageSessions({ groups }: Props) {
 
     return (
         <div className="flex flex-col gap-4">
-            {/* Filters */}
-            <div className="flex flex-wrap gap-3">
-                <Select
-                    size="sm"
-                    className="w-48"
-                    selectionMode="multiple"
-                    placeholder="All accounts"
-                    selectedKeys={selectedAccounts}
-                    onSelectionChange={(keys) => setSelectedAccounts(new Set(Array.from(keys) as string[]))}
-                    aria-label="Filter by account"
-                >
-                    {allAccounts.map((a) => (
-                        <SelectItem key={a.id}>{a.name}</SelectItem>
-                    ))}
-                </Select>
-
-                <Select
-                    size="sm"
-                    className="w-48"
-                    selectionMode="multiple"
-                    placeholder="All models"
-                    selectedKeys={selectedModels}
-                    onSelectionChange={(keys) => setSelectedModels(new Set(Array.from(keys) as string[]))}
-                    aria-label="Filter by model"
-                >
-                    {allModels.map((m) => (
-                        <SelectItem key={m}>{m}</SelectItem>
-                    ))}
-                </Select>
+            {/* Total stats summary */}
+            <div className="flex flex-wrap gap-4 text-sm">
+                <div className="flex items-center gap-1">
+                    <span className="text-default-500">Requests:</span>
+                    <span className="font-semibold font-mono">{totals.totalRequests}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                    <span className="text-default-500">Total Tokens:</span>
+                    <span className="font-semibold font-mono">{fmtM(totals.totalTokens)}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                    <span className="text-default-500">Total Cost:</span>
+                    <span className="font-semibold font-mono">${totals.totalCost.toFixed(4)}</span>
+                </div>
             </div>
-
             {/* Stacked bar chart */}
             {chartData.length === 0 ? (
-                <div className="text-center text-default-400 py-12">No data for selected filters</div>
+                <div className="text-center text-default-400 py-12">No data</div>
             ) : (
                 <ResponsiveContainer width="100%" height={400}>
                     <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--heroui-default-200))" />
                         <XAxis
                             dataKey="timeLabel"
-                            tick={{ fontSize: 11 }}
+                            tick={{ fontSize: 11, fontStyle: "normal" }}
                             interval="preserveStartEnd"
                             angle={-20}
                             textAnchor="end"
@@ -168,8 +121,11 @@ export function UsageSessions({ groups }: Props) {
                                 borderRadius: 8,
                                 fontSize: 12,
                             }}
-                            formatter={(value: number, name: string) => [fmtM(value), name]}
-                            labelFormatter={(label: string) => label}
+                            formatter={(value: any, name: any) => [fmtM(Number(value) || 0), String(name)]}
+                            labelFormatter={(label: any, payload: readonly any[]) => {
+                                const cost = payload?.[0]?.payload?.cost != null ? `$${Number(payload[0].payload.cost).toFixed(4)}` : "";
+                                return `${String(label)}${cost ? ` | ${cost}` : ""}`;
+                            }}
                         />
                         <Legend
                             formatter={(value: string) => (
@@ -188,6 +144,36 @@ export function UsageSessions({ groups }: Props) {
                     </BarChart>
                 </ResponsiveContainer>
             )}
+
+            {/* Recent sessions table */}
+            <div className="overflow-auto">
+                <Table aria-label="Recent sessions" className="min-w-max">
+                    <TableHeader>
+                        <TableColumn align="center">Time</TableColumn>
+                        <TableColumn align="center" className="hidden md:table-cell">Account</TableColumn>
+                        <TableColumn align="center">Model</TableColumn>
+                        <TableColumn align="center" className="hidden md:table-cell">Input</TableColumn>
+                        <TableColumn align="center" className="hidden md:table-cell">Output</TableColumn>
+                        <TableColumn align="center">Cost</TableColumn>
+                    </TableHeader>
+                    <TableBody emptyContent="No sessions">
+                        {recentSessions.map((session, idx) => (
+                            <TableRow key={`${session.startTime}-${idx}`}>
+                                <TableCell className="whitespace-nowrap font-mono text-sm text-center">
+                                    {format24Time(session.startTime)}
+                                </TableCell>
+                                <TableCell className="max-w-32 truncate text-center hidden md:table-cell">
+                                    {stripEmail(session.accountName || "")}
+                                </TableCell>
+                                <TableCell className="font-semibold text-center max-w-28 truncate">{session.modelAliases.join(", ")}</TableCell>
+                                <TableCell className="hidden md:table-cell text-center font-mono">{fmtM(session.inputTokens)}</TableCell>
+                                <TableCell className="hidden md:table-cell text-center font-mono">{fmtK(session.outputTokens)}</TableCell>
+                                <TableCell className="text-center font-mono">${session.cost?.toFixed(4) || "0"}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
         </div>
     );
 }

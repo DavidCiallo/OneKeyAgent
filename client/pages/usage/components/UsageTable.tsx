@@ -27,24 +27,24 @@ export function UsageTable({ list, total, page, onPageChange }: Props) {
             <div className="flex flex-row flex-1 overflow-auto">
                 <Table aria-label="Usage list" className="flex-1">
                     <TableHeader>
-                        <TableColumn>{locale.AccountId}</TableColumn>
+                        <TableColumn align="center">{locale.AccountId}</TableColumn>
                         <TableColumn align="center">{locale.ModelAlias}</TableColumn>
                         <TableColumn align="center">{locale.ProviderName}</TableColumn>
                         <TableColumn align="center">{locale.InputTokens}</TableColumn>
                         <TableColumn align="center">{locale.OutputTokens}</TableColumn>
-                        <TableColumn align="center">Requests</TableColumn>
+                        <TableColumn align="center">Cost</TableColumn>
                         <TableColumn align="center">{locale.Time}</TableColumn>
                     </TableHeader>
                     <TableBody emptyContent={locale.NoData}>
                         {list.map(item => (
                             <TableRow key={item.id}>
-                                <TableCell className="max-w-xs truncate">{stripEmail(item.accountName || "") || item.accountId || "—"}</TableCell>
-                                <TableCell>{item.modelAlias || "—"}</TableCell>
-                                <TableCell>{item.providerName || "—"}</TableCell>
-                                <TableCell>{item.inputTokens}</TableCell>
-                                <TableCell>{item.outputTokens}</TableCell>
-                                <TableCell>1</TableCell>
-                                <TableCell>{item.create_time ? new Date(item.create_time).toLocaleString() : "—"}</TableCell>
+                                <TableCell className="max-w-xs truncate text-center">{stripEmail(item.accountName || "") || item.accountId || "—"}</TableCell>
+                                <TableCell className="text-center">{item.modelAlias || "—"}</TableCell>
+                                <TableCell className="text-center">{item.providerName || "—"}</TableCell>
+                                <TableCell className="text-center">{item.inputTokens}</TableCell>
+                                <TableCell className="text-center">{item.outputTokens}</TableCell>
+                                <TableCell className="text-center">${item.cost.toFixed(4)}</TableCell>
+                                <TableCell className="text-center">{item.create_time ? new Date(item.create_time).toLocaleString() : "—"}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>

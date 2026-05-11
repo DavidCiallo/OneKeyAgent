@@ -1,5 +1,5 @@
 import { BaseRequest, BaseResponse } from "../../lib/default/decorator";
-import { RoleEntity, RoleType, AccountRoleEntity } from "./role.entity";
+import { RoleEntity, RoleType } from "./role.entity";
 
 export class RoleDTO {
     public id: string;
@@ -8,8 +8,6 @@ export class RoleDTO {
     public create_time: number;
     public update_time: number | null;
     public delete_time: number | null;
-
-    private isTypeSafe: symbol = Symbol();
 
     constructor(origin: RoleEntity) {
         this.id = origin.id;
@@ -24,8 +22,6 @@ export class RoleDTO {
 export class RoleCreateBody {
     public name: string;
     public type: RoleType;
-
-    private isTypeSafe: symbol = Symbol();
 
     constructor(origin: Pick<RoleEntity, "name" | "type">) {
         if (!origin.name || !origin.type) {
@@ -43,8 +39,6 @@ export class RoleCreateBody {
 export class RoleUpdateBody {
     public name?: string;
     public type?: RoleType;
-
-    private isTypeSafe: symbol = Symbol();
 
     constructor(origin: Partial<RoleEntity> = {}) {
         if (!origin.name && !origin.type) {
@@ -200,8 +194,6 @@ export class RoleDeleteResponse implements BaseResponse<RoleDTO> {
 // Assign roles to account
 export class AssignRolesBody {
     public permissions: { name: string; type: string }[];
-
-    private isTypeSafe: symbol = Symbol();
 
     constructor(origin: { permissions: { name: string; type: string }[] }) {
         if (!origin.permissions || !Array.isArray(origin.permissions)) {

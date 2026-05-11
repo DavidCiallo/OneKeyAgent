@@ -25,7 +25,6 @@ async function list(request: ModelListRequest): Promise<ModelListResponse> {
 
     const search: Partial<Record<string, any>> = {};
     if (filter?.alias) search.alias = filter.alias;
-    if (filter?.tier !== undefined) search.tier = filter.tier;
 
     const { list: data, total } = await ModelService.find(page, search as any);
     const list = data.map(item => new ModelDTO(item));
@@ -64,7 +63,8 @@ async function create(request: ModelCreateRequest): Promise<ModelCreateResponse>
     if (!auth || !getIdentifyByVerify(auth)) {
         throw "Authorization failed";
     }
-    const data = await ModelService.create(request.model as any);
+    const data = await ModelService.create(request.model);
+    console.log(data)
     const model = new ModelDTO(data);
     return new ModelCreateResponse({
         success: true,

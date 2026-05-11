@@ -17,8 +17,6 @@ export class ProviderDTO {
     public update_time: number | null;
     public delete_time: number | null;
 
-    private isTypeSafe: symbol = Symbol();
-
     constructor(origin: ProviderEntity) {
         this.id = origin.id;
         this.modelAlias = origin.modelAlias;
@@ -48,8 +46,6 @@ export class ProviderCreateBody {
     public apiType?: string;
     public proxyURL?: string;
     public enabled?: number;
-
-    private isTypeSafe: symbol = Symbol();
 
     constructor(origin: Pick<ProviderEntity, "modelAlias" | "baseURL" | "model" | "priority" | "name"> & Partial<Pick<ProviderEntity, "apiKey" | "authType" | "apiType" | "proxyURL" | "enabled">>) {
         if (!origin.modelAlias || !origin.baseURL || !origin.model || origin.priority === undefined) {
@@ -84,8 +80,6 @@ export class ProviderUpdateBody {
     public proxyURL?: string;
     public enabled?: number;
 
-    private isTypeSafe: symbol = Symbol();
-
     constructor(origin: Partial<ProviderEntity> = {}) {
         if (!origin.modelAlias && origin.priority === undefined && !origin.baseURL && !origin.model && !origin.apiKey && origin.apiKey === undefined && !origin.authType && !origin.apiType && !origin.proxyURL && origin.enabled === undefined) {
             throw new Error("At least one field is required");
@@ -110,8 +104,6 @@ export class ProviderUpdateBody {
 export class ProviderQueryBody {
     public modelAlias?: string;
     public enabled?: number;
-
-    private isTypeSafe: symbol = Symbol();
 
     constructor(origin: Partial<ProviderEntity>) {
         if (false) throw new Error("Unexpected error");

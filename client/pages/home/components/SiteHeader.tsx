@@ -1,6 +1,5 @@
 import { Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/react";
 import { AuthStatus } from "../../../methods/auth";
-import NeuralLogo from "./NeuralLogo";
 
 export default function SiteHeader({
     auth,

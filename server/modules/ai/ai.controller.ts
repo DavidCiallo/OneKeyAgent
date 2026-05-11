@@ -1,7 +1,4 @@
 import {
-    ChatCompletionsRequest,
-    CompletionRequest,
-    ModelsRequest,
     ModelsResponse,
 } from "../../../shared/modules/ai/ai.interface";
 import { AiRouterInstance } from "../../../shared/modules/ai/ai.router";
@@ -19,7 +16,6 @@ export const aiController = new AiRouterInstance(inject, {
         }
         const accountId = await getAccountIdByApiKey(apiKey);
         if (!accountId) throw new Error("Invalid API Key");
-        const req = ChatCompletionsRequest.self(request);
 
         if (request.stream) {
             const stream = await AiService.chatCompletionsStream(request, accountId);
@@ -46,7 +42,6 @@ export const aiController = new AiRouterInstance(inject, {
         }
         const accountId = await getAccountIdByApiKey(apiKey);
         if (!accountId) throw new Error("Invalid API Key");
-        const req = CompletionRequest.self(request);
 
         if (request.stream) {
             const stream = await AiService.completionsStream(request, accountId);
@@ -86,5 +81,57 @@ export const aiController = new AiRouterInstance(inject, {
 
         const data = await AiService.listModels(accountId);
         return new ModelsResponse(data);
+    },
+
+    async v1messages(request): Promise<any> {
+        const apiKey = request.auth || "";
+        if (!validateApiKey(apiKey) || !(await verifyApiKeyInDb(apiKey))) {
+            throw new Error("Invalid API Key");
+        }
+        const accountId = await getAccountIdByApiKey(apiKey);
+        if (!accountId) throw new Error("Invalid API Key");
+
+        if (request.stream) {
+            try {
+                const stream = await AiService.antMessagesStream(request, accountId);
+                return new Response(stream as any, {
+                    headers: {
+                        "Content-Type": "text/event-stream",
+                        "Cache-Control": "no-cache",
+                        Connection: "keep-alive",
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                        "Access-Control-Allow-Headers": "Content-Type, token, Authorization, x-api-key",
+                    },
+                });
+            } catch (e: any) {
+                console.error("[v1messages] streaming error:", e);
+                // Return SSE-formatted error so Claude Code doesn't get JSON parse error
+                const errorStream = new ReadableStream({
+                    start(controller) {
+                        const errEvent = {
+                            type: "error",
+                            error: { type: "api_error", message: e.message || "Stream failed" },
+                        };
+                        controller.enqueue(new TextEncoder().encode(`event: error\ndata: ${JSON.stringify(errEvent)}\n\n`));
+                        controller.enqueue(new TextEncoder().encode('event: message_stop\ndata: {"type":"message_stop"}\n\n'));
+                        controller.close();
+                    },
+                });
+                return new Response(errorStream, {
+                    headers: {
+                        "Content-Type": "text/event-stream",
+                        "Cache-Control": "no-cache",
+                        Connection: "keep-alive",
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                        "Access-Control-Allow-Headers": "Content-Type, token, Authorization, x-api-key",
+                    },
+                });
+            }
+        }
+
+        const result = await AiService.antMessages(request, accountId);
+        return result;
     },
 });

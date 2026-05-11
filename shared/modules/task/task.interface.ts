@@ -10,8 +10,6 @@ export class TaskDTO {
     public status: string;
     public create_time: number;
 
-    private isTypeSafe: symbol = Symbol();
-
     constructor(origin: TaskEntity) {
         this.id = origin.id;
         this.account_id = origin.account_id;
@@ -53,8 +51,6 @@ export class TaskPollResponse implements BaseResponse<TaskDTO> {
 export class TaskReceiveBody {
     public tg_chat_id: string;
     public text: string;
-
-    private isTypeSafe: symbol = Symbol();
 
     constructor(origin: { tg_chat_id: string; text: string }) {
         if (!origin.tg_chat_id || !origin.text) {
@@ -101,8 +97,6 @@ export class TaskReceiveResponse implements BaseResponse<TaskDTO> {
 export class TaskCompleteBody {
     public status: "completed" | "failed";
     public result?: string;
-
-    private isTypeSafe: symbol = Symbol();
 
     constructor(origin: { status: "completed" | "failed"; result?: string }) {
         if (!origin.status) {

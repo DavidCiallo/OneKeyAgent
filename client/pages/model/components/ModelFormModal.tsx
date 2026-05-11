@@ -1,9 +1,11 @@
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input, Switch } from "@heroui/react";
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Switch } from "@heroui/react";
+import { useEffect, useState } from "react";
 import { Locale } from "../../../methods/locale";
 
 type ModelForm = {
-    tier: number;
     alias?: string;
+    input_price: number;
+    output_price: number;
     is_public?: number;
 };
 
@@ -20,28 +22,50 @@ export function ModelFormModal({ isOpen, onOpenChange, mode, form, onFormChange,
     const locale = Locale("ModelPage");
     const common = Locale("Common");
 
+    const [inputPriceStr, setInputPriceStr] = useState(String(form.input_price));
+    const [outputPriceStr, setOutputPriceStr] = useState(String(form.output_price));
+
+    // Sync from parent form when opening
+    useEffect(() => {
+        setInputPriceStr(String(form.input_price));
+        setOutputPriceStr(String(form.output_price));
+    }, [isOpen]);
+
+    const commitPrices = () => {
+        const ip = parseFloat(inputPriceStr);
+        const op = parseFloat(outputPriceStr);
+        if (!isNaN(ip) && !isNaN(op)) {
+            onFormChange({ ...form, input_price: ip, output_price: op });
+        }
+    };
+
     return (
         <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
             <ModalContent>
                 <ModalHeader>{mode === "create" ? locale.CreateTitle : locale.EditTitle}</ModalHeader>
                 <ModalBody>
                     <div className="flex flex-col gap-3">
-                        <Select
-                            label={locale.Tier}
-                            selectedKeys={[String(form.tier)]}
-                            onChange={e => onFormChange({ ...form, tier: parseInt(e.target.value) })}
-                        >
-                            {[...Array(100)]
-                                .map((_, i) => (i))
-                                .filter(i => i < 10 || i % 5 == 4)
-                                .map(i => <SelectItem key={String(i + 1)}>{String(i + 1)}</SelectItem>)
-                            }
-                        </Select>
                         <Input
                             label={locale.Alias}
                             value={form.alias || ""}
                             onChange={e => onFormChange({ ...form, alias: e.target.value })}
                             isRequired
+                        />
+                        <Input
+                            label={locale.InputPrice || "Input Price"}
+                            value={inputPriceStr}
+                            onValueChange={setInputPriceStr}
+                            onBlur={commitPrices}
+                            startContent={<span className="text-default-400 text-sm font-mono">$</span>}
+                            className="font-mono"
+                        />
+                        <Input
+                            label={locale.OutputPrice || "Output Price"}
+                            value={outputPriceStr}
+                            onValueChange={setOutputPriceStr}
+                            onBlur={commitPrices}
+                            startContent={<span className="text-default-400 text-sm font-mono">$</span>}
+                            className="font-mono"
                         />
                         <Switch
                             isSelected={form.is_public === 1}

@@ -58,11 +58,10 @@ export class UsageDTO {
     public providerName?: string;
     public inputTokens: number;
     public outputTokens: number;
+    public cost: number;
     public create_time: number;
 
-    private isTypeSafe: symbol = Symbol();
-
-    constructor(origin: UsageLogEntity & { accountName?: string; providerName?: string }) {
+    constructor(origin: UsageLogEntity & { accountName?: string; providerName?: string; cost?: number }) {
         this.id = origin.id;
         this.accountId = origin.accountId;
         this.accountName = origin.accountName;
@@ -71,6 +70,7 @@ export class UsageDTO {
         this.providerName = origin.providerName;
         this.inputTokens = origin.inputTokens;
         this.outputTokens = origin.outputTokens;
+        this.cost = origin.cost ?? 0;
         this.create_time = origin.create_time;
     }
 }
@@ -78,8 +78,6 @@ export class UsageDTO {
 export class UsageQueryBody {
     public accountId?: string;
     public modelAlias?: string;
-
-    private isTypeSafe: symbol = Symbol();
 
     constructor(origin: Partial<UsageLogEntity>) {
         if (false) throw new Error("Unexpected error");
@@ -89,34 +87,6 @@ export class UsageQueryBody {
 
     static self(unsafe: Partial<UsageLogEntity>) {
         return new UsageQueryBody(unsafe);
-    }
-}
-
-export class MyUsageRequest implements BaseRequest {
-    public auth?: string;
-
-    constructor(origin: Partial<MyUsageRequest>) {
-        if (false) throw new Error("Unexpected error");
-        origin.auth && (this.auth = origin.auth);
-    }
-    static self(unsafe: MyUsageRequest) {
-        return new MyUsageRequest(unsafe);
-    }
-}
-
-export class MyUsageResponse implements BaseResponse<any> {
-    public success: boolean;
-    public message: string;
-    public data: {
-        today: number;
-        thisWeek: number;
-        total: number;
-    };
-
-    constructor(origin: MyUsageResponse) {
-        this.success = origin.success;
-        this.message = origin.message;
-        this.data = origin.data;
     }
 }
 
@@ -159,14 +129,24 @@ export interface ProviderUsage {
     outputTokens: number;
 }
 
+export interface ModelUsage {
+    modelAlias: string;
+    inputTokens: number;
+    outputTokens: number;
+}
+
 export interface UserSession {
     startTime: number;
     endTime: number;
-    modelAlias: string;
+    modelAliases: string[];
     requestCount: number;
     inputTokens: number;
     outputTokens: number;
+    cost: number;
     providerUsage: ProviderUsage[];
+    modelUsage: ModelUsage[];
+    windowLabel: string;
+    accountName?: string;
 }
 
 export interface UserSessionGroup {
@@ -181,26 +161,38 @@ export class UsageSessionsRequest implements BaseRequest {
     public auth?: string;
     public gapMinutes?: number;
     public since?: number;
+    public accountIds?: string[];
 
     constructor(origin: Partial<UsageSessionsRequest>) {
         if (false) throw new Error("Unexpected error");
         origin.auth && (this.auth = origin.auth);
         origin.gapMinutes && (this.gapMinutes = origin.gapMinutes);
         origin.since && (this.since = origin.since);
+        origin.accountIds && (this.accountIds = origin.accountIds);
     }
     static self(unsafe: UsageSessionsRequest) {
         return new UsageSessionsRequest(unsafe);
     }
 }
 
+export interface UsageSessionTotals {
+    totalTokens: number;
+    totalCost: number;
+    totalRequests: number;
+}
+
 export class UsageSessionsResponse implements BaseResponse<UserSessionGroup> {
     public success: boolean;
     public message: string;
     public data: UserSessionGroup[];
+    public totals: UsageSessionTotals;
+    public recentSessions?: UserSession[];
 
     constructor(origin: UsageSessionsResponse) {
         this.success = origin.success;
         this.message = origin.message;
         this.data = origin.data;
+        this.totals = origin.totals;
+        this.recentSessions = origin.recentSessions;
     }
 }

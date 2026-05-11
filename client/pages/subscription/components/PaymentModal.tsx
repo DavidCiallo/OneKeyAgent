@@ -7,14 +7,12 @@ import { PAYMENT_ICON_MAP } from "../../../images/svg/PaymentIcons";
 export default function PaymentModal({
     isOpen,
     onOpenChange,
-    planName,
     planPrice,
     onProceedToPay,
     paying,
 }: {
     isOpen: boolean;
     onOpenChange: () => void;
-    planName: string;
     planPrice: number;
     onProceedToPay: (payCurrency: string) => void;
     paying: boolean;
@@ -22,17 +20,18 @@ export default function PaymentModal({
     const locale = Locale("SubscriptionPage");
     const [selectedCurrency, setSelectedCurrency] = useState<string>(PAYMENT_CURRENCIES[0].pay_currency);
 
-    const formatPrice = (cents: number) => "$" + (cents / 100).toFixed(cents % 100 ? 2 : 0);
+    const formatPrice = (dollars: number) => "$" + dollars.toFixed(2);
 
     return (
         <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="md">
             <ModalContent>
-                <ModalHeader>{locale.Payment} - {planName.toUpperCase()}</ModalHeader>
+                <ModalHeader>{locale.Payment}</ModalHeader>
                 <ModalBody className="space-y-4">
                     <div className="bg-gray-50 rounded-lg p-4">
                         <p className="text-sm text-gray-600">
                             <span className="text-base">{locale.DepositAmount}: </span>
-                            <span className="font-bold text-primary text-base">{formatPrice(planPrice)} USD</span>
+                            <span className="text-primary text-base font-bold">{formatPrice(planPrice)}</span>
+                            <span className="mx-1 text-base">USD</span>
                         </p>
                     </div>
 

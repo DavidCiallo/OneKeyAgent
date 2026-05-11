@@ -5,10 +5,7 @@ CREATE TABLE `account` (
 	`password` text NOT NULL,
 	`api_key` text,
 	`is_admin` integer DEFAULT 0 NOT NULL,
-	`plan` text DEFAULT 'free' NOT NULL,
-	`plan_expires_at` integer,
-	`sub_wallet_address` text,
-	`tg_chat_id` text,
+	`last_daily_time` integer,
 	`create_time` integer NOT NULL,
 	`update_time` integer,
 	`delete_time` integer
@@ -17,7 +14,8 @@ CREATE TABLE `account` (
 CREATE TABLE `model` (
 	`id` text PRIMARY KEY NOT NULL,
 	`alias` text NOT NULL,
-	`tier` integer DEFAULT 1 NOT NULL,
+	`input_price` integer DEFAULT 0 NOT NULL,
+	`output_price` integer DEFAULT 0 NOT NULL,
 	`is_public` integer DEFAULT 0,
 	`create_time` integer NOT NULL,
 	`update_time` integer,
@@ -31,7 +29,8 @@ CREATE TABLE `usage_log` (
 	`provider_id` text DEFAULT '',
 	`input_tokens` integer NOT NULL,
 	`output_tokens` integer NOT NULL,
-	`tier_snapshot` integer,
+	`input_price` integer DEFAULT 0 NOT NULL,
+	`output_price` integer DEFAULT 0 NOT NULL,
 	`create_time` integer,
 	`update_time` integer,
 	`delete_time` integer
@@ -84,38 +83,25 @@ CREATE TABLE `task` (
 	`delete_time` integer
 );
 --> statement-breakpoint
-CREATE TABLE `subscription_plan` (
-	`id` text PRIMARY KEY NOT NULL,
-	`name` text NOT NULL,
-	`monthly_limit` integer NOT NULL,
-	`price` integer DEFAULT 0 NOT NULL,
-	`duration_days` integer DEFAULT 30 NOT NULL,
-	`create_time` integer NOT NULL,
-	`update_time` integer,
-	`delete_time` integer
-);
---> statement-breakpoint
-CREATE TABLE `subscription_record` (
+CREATE TABLE `transaction` (
 	`id` text PRIMARY KEY NOT NULL,
 	`account_id` text NOT NULL,
-	`plan_name` text NOT NULL,
 	`txid` text NOT NULL,
 	`amount` integer NOT NULL,
 	`confirmations` integer DEFAULT 0 NOT NULL,
 	`status` text DEFAULT 'pending' NOT NULL,
 	`payment_id` text,
+	`type` text DEFAULT 'topup' NOT NULL,
 	`create_time` integer NOT NULL,
 	`update_time` integer,
 	`delete_time` integer
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `subscription_record_txid_unique` ON `subscription_record` (`txid`);
---> statement-breakpoint
+CREATE UNIQUE INDEX `transaction_txid_unique` ON `transaction` (`txid`);--> statement-breakpoint
 CREATE TABLE `gift_card` (
 	`id` text PRIMARY KEY NOT NULL,
 	`code` text NOT NULL,
-	`plan_name` text NOT NULL,
-	`duration_days` integer NOT NULL,
+	`token_amount` integer NOT NULL,
 	`status` text DEFAULT 'unused' NOT NULL,
 	`redeemed_by` text,
 	`redeemed_at` integer,

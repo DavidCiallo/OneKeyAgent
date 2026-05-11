@@ -1,43 +1,28 @@
-import { Card, CardBody, CardHeader, Divider, Chip } from "@heroui/react";
+import { Card, CardBody, CardHeader, Divider, Chip, Progress } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
-import { useEffect, useState } from "react";
 
-interface UsageData {
-    today: number;
-    thisWeek: number;
-    total: number;
-}
-
-const DEFAULT_MONTHLY_LIMIT = 90_000_000;
-const fmt = (val: number) => {
-    if (val >= 1_000_000) return (val / 1_000_000).toFixed(1) + "M";
-    if (val >= 1000) return (val / 1000).toFixed(1) + "K";
-    return val.toString();
+const formatBalance = (dollars: number) => {
+    return "$" + dollars.toFixed(2);
 };
+
+const formatUsage = (dollars: number) => {
+    return "$" + dollars.toFixed(3);
+};
+
+const WEEKLY_LIMIT = 100;
 
 export default function AccountInfoCard({
     account,
-    usage,
+    weeklyUsage,
+    balance,
 }: {
-    account: { name: string; email: string; is_admin: number; plan?: string; plan_expires_at?: number | null };
-    usage: UsageData | null;
+    account: { name: string; email: string; is_admin: number };
+    weeklyUsage?: number;
+    balance?: number;
 }) {
     const locale = Locale("ProfilePage");
-    const [monthLimit, setMonthLimit] = useState(DEFAULT_MONTHLY_LIMIT);
-
-    useEffect(() => {
-        (async () => {
-            try {
-                const { SubscriptionPlanRouter } = await import("../../../api/instance");
-                const { SubscriptionPlanListRequest } = await import("../../../../shared/modules/subscription_plan/subscription_plan.interface");
-                const res = await SubscriptionPlanRouter.list(new SubscriptionPlanListRequest({}));
-                if (res.success && res.data) {
-                    const plan = res.data.list.find((p: any) => p.name === (account.plan || "free"));
-                    if (plan) setMonthLimit(plan.monthly_limit);
-                }
-            } catch { /* ignore */ }
-        })();
-    }, [account.plan]);
+    const usage = weeklyUsage ?? 0;
+    const progressPercent = Math.min((usage / WEEKLY_LIMIT) * 100, 100);
 
     return (
         <Card>
@@ -61,50 +46,22 @@ export default function AccountInfoCard({
                             </Chip>
                         </div>
                     </div>
-                    {usage && (
-                        <div className="w-full md:w-56 space-y-3 md:pl-6">
-                            <div className="flex justify-between items-center mx-[-5px]">
-                                <Chip size="sm" color={account.plan === "free" ? "default" : account.plan === "pro" ? "primary" : "warning"} variant="flat">
-                                    {account.plan?.toUpperCase() || "FREE"}
-                                </Chip>
-                                {account.plan !== "free" && account.plan_expires_at && account.plan_expires_at > Date.now() && (
-                                    <span className="text-xs text-gray-400">
-                                        Expires: {new Date(account.plan_expires_at).toLocaleDateString()}
-                                    </span>
-                                )}
-                                {account.plan == "free" && (
-                                    <span className="text-xs text-gray-400">
-                                        Expires: N/A
-                                    </span>
-                                )}
+                    <div className="w-full md:w-48 flex flex-col items-center justify-center md:pl-6">
+                        <span className="text-sm text-gray-500 mb-1 ml-2">{locale.Balance}</span>
+                        <span className="text-2xl font-bold text-primary">{formatBalance(balance || 0)}</span>
+                        <div className="mt-3 w-full">
+                            <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                <span>{locale.WeeklyUsage}</span>
+                                <span>{formatUsage(usage)} / {formatBalance(WEEKLY_LIMIT)}</span>
                             </div>
-                            <div>
-                                <div className="flex justify-between text-xs mb-1">
-                                    <span className="text-gray-500">{locale.Today}</span>
-                                    <span className="font-semibold text-primary">
-                                        {fmt(usage.today)}/{fmt(monthLimit / 12)}
-                                    </span>
-                                </div>
-                                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full bg-primary rounded-full transition-all"
-                                        style={{ width: `${Math.min((usage.today / (monthLimit / 12)) * 100, 100)}%` }}
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <div className="flex justify-between text-xs mb-1">
-                                    <span className="text-gray-500">{locale.ThisWeek}</span>
-                                    <span className="font-semibold text-danger">
-                                        {fmt(usage.thisWeek)}/{fmt(monthLimit / 4)}
-                                    </span>
-                                </div>
-                                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                    <div className="h-full bg-success rounded-full transition-all" style={{ width: `${Math.min((usage.thisWeek / (monthLimit / 4)) * 100, 100)}%` }} />
-                                </div>
-                            </div>
+                            <Progress
+                                aria-label="Weekly usage"
+                                size="sm"
+                                value={progressPercent}
+                                color={progressPercent >= 100 ? "danger" : progressPercent >= 80 ? "warning" : "primary"}
+                            />
                         </div>
-                    )}
+                    </div>
                 </div>
             </CardBody>
         </Card>

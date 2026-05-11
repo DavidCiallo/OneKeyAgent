@@ -1,7 +1,6 @@
 import { nanoid } from "nanoid";
 import Repository from "../../lib/repository";
 import { GiftCardEntity } from "../../../shared/modules/gift_card/gift_card.entity";
-import { AccountService } from "../account/account.service";
 
 const cardRepo = Repository.instance<GiftCardEntity>("GiftCard");
 
@@ -9,13 +8,12 @@ export class GiftCardService {
 
     // ─── Generate a single gift card ───
 
-    static async create(planName: string, durationDays: number): Promise<GiftCardEntity> {
+    static async create(tokenAmount: number): Promise<GiftCardEntity> {
         const raw = nanoid(32).replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 16);
         const code = raw.padEnd(16, "X");
         return await cardRepo.insert({
             code,
-            plan_name: planName,
-            duration_days: durationDays,
+            token_amount: tokenAmount,
             status: "unused",
             redeemed_by: null,
             redeemed_at: null,
@@ -47,8 +45,7 @@ export class GiftCardService {
             update_time: now,
         });
 
-        // Upgrade the account
-        await SubscriptionService.upgradeAccount(accountId, card.plan_name, card.duration_days);
+        // Balance is computed from gift card table — no manual update needed
     }
 
     // ─── Hard delete expired unused cards ───
@@ -65,6 +62,3 @@ export class GiftCardService {
         return deleted;
     }
 }
-
-// Lazy import to avoid circular dependency
-import { SubscriptionService } from "./subscription.service";

@@ -8,25 +8,58 @@ import {
 } from "../../../shared/modules/ai/ai.interface";
 import { getAllModels, logUsage } from "./ai.session";
 import { ProviderService } from "../provider/provider.service";
-import { UsageService } from "../usage/usage.service";
 import { AccountService } from "../account/account.service";
 import { AccountRoleService } from "../role/role.service";
-import { SubscriptionService } from "../subscription/subscription.service";
+import { toAnthropicBody, anthropicToOpenAI, antMessagesToOpenAI, openAIToAntMessages, openAIToAntStream, antStreamToOpenAI } from "./ai.trans";
+import Repository from "../../lib/repository";
 
-const DEFAULT_MONTHLY_LIMIT = 90_000_000; // 90M tokens default (free plan)
+/** Calculate cost in USDT for a request */
+function calculateCost(inputTokens: number, outputTokens: number, inputPrice: number, outputPrice: number): number {
+    // inputPrice/outputPrice are in dollars per 1M tokens
+    const cost = (inputTokens * inputPrice + outputTokens * outputPrice) / 1_000_000;
+    return Math.round(cost * 1_000_000) / 1_000_000; // 6 decimal precision
+}
 
-/** Check monthly usage limit, throw 429 if exceeded */
-async function checkUsageLimit(accountId: string): Promise<void> {
-    const account = await AccountService.findOne(accountId);
-    if (!account) return;
+const WEEKLY_LIMIT = 100; // $100 per week
 
-    const plan = await SubscriptionService.findPlanByName(account.plan || "free");
-    const limit = plan?.monthly_limit || DEFAULT_MONTHLY_LIMIT;
-    const billed = await UsageService.monthlyBilledTokens(accountId);
-
-    if (billed >= limit) {
-        throw new Error("429 Too Many Requests. Monthly usage limit exceeded");
+/** Get total weekly spending for an account */
+async function getWeeklySpending(accountId: string): Promise<number> {
+    const since = Date.now() - 7 * 86400000;
+    const repo = Repository.instance<any>("UsageLog");
+    const logs = await repo.find({ accountId }, { since });
+    let total = 0;
+    for (const log of logs) {
+        const cost = (log.inputTokens * (log.inputPrice || 0) + log.outputTokens * (log.outputPrice || 0)) / 1_000_000;
+        total += Math.round(cost * 1_000_000) / 1_000_000;
     }
+    return Math.round(total * 1_000_000) / 1_000_000;
+}
+
+/** Deduct balance from account, throw 429 if insufficient */
+async function deductBalance(accountId: string, cost: number): Promise<void> {
+    if (cost <= 0) return;
+
+    // Check weekly limit
+    const weeklySpent = await getWeeklySpending(accountId);
+    if (weeklySpent + cost > WEEKLY_LIMIT) {
+        throw new Error("429 Weekly spending limit reached");
+    }
+
+    const balance = await AccountService.getBalance(accountId);
+    if (balance < cost) {
+        throw new Error("429 Insufficient balance");
+    }
+    // Balance is computed from UsageLog — no manual deduction needed
+}
+
+/** Get model prices for an alias */
+async function getModelPrices(alias: string): Promise<{ inputPrice: number; outputPrice: number }> {
+    const models = await getAllModels();
+    const match = models.find(m => m.alias === alias);
+    return {
+        inputPrice: match?.input_price ?? 0,
+        outputPrice: match?.output_price ?? 0,
+    };
 }
 
 /** Build Authorization header value based on auth type */
@@ -34,50 +67,6 @@ function buildAuthHeader(apiKey: string | undefined, authType?: string): string 
     if (!apiKey) return "";
     if (authType === "custom") return apiKey;
     return `Bearer ${apiKey}`;
-}
-
-/** Convert OpenAI-format chat body to Anthropic format */
-function toAnthropicBody(body: Record<string, any>): Record<string, any> {
-    const messages = body.messages || [];
-    const systemMsg = messages.filter((m: any) => m.role === "system");
-    const chatMessages = messages.filter((m: any) => m.role !== "system");
-
-    const anthropicMessages = chatMessages.map((m: any) => ({
-        role: m.role,
-        content: [{ type: "text", text: m.content }],
-    }));
-
-    const result: Record<string, any> = {
-        model: body.model,
-        max_tokens: body.max_tokens || 4096,
-        messages: anthropicMessages,
-        stream: body.stream,
-    };
-
-    if (systemMsg.length > 0) {
-        result.system = systemMsg.map((m: any) => ({ type: "text", text: m.content }));
-    }
-
-    return result;
-}
-
-/** Convert Anthropic non-stream response to OpenAI-compatible format */
-function anthropicToOpenAI(data: any, model: string): any {
-    const content = data.content?.find((c: any) => c.type === "text")?.text || "";
-    return {
-        id: data.id,
-        model,
-        choices: [{
-            index: 0,
-            message: { role: "assistant", content },
-            finish_reason: data.stop_reason === "end_turn" ? "stop" : data.stop_reason,
-        }],
-        usage: {
-            prompt_tokens: data.usage?.input_tokens || 0,
-            completion_tokens: data.usage?.output_tokens || 0,
-            total_tokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
-        },
-    };
 }
 
 /** Build request headers and URL path based on api type */
@@ -192,20 +181,19 @@ async function tryProviderStream(
             res.on("data", (chunk: Buffer) => writer.write(chunk));
             res.on("end", () => writer.close());
             res.on("error", () => writer.close());
-            resolve(ts.readable);
+
+            // Normalize Anthropic SSE to OpenAI SSE so downstream always gets OpenAI format
+            if (apiType === "anthropic") {
+                resolve(antStreamToOpenAI(ts.readable));
+            } else {
+                resolve(ts.readable);
+            }
         });
         req.on("error", () => resolve(null));
         req.on("timeout", () => { req.destroy(); resolve(null); });
         req.write(postBody);
         req.end();
     });
-}
-
-/** Get model tier for an alias, defaults to 1 */
-async function getModelTier(alias: string): Promise<number> {
-    const models = await getAllModels();
-    const match = models.find(m => m.alias === alias);
-    return match?.tier ?? 1;
 }
 
 /** Get allowed model aliases for a non-admin account, null means no restriction */
@@ -235,9 +223,9 @@ async function requireModelAccess(accountId: string, alias: string): Promise<voi
 async function chatHex(body: Record<string, any>, accountId: string): Promise<any> {
     const t0 = Date.now();
     const requestedAlias = body.model;
+    console.log("[chatHex] model:", requestedAlias, "accountId:", accountId, "stream:", body.stream);
 
     await requireModelAccess(accountId, requestedAlias);
-    await checkUsageLimit(accountId);
 
     const providers = await ProviderService.getProvidersByAlias(requestedAlias);
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
@@ -259,11 +247,14 @@ async function chatHex(body: Record<string, any>, accountId: string): Promise<an
         ProviderService.recordSuccess(provider.id);
 
         const ms = Date.now() - t0;
-        const tier = await getModelTier(requestedAlias);
+        const { inputPrice: input_price, outputPrice: output_price } = await getModelPrices(requestedAlias);
         const { usage } = data;
         // OpenAI format: prompt_tokens/completion_tokens; Anthropic format: input_tokens/output_tokens
         const rawInput = usage?.input_tokens ?? usage?.prompt_tokens ?? 0;
         const rawOutput = usage?.output_tokens ?? usage?.completion_tokens ?? 0;
+        // Deduct balance
+        const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
+        await deductBalance(accountId, cost);
 
         await logUsage({
             accountId,
@@ -271,9 +262,9 @@ async function chatHex(body: Record<string, any>, accountId: string): Promise<an
             providerId: provider.id,
             inputTokens: rawInput,
             outputTokens: rawOutput,
-            tierSnapshot: tier,
+            inputPrice: input_price,
+            outputPrice: output_price,
         });
-
         data.model = requestedAlias;
         return data;
     }
@@ -297,12 +288,13 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
     const requestedAlias = body.model;
 
     await requireModelAccess(accountId, requestedAlias);
-    await checkUsageLimit(accountId);
 
+    console.log("[chatHexStream] alias:", requestedAlias, "accountId:", accountId);
     const providers = await ProviderService.getProvidersByAlias(requestedAlias);
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
 
     for (const provider of providers) {
+        console.log("[chatHexStream] trying provider:", provider.id, "apiType:", provider.apiType, "model:", provider.model, "baseURL:", provider.baseURL);
         const requestBody: Record<string, any> = {
             ...body,
             stream: true,
@@ -320,18 +312,41 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
             provider.apiType
         );
         if (!bodyStream) {
+            console.log("[chatHexStream] provider", provider.id, "returned null, trying next");
             ProviderService.recordFail(provider.id);
             continue;
         }
 
+        console.log("[chatHexStream] provider", provider.id, "connected successfully, streaming...");
         ProviderService.recordSuccess(provider.id);
 
         const t0 = Date.now();
         const [upstreamForward, parseStream] = (bodyStream.tee() as [ReadableStream<Uint8Array>, ReadableStream<Uint8Array>]);
 
+        // Log raw data from upstream to debug
+        const logStream = new TransformStream<Uint8Array, Uint8Array>();
+        (async () => {
+            const r = upstreamForward.getReader();
+            const w = logStream.writable.getWriter();
+            let totalBytes = 0;
+            let chunks: string[] = [];
+            while (true) {
+                const { done, value } = await r.read();
+                if (done) {
+                    console.log("[chatHexStream] stream done, bytes:", totalBytes, "chunks:", chunks.length);
+                    break;
+                }
+                totalBytes += value.length;
+                const text = new TextDecoder().decode(value);
+                chunks.push(text.substring(0, 100));
+                await w.write(value);
+            }
+            await w.close();
+        })();
+
         const ts = new TransformStream<Uint8Array, Uint8Array>();
         const forwardStream = ts.readable;
-        safePipe(upstreamForward.getReader(), ts.writable.getWriter());
+        safePipe(logStream.readable.getReader(), ts.writable.getWriter());
 
         // Background parse usage
         (async () => {
@@ -339,6 +354,7 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
                 const reader = parseStream.getReader();
                 const decoder = new TextDecoder();
                 let usageData: any = null;
+                let estimatedOutputChars = 0;
 
                 while (true) {
                     const { done, value } = await reader.read();
@@ -364,28 +380,43 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
                                         output_tokens: data.usage.output_tokens || 0,
                                     };
                                 }
+                                // Count output content for fallback estimation
+                                const content = data.choices?.[0]?.delta?.content || '';
+                                if (content) {
+                                    estimatedOutputChars += content.length;
+                                }
                             } catch { }
                             pendingAnthropic = false;
                         }
                     }
                 }
 
+                const { inputPrice: input_price, outputPrice: output_price } = await getModelPrices(requestedAlias);
+
+                let rawInput: number;
+                let rawOutput: number;
+
                 if (usageData) {
-                    const ms = Date.now() - t0;
-                    const tier = await getModelTier(requestedAlias);
-                    // OpenAI format: prompt_tokens/completion_tokens
-                    // Anthropic format: input_tokens/output_tokens
-                    const rawInput = usageData.input_tokens ?? usageData.prompt_tokens ?? 0;
-                    const rawOutput = usageData.output_tokens ?? usageData.completion_tokens ?? 0;
-                    await logUsage({
-                        accountId,
-                        modelAlias: requestedAlias,
-                        providerId: provider.id,
-                        inputTokens: rawInput,
-                        outputTokens: rawOutput,
-                        tierSnapshot: tier,
-                    });
+                    rawInput = usageData.input_tokens ?? usageData.prompt_tokens ?? 0;
+                    rawOutput = usageData.output_tokens ?? usageData.completion_tokens ?? 0;
+                } else {
+                    rawInput = 0;
+                    rawOutput = Math.max(1, Math.round(estimatedOutputChars / 4));
                 }
+
+                // Deduct balance
+                const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
+                await deductBalance(accountId, cost);
+
+                await logUsage({
+                    accountId,
+                    modelAlias: requestedAlias,
+                    providerId: provider.id,
+                    inputTokens: rawInput,
+                    outputTokens: rawOutput,
+                    inputPrice: input_price,
+                    outputPrice: output_price,
+                });
             } catch (err) {
             }
         })();
@@ -434,7 +465,6 @@ async function completeHex(body: Record<string, any>, accountId: string): Promis
     const requestedAlias = body.model;
 
     await requireModelAccess(accountId, requestedAlias);
-    await checkUsageLimit(accountId);
 
     const providers = await ProviderService.getProvidersByAlias(requestedAlias);
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
@@ -448,10 +478,14 @@ async function completeHex(body: Record<string, any>, accountId: string): Promis
 
         ProviderService.recordSuccess(provider.id);
         const ms = Date.now() - t0;
-        const tier = await getModelTier(requestedAlias);
+        const { inputPrice: input_price, outputPrice: output_price } = await getModelPrices(requestedAlias);
         // OpenAI format: prompt_tokens/completion_tokens; Anthropic format: input_tokens/output_tokens
         const rawInput = data.usage?.input_tokens ?? data.usage?.prompt_tokens ?? 0;
         const rawOutput = data.usage?.output_tokens ?? data.usage?.completion_tokens ?? 0;
+
+        // Deduct balance
+        const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
+        await deductBalance(accountId, cost);
 
         await logUsage({
             accountId,
@@ -459,7 +493,8 @@ async function completeHex(body: Record<string, any>, accountId: string): Promis
             providerId: provider.id,
             inputTokens: rawInput,
             outputTokens: rawOutput,
-            tierSnapshot: tier,
+            inputPrice: input_price,
+            outputPrice: output_price,
         });
         return data;
     }
@@ -495,7 +530,13 @@ function requestStream(urlStr: string, apiKey: string | undefined, postBody: str
             res.on("data", (chunk: Buffer) => writer.write(chunk));
             res.on("end", () => writer.close());
             res.on("error", () => writer.close());
-            resolve(ts.readable);
+
+            // Normalize Anthropic SSE to OpenAI SSE so downstream always gets OpenAI format
+            if (apiType === "anthropic") {
+                resolve(antStreamToOpenAI(ts.readable));
+            } else {
+                resolve(ts.readable);
+            }
         });
         req.on("error", () => resolve(null));
         req.on("timeout", () => { req.destroy(); resolve(null); });
@@ -508,7 +549,6 @@ async function completeHexStream(body: Record<string, any>, accountId: string): 
     const requestedAlias = body.model;
 
     await requireModelAccess(accountId, requestedAlias);
-    await checkUsageLimit(accountId);
 
     const providers = await ProviderService.getProvidersByAlias(requestedAlias);
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
@@ -522,9 +562,70 @@ async function completeHexStream(body: Record<string, any>, accountId: string): 
 
         ProviderService.recordSuccess(provider.id);
 
+        const [upstreamForward, parseStream] = (bodyStream.tee() as [ReadableStream<Uint8Array>, ReadableStream<Uint8Array>]);
+
         const ts = new TransformStream<Uint8Array, Uint8Array>();
         const forwardStream = ts.readable;
-        safePipe(bodyStream.getReader(), ts.writable.getWriter());
+        safePipe(upstreamForward.getReader(), ts.writable.getWriter());
+
+        // Background parse usage
+        (async () => {
+            try {
+                const reader = parseStream.getReader();
+                const decoder = new TextDecoder();
+                let usageData: any = null;
+                let estimatedOutputChars = 0;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const text = decoder.decode(value, { stream: true });
+                    const lines = text.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ') && !line.startsWith('data: [DONE]')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                if (data.usage) {
+                                    usageData = data.usage;
+                                }
+                                const content = data.choices?.[0]?.delta?.content || data.choices?.[0]?.text || '';
+                                if (content) {
+                                    estimatedOutputChars += content.length;
+                                }
+                            } catch { }
+                        }
+                    }
+                }
+
+                const { inputPrice: input_price, outputPrice: output_price } = await getModelPrices(requestedAlias);
+
+                let rawInput: number;
+                let rawOutput: number;
+
+                if (usageData) {
+                    rawInput = usageData.input_tokens ?? usageData.prompt_tokens ?? 0;
+                    rawOutput = usageData.output_tokens ?? usageData.completion_tokens ?? 0;
+                } else {
+                    rawInput = 0;
+                    rawOutput = Math.max(1, Math.round(estimatedOutputChars / 4));
+                }
+
+                const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
+                await deductBalance(accountId, cost);
+
+                await logUsage({
+                    accountId,
+                    modelAlias: requestedAlias,
+                    providerId: provider.id,
+                    inputTokens: rawInput,
+                    outputTokens: rawOutput,
+                    inputPrice: input_price,
+                    outputPrice: output_price,
+                });
+            } catch (err) {
+            }
+        })();
 
         return forwardStream;
     }
@@ -565,9 +666,24 @@ export class AiService {
                 object: "model",
                 created: m.create_time,
                 owned_by: "onekey",
-                tier: m.tier,
+                input_price: m.input_price,
+                output_price: m.output_price,
             });
         }
         return { data };
+    }
+
+    /** Anthropic /v1/messages non-streaming: convert request → call chatHex → convert response back */
+    static async antMessages(data: Record<string, any>, accountId: string): Promise<Record<string, any>> {
+        const openaiBody = antMessagesToOpenAI(data);
+        const result = await chatHex(openaiBody, accountId);
+        return openAIToAntMessages(result, data.model);
+    }
+
+    /** Anthropic /v1/messages streaming: convert request → call chatHexStream → convert SSE stream */
+    static async antMessagesStream(data: Record<string, any>, accountId: string): Promise<ReadableStream<Uint8Array>> {
+        const openaiBody = antMessagesToOpenAI(data);
+        const upstream = await chatHexStream(openaiBody, accountId);
+        return openAIToAntStream(upstream);
     }
 }

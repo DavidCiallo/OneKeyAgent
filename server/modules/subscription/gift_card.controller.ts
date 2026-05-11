@@ -65,7 +65,7 @@ async function create(request: GiftCardCreateRequest): Promise<GiftCardCreateRes
     request = GiftCardCreateRequest.self(request);
     await requireAdmin(request.auth);
 
-    const card = await GiftCardService.create(request.plan_name, request.duration_days);
+    const card = await GiftCardService.create(request.token_amount);
     return new GiftCardCreateResponse({
         success: true,
         message: "success",

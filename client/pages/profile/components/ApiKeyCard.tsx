@@ -4,14 +4,16 @@ import { Locale } from "../../../methods/locale";
 
 export default function ApiKeyCard({
     apiKey,
-    onRegenerate,
     regenerating,
     onConfirmOpen,
+    endpoint,
+    onCopy,
 }: {
     apiKey: string;
-    onRegenerate: () => void;
     regenerating: boolean;
     onConfirmOpen: () => void;
+    endpoint: string;
+    onCopy: (text: string) => void;
 }) {
     const locale = Locale("ProfilePage");
     const [showApiKey, setShowApiKey] = useState(false);
@@ -52,6 +54,21 @@ export default function ApiKeyCard({
                 >
                     {locale.Regenerate}
                 </Button>
+
+                <Divider />
+
+                <div>
+                    <span className="text-sm font-semibold block mb-2">{locale.EndpointSection}</span>
+                    <div className="flex items-center gap-2 mb-3">
+                        <code className="flex-1 text-sm bg-gray-100 px-4 py-1.5 rounded-lg font-mono break-all select-all">
+                            {endpoint}
+                        </code>
+                        <Button size="sm" variant="flat" onPress={() => onCopy(endpoint)}>
+                            {locale.Copy}
+                        </Button>
+                    </div>
+                    <a href="/terms" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">{locale.TermsLink}</a>
+                </div>
             </CardBody>
         </Card>
     );

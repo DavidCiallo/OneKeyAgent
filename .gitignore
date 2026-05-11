@@ -3,5 +3,5 @@
 dist
 node_modules
 data/*
-
+server/data/*
 *.local.json

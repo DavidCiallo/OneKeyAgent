@@ -118,8 +118,11 @@ class Repository<
         return result as T;
     }
 
-    async update(where: Partial<T>, updateData: Partial<T>): Promise<boolean> {
-        const filters: any[] = [isNull(this.table.delete_time)];
+    async update(where: Partial<T>, updateData: Partial<T>, includeDeleted = false): Promise<boolean> {
+        const filters: any[] = [];
+        if (!includeDeleted) {
+            filters.push(isNull(this.table.delete_time));
+        }
         if (where) {
             Object.entries(where).forEach(([key, val]) => {
                 if (val !== undefined && val !== null && val !== "" && this.table[key]) {
@@ -136,7 +139,7 @@ class Repository<
 
         await db
             .update(this.table)
-            .set(data as any)
+            .set(data)
             .where(and(...filters))
             .execute();
 

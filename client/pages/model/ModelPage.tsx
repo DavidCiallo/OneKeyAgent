@@ -13,14 +13,15 @@ import {
     ModelDeleteRequest,
     ModelQueryBody,
 } from "../../../shared/modules/model/model.interface";
-import { UsageStatsRequest, UsageStatsPeriod, UsageAmountData } from "../../../shared/modules/usage/usage.interface";
+import { UsageStatsRequest, UsageStatsPeriod } from "../../../shared/modules/usage/usage.interface";
 import { ModelCardGrid } from "./components/ModelCardGrid";
 import { ModelPagination } from "./components/ModelPagination";
 import { ModelFormModal } from "./components/ModelFormModal";
 
 type ModelForm = {
-    tier: number;
     alias?: string;
+    input_price: number;
+    output_price: number;
     is_public?: number;
 };
 
@@ -31,9 +32,6 @@ export default function ModelPage() {
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
 
-    // Filter
-    const [filterTier, setFilterTier] = useState<string>("");
-
     // Per-model usage stats
     const [usageMap, setUsageMap] = useState<Record<string, { todayPeriod: UsageStatsPeriod; last24hPeriod: UsageStatsPeriod; weekPeriod: UsageStatsPeriod }>>({});
 
@@ -41,14 +39,13 @@ export default function ModelPage() {
     const { isOpen: isFormOpen, onOpen: onFormOpen, onClose: onFormClose, onOpenChange: onFormOpenChange } = useDisclosure();
     const [formMode, setFormMode] = useState<"create" | "edit">("create");
     const [editId, setEditId] = useState<string>("");
-    const [form, setForm] = useState<ModelForm>({ tier: 1 });
+    const [form, setForm] = useState<ModelForm>({ input_price: 0, output_price: 0 });
 
 
     const getToken = () => localStorage.getItem("access_token") || "";
 
     const fetchList = useCallback(async (p: number) => {
         const filter: Record<string, string | number> = {};
-        if (filterTier) filter.tier = parseInt(filterTier);
 
         const req = new ModelListRequest({ page: p, filter: new ModelQueryBody(filter), auth: getToken() });
         const res = await ModelRouter.list(req);
@@ -73,7 +70,7 @@ export default function ModelPage() {
             }));
             setUsageMap(map);
         }
-    }, [filterTier]);
+    }, []);
 
     useEffect(() => {
         fetchList(page);
@@ -81,7 +78,7 @@ export default function ModelPage() {
 
     const openCreate = () => {
         setFormMode("create");
-        setForm({ tier: 1, alias: "", is_public: 0 });
+        setForm({ alias: "", input_price: 0, output_price: 0, is_public: 0 });
         onFormOpen();
     };
 
@@ -89,8 +86,9 @@ export default function ModelPage() {
         setFormMode("edit");
         setEditId(item.id);
         setForm({
-            tier: item.tier,
             alias: item.alias || "",
+            input_price: item.input_price,
+            output_price: item.output_price,
             is_public: item.is_public,
         });
         onFormOpen();
@@ -100,8 +98,9 @@ export default function ModelPage() {
         if (formMode === "create") {
             const req = new ModelCreateRequest({
                 model: new ModelCreateBody({
-                    tier: form.tier,
                     alias: form.alias || "",
+                    input_price: form.input_price,
+                    output_price: form.output_price,
                     is_public: form.is_public ?? 0,
                 }),
                 auth: getToken(),
@@ -116,8 +115,9 @@ export default function ModelPage() {
             const req = new ModelUpdateRequest({
                 id: editId,
                 model: new ModelUpdateBody({
-                    tier: form.tier,
                     alias: form.alias || undefined,
+                    input_price: form.input_price,
+                    output_price: form.output_price,
                     is_public: form.is_public,
                 }),
                 auth: getToken(),
