@@ -4,7 +4,6 @@ import path from "path";
 import { runMigrations } from "../lib/migrate";
 import { initialize } from "./initialize";
 import { seedDefaultModel } from "../modules/ai/ai.session";
-import { seedDefaultPlans } from "../modules/subscription/seed";
 import { startMonitor } from "../modules/subscription/monitor";
 
 config();
@@ -23,12 +22,11 @@ import { roleController } from "../modules/role/role.controller";
 import { providerController } from "../modules/provider/provider.controller";
 import { taskController } from "../modules/task/task.controller";
 import { telegramController } from "../modules/telegram/telegram.controller";
-import { subscriptionPlanController, subscriptionRecordController } from "../modules/subscription/subscription.controller";
+import { subscriptionRecordController } from "../modules/subscription/subscription.controller";
 import { giftCardController } from "../modules/subscription/gift_card.controller";
 const PORT = parseInt(process.env.SERVER_PORT || "3300");
 await initialize();
 await seedDefaultModel();
-await seedDefaultPlans();
 startMonitor();
 // @ts-ignore
 Bun.serve({
@@ -48,7 +46,6 @@ Bun.serve({
             providerController,
             taskController,
             telegramController,
-            subscriptionPlanController,
             subscriptionRecordController,
             giftCardController,
         ]);
