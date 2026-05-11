@@ -5,6 +5,10 @@ const formatBalance = (dollars: number) => {
     return "$" + dollars.toFixed(2);
 };
 
+const formatUsage = (dollars: number) => {
+    return "$" + dollars.toFixed(3);
+};
+
 const WEEKLY_LIMIT = 100;
 
 export default function AccountInfoCard({
@@ -48,7 +52,7 @@ export default function AccountInfoCard({
                         <div className="mt-3 w-full">
                             <div className="flex justify-between text-xs text-gray-500 mb-1">
                                 <span>{locale.WeeklyUsage}</span>
-                                <span>{formatBalance(usage)} / {formatBalance(WEEKLY_LIMIT)}</span>
+                                <span>{formatUsage(usage)} / {formatBalance(WEEKLY_LIMIT)}</span>
                             </div>
                             <Progress
                                 aria-label="Weekly usage"

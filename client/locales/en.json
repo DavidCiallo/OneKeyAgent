@@ -126,8 +126,8 @@
         "StartFree": "Get Started",
         "TryChat": "Try Online",
         "FeatureTitle": "Why EHEX",
-        "Feature1Title": "Powerful Performance",
-        "Feature1Desc": "EHEX series models deliver strong results across multiple benchmarks, balancing inference speed with generation quality for production workloads.",
+        "Feature1Title": "Massive Models",
+        "Feature1Desc": "Aggregates leading models from around the world, offering cost-effective API access for all use cases.",
         "Feature2Title": "Open & Compatible",
         "Feature2Desc": "Natively compatible with the OpenAI API format. Integrate seamlessly with your existing toolchain and platform with zero migration cost.",
         "Feature3Title": "Clear & Transparent",
@@ -244,8 +244,8 @@
         "Payment": "Payment",
         "DepositAmount": "Deposit Amount",
         "RechargeUnitPrice": "Unit Price",
-        "TransactionHistory": "Transaction History",
-        "NoTransactions": "No transactions yet",
+        "Statement": "Statement",
+        "NoTransactions": "No records yet",
         "SelectCurrency": "Select Payment Channel",
         "ProceedToPay": "Proceed to Pay",
         "CurrencyETHUSDT": "ETH-USDT",
@@ -261,7 +261,9 @@
         "CurrencyALGOUSDT": "ALGO-USDT",
         "CurrencyALGOUSDC": "ALGO-USDC",
         "TopupLabel": "Topup",
-        "BonusLabel": "Bonus"
+        "BonusLabel": "Bonus",
+        "GiftCardLabel": "Gift Card",
+        "UsageLabel": "Usage"
     },
 
     "TermsPage": {

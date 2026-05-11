@@ -244,8 +244,8 @@
         "Payment": "Оплата",
         "DepositAmount": "Сумма депозита",
         "RechargeUnitPrice": "Цена за единицу",
-        "TransactionHistory": "История транзакций",
-        "NoTransactions": "Нет транзакций",
+        "Statement": "Выписка",
+        "NoTransactions": "Нет записей",
         "SelectCurrency": "Выберите канал оплаты",
         "ProceedToPay": "Перейти к оплате",
         "CurrencyETHUSDT": "ETH-USDT",
@@ -261,7 +261,9 @@
         "CurrencyALGOUSDT": "ALGO-USDT",
         "CurrencyALGOUSDC": "ALGO-USDC",
         "TopupLabel": "Пополнение",
-        "BonusLabel": "Бонус"
+        "BonusLabel": "Бонус",
+        "GiftCardLabel": "Подарочная карта",
+        "UsageLabel": "Использование"
     },
 
     "TermsPage": {

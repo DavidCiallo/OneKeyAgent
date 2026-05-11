@@ -244,8 +244,8 @@
         "Payment": "Pagamento",
         "DepositAmount": "Valor do depósito",
         "RechargeUnitPrice": "Preço unitário",
-        "TransactionHistory": "Histórico de transações",
-        "NoTransactions": "Nenhuma transação ainda",
+        "Statement": "Extrato",
+        "NoTransactions": "Nenhum registro ainda",
         "SelectCurrency": "Selecionar canal de pagamento",
         "ProceedToPay": "Prosseguir para pagamento",
         "CurrencyETHUSDT": "ETH-USDT",
@@ -261,7 +261,9 @@
         "CurrencyALGOUSDT": "ALGO-USDT",
         "CurrencyALGOUSDC": "ALGO-USDC",
         "TopupLabel": "Recarga",
-        "BonusLabel": "Bônus"
+        "BonusLabel": "Bônus",
+        "GiftCardLabel": "Cartão-presente",
+        "UsageLabel": "Uso"
     },
 
     "TermsPage": {

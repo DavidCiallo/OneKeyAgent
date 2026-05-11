@@ -128,8 +128,8 @@
         "StartFree": "开始使用",
         "TryChat": "在线体验",
         "FeatureTitle": "为什么选择 EHEX",
-        "Feature1Title": "强大性能",
-        "Feature1Desc": "EHEX 系列模型在多种基准测试中表现优异，兼顾推理速度与生成质量，为各类应用场景提供稳定支撑。",
+        "Feature1Title": "海量模型",
+        "Feature1Desc": "聚合全球主流模型，以极具性价比的调用价格，满足各类应用场景需求。",
         "Feature2Title": "开放兼容",
         "Feature2Desc": "原生兼容 OpenAI API 格式，无需额外适配即可接入现有工具链与平台，迁移成本趋近于零。",
         "Feature3Title": "清晰透明",
@@ -245,8 +245,8 @@
         "Payment": "支付",
         "DepositAmount": "充值金额",
         "RechargeUnitPrice": "单价",
-        "TransactionHistory": "交易记录",
-        "NoTransactions": "暂无交易记录",
+        "Statement": "账单明细",
+        "NoTransactions": "暂无记录",
         "SelectCurrency": "选择支付渠道",
         "ProceedToPay": "确认订单",
         "CurrencyETHUSDT": "ETH-USDT",
@@ -262,7 +262,9 @@
         "CurrencyALGOUSDT": "ALGO-USDT",
         "CurrencyALGOUSDC": "ALGO-USDC",
         "TopupLabel": "充值",
-        "BonusLabel": "奖励"
+        "BonusLabel": "奖励",
+        "GiftCardLabel": "礼品卡",
+        "UsageLabel": "使用"
     },
 
     "TermsPage": {

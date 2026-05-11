@@ -14,7 +14,7 @@ export default function ModelsCard({ models }: { models: ModelInfo[] }) {
 
     const formatPrice = (dollarsPerMToken: number) => {
         if (dollarsPerMToken <= 0) return "-";
-        return `$${dollarsPerMToken.toFixed(2)}/M`;
+        return `$${dollarsPerMToken.toFixed(3)}/M`;
     };
 
     return (

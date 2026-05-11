@@ -244,8 +244,8 @@
         "Payment": "支払い",
         "DepositAmount": "入金額",
         "RechargeUnitPrice": "単価",
-        "TransactionHistory": "取引履歴",
-        "NoTransactions": "取引履歴はありません",
+        "Statement": "明細",
+        "NoTransactions": "記録がありません",
         "SelectCurrency": "支払いチャネルを選択",
         "ProceedToPay": "支払いに進む",
         "CurrencyETHUSDT": "ETH-USDT",
@@ -261,7 +261,9 @@
         "CurrencyALGOUSDT": "ALGO-USDT",
         "CurrencyALGOUSDC": "ALGO-USDC",
         "TopupLabel": "チャージ",
-        "BonusLabel": "ボーナス"
+        "BonusLabel": "ボーナス",
+        "GiftCardLabel": "ギフトカード",
+        "UsageLabel": "使用量"
     },
 
     "TermsPage": {

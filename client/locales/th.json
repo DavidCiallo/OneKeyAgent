@@ -241,8 +241,8 @@
         "Payment": "การชำระเงิน",
         "DepositAmount": "จำนวนเงินฝาก",
         "RechargeUnitPrice": "ราคาต่อหน่วย",
-        "TransactionHistory": "ประวัติธุรกรรม",
-        "NoTransactions": "ยังไม่มีธุรกรรม",
+        "Statement": "รายการเดินบัญชี",
+        "NoTransactions": "ยังไม่มีรายการ",
         "SelectCurrency": "เลือกช่องทางการชำระเงิน",
         "ProceedToPay": "ดำเนินการชำระเงิน",
         "CurrencyETHUSDT": "ETH-USDT",
@@ -258,7 +258,9 @@
         "CurrencyALGOUSDT": "ALGO-USDT",
         "CurrencyALGOUSDC": "ALGO-USDC",
         "TopupLabel": "เติมเงิน",
-        "BonusLabel": "โบนัส"
+        "BonusLabel": "โบนัส",
+        "GiftCardLabel": "บัตรของขวัญ",
+        "UsageLabel": "การใช้งาน"
     },
 
     "TermsPage": {

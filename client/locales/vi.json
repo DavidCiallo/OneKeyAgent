@@ -241,8 +241,8 @@
         "Payment": "Thanh toán",
         "DepositAmount": "Số tiền nạp",
         "RechargeUnitPrice": "Đơn giá",
-        "TransactionHistory": "Lịch sử giao dịch",
-        "NoTransactions": "Chưa có giao dịch nào",
+        "Statement": "Sao kê",
+        "NoTransactions": "Chưa có bản ghi nào",
         "SelectCurrency": "Chọn kênh thanh toán",
         "ProceedToPay": "Tiến hành thanh toán",
         "CurrencyETHUSDT": "ETH-USDT",
@@ -258,7 +258,9 @@
         "CurrencyALGOUSDT": "ALGO-USDT",
         "CurrencyALGOUSDC": "ALGO-USDC",
         "TopupLabel": "Nạp tiền",
-        "BonusLabel": "Tiền thưởng"
+        "BonusLabel": "Tiền thưởng",
+        "GiftCardLabel": "Thẻ quà tặng",
+        "UsageLabel": "Sử dụng"
     },
 
     "TermsPage": {
