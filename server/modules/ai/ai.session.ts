@@ -12,7 +12,7 @@ export async function seedDefaultModel() {
     // const models = await modelRepo.find();
     // const hasHex = models.some(m => m.alias === "hex");
     // if (!hasHex) {
-    //     await modelRepo.insert({ alias: "hex", tier: 1 });
+    //     await modelRepo.insert({ alias: "hex" });
     //     console.log("[Seed] Created default model 'hex'");
     // }
 }
@@ -23,13 +23,15 @@ export async function logUsage(usage: {
     providerId?: string,
     inputTokens: number,
     outputTokens: number,
-    tierSnapshot?: number,
+    inputPrice: number,
+    outputPrice: number,
 }) {
     await usageRepo.insert(usage);
 }
 
 export async function getAllModels(): Promise<ModelEntity[]> {
-    return await modelRepo.find({ delete_time: null });
+    const list = await modelRepo.find({ delete_time: null });
+    return list.sort((a, b) => a.alias.localeCompare(b.alias));
 }
 
 export async function getModelById(id: string): Promise<ModelEntity | null> {
@@ -38,5 +40,5 @@ export async function getModelById(id: string): Promise<ModelEntity | null> {
 
 export async function getModelsByAlias(name: string): Promise<ModelEntity[]> {
     const all = await getAllModels();
-    return all.filter(m => m.alias === name).sort((a, b) => b.tier - a.tier);
+    return all.filter(m => m.alias === name);
 }

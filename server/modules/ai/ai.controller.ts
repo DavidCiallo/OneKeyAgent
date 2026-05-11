@@ -84,7 +84,6 @@ export const aiController = new AiRouterInstance(inject, {
     },
 
     async v1messages(request): Promise<any> {
-        console.log("[v1messages] received request:", JSON.stringify({ model: request.model, stream: request.stream, msgCount: request.messages?.length, lastMsg: request.messages?.[request.messages?.length - 1]?.content?.substring?.(0, 100) }));
         const apiKey = request.auth || "";
         if (!validateApiKey(apiKey) || !(await verifyApiKeyInDb(apiKey))) {
             throw new Error("Invalid API Key");
@@ -93,7 +92,6 @@ export const aiController = new AiRouterInstance(inject, {
         if (!accountId) throw new Error("Invalid API Key");
 
         if (request.stream) {
-            console.log("[v1messages] streaming mode, calling antMessagesStream");
             try {
                 const stream = await AiService.antMessagesStream(request, accountId);
                 return new Response(stream as any, {
@@ -133,9 +131,7 @@ export const aiController = new AiRouterInstance(inject, {
             }
         }
 
-        console.log("[v1messages] non-streaming mode, calling antMessages");
         const result = await AiService.antMessages(request, accountId);
-        console.log("[v1messages] response:", JSON.stringify({ id: result.id, stop_reason: result.stop_reason, usage: result.usage }));
         return result;
     },
 });
