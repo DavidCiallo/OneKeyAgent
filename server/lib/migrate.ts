@@ -5,7 +5,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 
-const DB_DIR = "data";
+const _filename = fileURLToPath(import.meta.url);
+const SERVER_DIR = path.resolve(path.dirname(_filename), ".."); // server/
+const DB_DIR = path.join(SERVER_DIR, "data");
 const DB_FILE = "onekey.db";
 
 if (!fs.existsSync(DB_DIR)) {
@@ -15,8 +17,21 @@ if (!fs.existsSync(DB_DIR)) {
 const dbPath = path.join(DB_DIR, DB_FILE);
 const sqlite = new Database(dbPath);
 
-sqlite.exec("PRAGMA journal_mode=WAL;");
-sqlite.exec("PRAGMA foreign_keys=ON;");
+try {
+    sqlite.exec("PRAGMA journal_mode=WAL;");
+} catch (e) {
+    console.log("WAL mode not available, falling back to DELETE journal mode");
+    try {
+        sqlite.exec("PRAGMA journal_mode=DELETE;");
+    } catch (e2) {
+        console.log("Journal mode change failed, continuing...");
+    }
+}
+try {
+    sqlite.exec("PRAGMA foreign_keys=ON;");
+} catch (e) {
+    console.log("Could not enable foreign_keys, continuing...");
+}
 
 const db = drizzle(sqlite);
 
@@ -31,8 +46,7 @@ const db = drizzle(sqlite);
  * and Drizzle's recreate-table pattern (CREATE __new + INSERT + DROP + RENAME).
  */
 export function runMigrations() {
-    const _dirname = path.dirname(fileURLToPath(import.meta.url));
-    const migrationsFolder = path.resolve(_dirname, "../../drizzle");
+    const migrationsFolder = path.resolve(SERVER_DIR, "../drizzle");
     const journalPath = path.join(migrationsFolder, "meta/_journal.json");
 
     if (!fs.existsSync(journalPath)) {
