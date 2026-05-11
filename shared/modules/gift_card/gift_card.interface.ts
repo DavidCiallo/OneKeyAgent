@@ -4,20 +4,16 @@ import { GiftCardEntity, GiftCardStatus } from "./gift_card.entity";
 export class GiftCardDTO {
     public id: string;
     public code: string;
-    public plan_name: string;
-    public duration_days: number;
+    public token_amount: number;
     public status: GiftCardStatus;
     public redeemed_by: string | null;
     public redeemed_at: number | null;
     public create_time: number;
 
-    private isTypeSafe: symbol = Symbol();
-
     constructor(origin: GiftCardEntity) {
         this.id = origin.id;
         this.code = origin.code;
-        this.plan_name = origin.plan_name;
-        this.duration_days = origin.duration_days;
+        this.token_amount = origin.token_amount;
         this.status = origin.status;
         this.redeemed_by = origin.redeemed_by;
         this.redeemed_at = origin.redeemed_at;
@@ -29,14 +25,12 @@ export class GiftCardDTO {
 
 export class GiftCardCreateRequest implements BaseRequest {
     public auth?: string;
-    public plan_name: string;
-    public duration_days: number;
+    public token_amount: number;
 
     constructor(origin: Partial<GiftCardCreateRequest>) {
-        if (!origin.plan_name || !origin.duration_days) throw new Error("plan_name and duration_days are required");
+        if (!origin.token_amount || origin.token_amount <= 0) throw new Error("token_amount is required and must be positive");
         origin.auth && (this.auth = origin.auth);
-        this.plan_name = origin.plan_name;
-        this.duration_days = origin.duration_days;
+        this.token_amount = origin.token_amount;
     }
     static self(unsafe: GiftCardCreateRequest) {
         return new GiftCardCreateRequest(unsafe);
