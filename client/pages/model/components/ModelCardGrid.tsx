@@ -1,7 +1,7 @@
 import { Button, Chip } from "@heroui/react";
 import { ModelDTO } from "../../../../shared/modules/model/model.entity";
 import { Locale } from "../../../methods/locale";
-import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip } from "recharts";
+import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
 import { UsageAmountData, UsageStatsPeriod } from "../../../../shared/modules/usage/usage.interface";
 
 type ModelWithUsage = ModelDTO & {
@@ -89,20 +89,20 @@ export function ModelCardGrid({ list, onEdit, onDelete }: Props) {
                         key={item.id}
                         className="bg-content1 rounded-xl shadow-sm border border-default-100 p-4 flex flex-col gap-2.5 hover:shadow-md transition-shadow"
                     >
-                        {/* Header: Tier badge + Alias + Public */}
+                        {/* Header: Alias + Public */}
                         <div className="flex items-center gap-2 pb-2.5 border-b border-default-200">
-                            <Chip
-                                color="primary"
-                                variant="flat"
-                            >
-                                {item.tier}x
-                            </Chip>
                             <span className="text-xl font-bold text-foreground truncate">
                                 {item.alias || "—"}
                             </span>
                             {item.is_public === 1 && (
                                 <Chip color="success" variant="flat" size="sm">{locale.Public}</Chip>
                             )}
+                        </div>
+
+                        {/* Prices */}
+                        <div className="flex gap-3 text-xs text-default-500">
+                            <span>IN: <strong className="text-foreground">{item.input_price}</strong> /M</span>
+                            <span>OUT: <strong className="text-foreground">{item.output_price}</strong> /M</span>
                         </div>
 
                         {/* Three mini charts */}

@@ -1,9 +1,10 @@
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input, Switch } from "@heroui/react";
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Switch } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
 
 type ModelForm = {
-    tier: number;
     alias?: string;
+    input_price: number;
+    output_price: number;
     is_public?: number;
 };
 
@@ -26,22 +27,21 @@ export function ModelFormModal({ isOpen, onOpenChange, mode, form, onFormChange,
                 <ModalHeader>{mode === "create" ? locale.CreateTitle : locale.EditTitle}</ModalHeader>
                 <ModalBody>
                     <div className="flex flex-col gap-3">
-                        <Select
-                            label={locale.Tier}
-                            selectedKeys={[String(form.tier)]}
-                            onChange={e => onFormChange({ ...form, tier: parseInt(e.target.value) })}
-                        >
-                            {[...Array(100)]
-                                .map((_, i) => (i))
-                                .filter(i => i < 10 || i % 5 == 4)
-                                .map(i => <SelectItem key={String(i + 1)}>{String(i + 1)}</SelectItem>)
-                            }
-                        </Select>
                         <Input
                             label={locale.Alias}
                             value={form.alias || ""}
                             onChange={e => onFormChange({ ...form, alias: e.target.value })}
                             isRequired
+                        />
+                        <Input
+                            label={locale.InputPrice || "Input Price"}
+                            value={String(form.input_price)}
+                            onChange={e => onFormChange({ ...form, input_price: Number(e.target.value) || 0 })}
+                        />
+                        <Input
+                            label={locale.OutputPrice || "Output Price"}
+                            value={String(form.output_price)}
+                            onChange={e => onFormChange({ ...form, output_price: Number(e.target.value) || 0 })}
                         />
                         <Switch
                             isSelected={form.is_public === 1}
