@@ -21,10 +21,6 @@ export class AccountService {
         return await accountRepository.find({ delete_time: null });
     }
 
-    static async findBySubWalletAddress(address: string): Promise<AccountEntity | null> {
-        return await accountRepository.findOne({ sub_wallet_address: address });
-    }
-
     static async findByEmail(email: string): Promise<AccountEntity | null> {
         return await accountRepository.findIgnoreDelete({ email });
     }
@@ -47,5 +43,28 @@ export class AccountService {
 
     static async delete(id: string): Promise<void> {
         await accountRepository.delete({ id });
+    }
+
+    /** Compute account balance from transactions + gift cards - usage costs */
+    static async getBalance(accountId: string): Promise<number> {
+        // SUM of confirmed topup/bonus transactions
+        const txRepo = Repository.instance<any>("Transaction");
+        const transactions = await txRepo.find({ account_id: accountId, status: "confirmed", delete_time: null });
+        const txTotal = transactions.reduce((sum: number, t: any) => sum + (t.amount || 0), 0);
+
+        // SUM of redeemed gift cards
+        const cardRepo = Repository.instance<any>("GiftCard");
+        const giftCards = await cardRepo.find({ redeemed_by: accountId, status: "redeemed" });
+        const gcTotal = giftCards.reduce((sum: number, c: any) => sum + (c.token_amount || 0), 0);
+
+        // SUM of usage costs
+        const usageRepo = Repository.instance<any>("UsageLog");
+        const usageLogs = await usageRepo.find({ accountId, delete_time: null });
+        const usageTotal = usageLogs.reduce((sum: number, log: any) => {
+            const cost = (log.inputTokens * (log.inputPrice || 0) + log.outputTokens * (log.outputPrice || 0)) / 1_000_000;
+            return sum + cost;
+        }, 0);
+
+        return Math.round((txTotal + gcTotal - usageTotal) * 1_000_000) / 1_000_000;
     }
 }

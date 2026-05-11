@@ -45,7 +45,11 @@ async function list(request: AccountListRequest): Promise<AccountListResponse> {
     if (request.filter?.email) search.email = request.filter.email;
 
     const { list: data, total } = await AccountService.find(page, search);
-    const list = data.map(item => new AccountDTO(item));
+    const list = await Promise.all(data.map(async item => {
+        const dto = new AccountDTO(item);
+        dto.balance = await AccountService.getBalance(item.id);
+        return dto;
+    }));
 
     return new AccountListResponse({
         success: true,
@@ -129,10 +133,25 @@ async function profile(request: AccountProfileRequest): Promise<AccountProfileRe
     if (!email) throw new Error("Unauthorized");
     const account = await getAccountByEmail(email);
     if (!account) throw new Error("Account not found");
+
+    // Calculate weekly usage cost
+    const since = Date.now() - 7 * 86400000;
+    const usageRepo = Repository.instance<any>("UsageLog");
+    const logs = await usageRepo.find({ accountId: account.id }, { since });
+    let weeklyUsage = 0;
+    for (const log of logs) {
+        const cost = (log.inputTokens * (log.inputPrice || 0) + log.outputTokens * (log.outputPrice || 0)) / 1_000_000;
+        weeklyUsage += cost;
+    }
+
     return new AccountProfileResponse({
         success: true,
         message: "success",
-        data: { account: new AccountDTO(account) },
+        data: {
+            account: new AccountDTO(account),
+            weeklyUsage: Math.round(weeklyUsage * 100) / 100,
+            balance: await AccountService.getBalance(account.id),
+        },
     });
 }
 
@@ -161,19 +180,17 @@ async function exportData(request: AccountExportRequest): Promise<AccountExportR
     const providerRepo = Repository.instance<any>("Provider");
     const roleRepo = Repository.instance<any>("Role");
     const accountRoleRepo = Repository.instance<any>("AccountRole");
-    const planRepo = Repository.instance<any>("SubscriptionPlan");
-    const recordRepo = Repository.instance<any>("SubscriptionRecord");
+    const recordRepo = Repository.instance<any>("Transaction");
     const taskRepo = Repository.instance<any>("Task");
     const usageRepo = Repository.instance<any>("UsageLog");
     const giftCardRepo = Repository.instance<any>("GiftCard");
 
-    const [accounts, models, providers, roles, accountRoles, plans, records, tasks, usageLogs, giftCards] = await Promise.all([
+    const [accounts, models, providers, roles, accountRoles, records, tasks, usageLogs, giftCards] = await Promise.all([
         accountRepo.findAllIgnoreDelete(),
         modelRepo.findAllIgnoreDelete(),
         providerRepo.findAllIgnoreDelete(),
         roleRepo.findAllIgnoreDelete(),
         accountRoleRepo.findAllIgnoreDelete(),
-        planRepo.findAllIgnoreDelete(),
         recordRepo.findAllIgnoreDelete(),
         taskRepo.findAllIgnoreDelete(),
         usageRepo.findAllIgnoreDelete(),
@@ -192,8 +209,7 @@ async function exportData(request: AccountExportRequest): Promise<AccountExportR
                 providers: providers as any[] || [],
                 roles: roles as any[] || [],
                 account_roles: accountRoles as any[] || [],
-                subscription_plans: plans as any[] || [],
-                subscription_records: records as any[] || [],
+                transactions: records as any[] || [],
                 tasks: tasks as any[] || [],
                 usage_logs: usageLogs as any[] || [],
                 gift_cards: giftCards as any[] || [],
@@ -251,8 +267,7 @@ async function importData(request: AccountImportRequest): Promise<AccountImportR
     const providerRepo = Repository.instance<any>("Provider");
     const roleRepo = Repository.instance<any>("Role");
     const accountRoleRepo = Repository.instance<any>("AccountRole");
-    const planRepo = Repository.instance<any>("SubscriptionPlan");
-    const recordRepo = Repository.instance<any>("SubscriptionRecord");
+    const recordRepo = Repository.instance<any>("Transaction");
     const taskRepo = Repository.instance<any>("Task");
     const usageRepo = Repository.instance<any>("UsageLog");
     const giftCardRepo = Repository.instance<any>("GiftCard");
@@ -260,14 +275,13 @@ async function importData(request: AccountImportRequest): Promise<AccountImportR
     type TableDef = { repo: Repository<any>; items: any[] | undefined; name: string };
     const tables: TableDef[] = [
         { repo: roleRepo, items: data.roles, name: "roles" },
-        { repo: planRepo, items: data.subscription_plans, name: "subscription_plans" },
         { repo: accountRepo, items: data.accounts, name: "accounts" },
         { repo: accountRoleRepo, items: data.account_roles, name: "account_roles" },
         { repo: modelRepo, items: data.models, name: "models" },
         { repo: providerRepo, items: data.providers, name: "providers" },
         { repo: taskRepo, items: data.tasks, name: "tasks" },
         { repo: usageRepo, items: data.usage_logs, name: "usage_logs" },
-        { repo: recordRepo, items: data.subscription_records, name: "subscription_records" },
+        { repo: recordRepo, items: data.transactions, name: "transactions" },
         { repo: giftCardRepo, items: data.gift_cards, name: "gift_cards" },
     ];
 
