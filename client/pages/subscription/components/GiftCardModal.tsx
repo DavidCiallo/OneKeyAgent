@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
-import { SubscriptionRecordRouter, GiftCardRouter } from "../../../api/instance";
+import { GiftCardRouter } from "../../../api/instance";
 
 export default function GiftCardModal({
     isOpen,
