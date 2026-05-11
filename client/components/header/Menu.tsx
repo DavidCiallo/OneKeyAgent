@@ -6,7 +6,7 @@ import { Locale } from "../../methods/locale";
 import { useAuth } from "../../methods/auth-context";
 import { clearAuthData } from "../../methods/auth";
 
-const ALL_MENUS = ["profile", "subscription", "model", "provider", "usage", "account"] as const;
+const ALL_MENUS = ["account", "profile", "subscription", "model", "provider", "usage"] as const;
 
 export const MenuComp = ({ now }: { now?: string }) => {
     const locale = Locale("Menu");
@@ -31,6 +31,7 @@ export const MenuComp = ({ now }: { now?: string }) => {
             : ["nocontent"]);
     const menuList = menuKeys
         .filter((key): key is string => key in menuMap)
+        .sort((a, b) => ALL_MENUS.indexOf(a as any) - ALL_MENUS.indexOf(b as any))
         .map(key => menuMap[key]);
 
     function handleLogout() {
