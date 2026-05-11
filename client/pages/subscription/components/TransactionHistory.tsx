@@ -3,10 +3,10 @@ import { Locale } from "../../../methods/locale";
 
 interface TxRecord {
     id: string;
-    plan_name: string;
     txid: string;
     amount: number;
     status: string;
+    type: string;
     create_time: number;
 }
 
@@ -15,6 +15,11 @@ const STATUS_MAP: Record<string, { color: "warning" | "success" | "danger" | "de
     confirmed: { color: "success", label: "Confirmed" },
     expired: { color: "danger", label: "Expired" },
 };
+
+function getTypeLabel(type: string, locale: any): string {
+    if (type === "bonus") return locale.BonusLabel || "Bonus";
+    return locale.TopupLabel || "Topup";
+}
 
 export default function TransactionHistory({ records, onRefresh, refreshing }: { records: TxRecord[]; onRefresh?: () => void; refreshing?: boolean }) {
     const locale = Locale("SubscriptionPage");
@@ -40,21 +45,28 @@ export default function TransactionHistory({ records, onRefresh, refreshing }: {
                         {records.map(record => {
                             const status = STATUS_MAP[record.status] || STATUS_MAP.default;
                             return (
-                                <div key={record.id} className="flex items-center justify-between border-b pb-2 last:border-b-0">
+                                <div key={record.id} className="flex items-center justify-between border-b border-gray-200/50 border-dashed pb-2 last:border-b-0">
                                     <div className="space-y-1">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-sm font-medium">{record.plan_name.toUpperCase()}</span>
+                                            <span className="text-sm font-medium">{getTypeLabel(record.type, locale)}</span>
                                             <Chip size="sm" color={status.color} variant="flat">
                                                 {status.label}
                                             </Chip>
                                         </div>
-                                        <p className="text-xs text-gray-400 font-mono truncate max-w-48">
-                                            {record.txid}
-                                        </p>
+                                        {record.type !== "bonus" && (
+                                            <p className="text-xs text-gray-400 font-mono truncate max-w-48">
+                                                {record.txid}
+                                            </p>
+                                        )}
+                                        {record.type === "bonus" && (
+                                            <p className="text-xs text-gray-400 font-mono">
+                                                #{String(record.create_time).slice(-6)}
+                                            </p>
+                                        )}
                                     </div>
                                     <div className="text-right">
                                         <p className="text-sm font-semibold">
-                                            ${(record.amount / 100).toFixed(2)}
+                                            ${record.amount.toFixed(2)}
                                         </p>
                                         <p className="text-xs text-gray-400">
                                             {new Date(record.create_time).toLocaleDateString()}
