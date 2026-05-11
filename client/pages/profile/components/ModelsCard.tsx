@@ -3,13 +3,19 @@ import { Locale } from "../../../methods/locale";
 
 type ModelInfo = {
     id: string;
-    tier: number;
+    input_price: number;
+    output_price: number;
 };
 
 export default function ModelsCard({ models }: { models: ModelInfo[] }) {
     const locale = Locale("ProfilePage");
 
-    const sorted = [...models].sort((a, b) => a.tier - b.tier || a.id.localeCompare(b.id));
+    const sorted = [...models].sort((a, b) => a.id.localeCompare(b.id));
+
+    const formatPrice = (dollarsPerMToken: number) => {
+        if (dollarsPerMToken <= 0) return "-";
+        return `$${dollarsPerMToken.toFixed(2)}/M`;
+    };
 
     return (
         <Card>
@@ -19,7 +25,8 @@ export default function ModelsCard({ models }: { models: ModelInfo[] }) {
                 <Table removeWrapper aria-label="Models table" className="min-w-full">
                     <TableHeader>
                         <TableColumn className="text-xs uppercase tracking-wider text-gray-500">{locale.ModelName}</TableColumn>
-                        <TableColumn className="text-xs uppercase tracking-wider text-gray-500">{locale.Tier}</TableColumn>
+                        <TableColumn className="text-xs uppercase tracking-wider text-gray-500">{locale.InputPrice}</TableColumn>
+                        <TableColumn className="text-xs uppercase tracking-wider text-gray-500">{locale.OutputPrice}</TableColumn>
                     </TableHeader>
                     <TableBody emptyContent="No models available">
                         {sorted.map(m => (
@@ -28,17 +35,19 @@ export default function ModelsCard({ models }: { models: ModelInfo[] }) {
                                     <span className="font-mono text-sm">{m.id}</span>
                                 </TableCell>
                                 <TableCell>
-                                    <Chip size="sm" color={m.tier > 1 ? "warning" : "default"} variant="flat">
-                                        {m.tier}x
+                                    <Chip size="sm" variant="flat">
+                                        {formatPrice(m.input_price)}
+                                    </Chip>
+                                </TableCell>
+                                <TableCell>
+                                    <Chip size="sm" variant="flat">
+                                        {formatPrice(m.output_price)}
                                     </Chip>
                                 </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
                 </Table>
-                <div className="mt-4 pt-3 border-t border-default-100">
-                    <p className="text-xs text-gray-400">{locale.BillingHint}</p>
-                </div>
             </CardBody>
         </Card>
     );
