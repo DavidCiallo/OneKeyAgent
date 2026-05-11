@@ -6,9 +6,6 @@ export interface AccountEntity extends BaseEntity {
     password: string;
     apiKey: string;
     is_admin: number; // 1 = admin, 0 = regular user
-    plan: string; // "free" | "pro" | "max" — defaults to "free"
-    plan_expires_at: number | null;
-    sub_wallet_address: string | null;
     tg_chat_id: string | null;
-    topup_tokens: number; // raw tokens purchased via top-up packs, deducted after monthly limit
+    last_daily_time: number | null; // timestamp of last daily bonus claim
 }
