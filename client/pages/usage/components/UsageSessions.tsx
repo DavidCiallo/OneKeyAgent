@@ -1,26 +1,21 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid,
 } from "recharts";
-import { Select, SelectItem } from "@heroui/react";
+import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell } from "@heroui/react";
 import { UserSessionGroup } from "../../../../shared/modules/usage/usage.interface";
-import { stringToColor, fmtM, stripEmail } from "./utils";
+import { stringToColor, fmtM, format24Time, stripEmail } from "./utils";
 
 type Props = {
     groups: UserSessionGroup[];
 };
 
-/** Collect all unique provider names that have non-zero total across chart data */
 function getActiveProviders(
     groups: UserSessionGroup[],
-    accountFilter: Set<string>,
-    modelFilter: Set<string>,
 ): string[] {
     const totals = new Map<string, number>();
     for (const g of groups) {
-        if (!accountFilter.has(g.accountId)) continue;
         for (const s of g.sessions) {
-            if (!modelFilter.has(s.modelAlias)) continue;
             for (const pu of s.providerUsage) {
                 totals.set(pu.providerName, (totals.get(pu.providerName) || 0) + pu.inputTokens + pu.outputTokens);
             }
@@ -32,7 +27,6 @@ function getActiveProviders(
         .sort();
 }
 
-/** Build chart data: each entry = one session with provider token values */
 function buildChartData(
     sessions: UserSessionGroup["sessions"],
     providers: string[],
@@ -56,57 +50,19 @@ function buildChartData(
 }
 
 export function UsageSessions({ groups }: Props) {
-    const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set());
-    const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
-
-    // Derive all unique accounts and models
-    const allAccounts = useMemo(
-        () => groups.map((g) => ({ id: g.accountId, name: stripEmail(g.accountName || g.accountId) })),
-        [groups],
-    );
-    const allModels = useMemo(() => {
-        const set = new Set<string>();
-        for (const g of groups) {
-            for (const s of g.sessions) {
-                set.add(s.modelAlias);
-            }
-        }
-        return Array.from(set).sort();
+    // Flatten all sessions, sort by time DESC, take latest 10
+    const recentSessions = useMemo(() => {
+        const all = groups.flatMap(g => g.sessions);
+        all.sort((a, b) => b.startTime - a.startTime);
+        return all.slice(0, 10);
     }, [groups]);
 
-    // Auto-select all when nothing selected
-    const activeAccounts = selectedAccounts.size > 0 ? selectedAccounts : new Set(allAccounts.map((a) => a.id));
-    const activeModels = selectedModels.size > 0 ? selectedModels : new Set(allModels);
+    const providers = useMemo(() => getActiveProviders(groups), [groups]);
 
-    // Filter groups by selected accounts
-    const filteredGroups = useMemo(
-        () => groups.filter((g) => activeAccounts.has(g.accountId)),
-        [groups, activeAccounts],
-    );
-
-    // Get all sessions across filtered groups, sorted by time ASC for the chart
-    const allSessions = useMemo(() => {
-        const s = filteredGroups.flatMap((g) => g.sessions);
-        s.sort((a, b) => a.startTime - b.startTime);
-        return s;
-    }, [filteredGroups]);
-
-    // Filter by model
-    const modelSessions = useMemo(
-        () => allSessions.filter((s) => activeModels.has(s.modelAlias)),
-        [allSessions, activeModels],
-    );
-
-    // Only show providers that have non-zero total in the filtered data
-    const providers = useMemo(
-        () => getActiveProviders(groups, activeAccounts, activeModels),
-        [groups, activeAccounts, activeModels],
-    );
-
-    const chartData = useMemo(
-        () => buildChartData(modelSessions, providers),
-        [modelSessions, providers],
-    );
+    const chartData = useMemo(() => {
+        const asc = [...recentSessions].sort((a, b) => a.startTime - b.startTime);
+        return buildChartData(asc, providers);
+    }, [recentSessions, providers]);
 
     if (groups.length === 0) {
         return <div className="text-center text-default-400 py-12">No data</div>;
@@ -114,40 +70,9 @@ export function UsageSessions({ groups }: Props) {
 
     return (
         <div className="flex flex-col gap-4">
-            {/* Filters */}
-            <div className="flex flex-wrap gap-3">
-                <Select
-                    size="sm"
-                    className="w-48"
-                    selectionMode="multiple"
-                    placeholder="All accounts"
-                    selectedKeys={selectedAccounts}
-                    onSelectionChange={(keys) => setSelectedAccounts(new Set(Array.from(keys) as string[]))}
-                    aria-label="Filter by account"
-                >
-                    {allAccounts.map((a) => (
-                        <SelectItem key={a.id}>{a.name}</SelectItem>
-                    ))}
-                </Select>
-
-                <Select
-                    size="sm"
-                    className="w-48"
-                    selectionMode="multiple"
-                    placeholder="All models"
-                    selectedKeys={selectedModels}
-                    onSelectionChange={(keys) => setSelectedModels(new Set(Array.from(keys) as string[]))}
-                    aria-label="Filter by model"
-                >
-                    {allModels.map((m) => (
-                        <SelectItem key={m}>{m}</SelectItem>
-                    ))}
-                </Select>
-            </div>
-
             {/* Stacked bar chart */}
             {chartData.length === 0 ? (
-                <div className="text-center text-default-400 py-12">No data for selected filters</div>
+                <div className="text-center text-default-400 py-12">No data</div>
             ) : (
                 <ResponsiveContainer width="100%" height={400}>
                     <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -191,6 +116,38 @@ export function UsageSessions({ groups }: Props) {
                     </BarChart>
                 </ResponsiveContainer>
             )}
+
+            {/* Recent sessions table */}
+            <div className="overflow-auto">
+                <Table aria-label="Recent sessions" className="min-w-max">
+                    <TableHeader>
+                        <TableColumn>Time</TableColumn>
+                        <TableColumn>Account</TableColumn>
+                        <TableColumn>Model</TableColumn>
+                        <TableColumn align="center">Input</TableColumn>
+                        <TableColumn align="center">Output</TableColumn>
+                        <TableColumn align="center">Cost</TableColumn>
+                    </TableHeader>
+                    <TableBody emptyContent="No sessions">
+                        {recentSessions.map((session, idx) => (
+                            <TableRow key={`${session.startTime}-${idx}`}>
+                                <TableCell className="whitespace-nowrap font-mono text-sm">
+                                    {format24Time(session.startTime)}
+                                </TableCell>
+                                <TableCell className="max-w-32 truncate">
+                                    {stripEmail(
+                                        groups.find(g => g.sessions.includes(session))?.accountName || ""
+                                    )}
+                                </TableCell>
+                                <TableCell className="font-semibold">{session.modelAlias}</TableCell>
+                                <TableCell className="text-right">{fmtM(session.inputTokens)}</TableCell>
+                                <TableCell className="text-right">{fmtM(session.outputTokens)}</TableCell>
+                                <TableCell className="text-right font-mono">${session.cost?.toFixed(4) || "0"}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
         </div>
     );
 }
