@@ -34,7 +34,9 @@ export class ProviderService {
     }
 
     static async find(page: number, filter: Partial<ProviderEntity>): Promise<{ list: ProviderEntity[], total: number }> {
-        const list = await providerRepository.find(filter, { offset: (page - 1) * 10, limit: 10 });
+        const list = (await providerRepository.find(filter))
+            .sort((a, b) => a.modelAlias.localeCompare(b.modelAlias))
+            .slice((page - 1) * 10, page * 10);
         const total = await providerRepository.count(filter);
         return { list, total };
     }

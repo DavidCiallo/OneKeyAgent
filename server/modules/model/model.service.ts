@@ -5,21 +5,25 @@ const modelRepository: Repository<ModelEntity> = Repository.instance("Model");
 
 export class ModelService {
     static async find(page: number, filter: Partial<ModelEntity>): Promise<{ list: ModelEntity[], total: number }> {
-        const list = await modelRepository.find(filter, { offset: (page - 1) * 10, limit: 10 });
+        const list = await modelRepository.find(filter);
+        list.sort((a, b) => a.alias.localeCompare(b.alias));
         const total = await modelRepository.count(filter);
-        return { list, total };
+        return { list: list.slice((page - 1) * 10, page * 10), total };
     }
 
     static async findOne(id: string): Promise<ModelEntity | null> {
         return await modelRepository.findOne({ id });
     }
 
+    static async findByAlias(alias: string): Promise<ModelEntity[]> {
+        return await modelRepository.find({ alias });
+    }
+
     static async create(data: Partial<ModelEntity>): Promise<ModelEntity> {
-        // If a soft-deleted model with the same alias exists, restore it
         if (data.alias) {
             const existing = await modelRepository.findIgnoreDelete({ alias: data.alias });
             if (existing && existing.delete_time) {
-                await modelRepository.update({ id: existing.id }, { ...data, id: existing.id, delete_time: null as any });
+                await modelRepository.update({ id: existing.id }, { ...data, id: existing.id, delete_time: null }, true);
                 return (await modelRepository.findOne({ id: existing.id }))!;
             }
         }
