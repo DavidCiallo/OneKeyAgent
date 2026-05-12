@@ -31,7 +31,7 @@ export class WebSocketClientService {
     }
 
     public async sendMessage(message: string): Promise<void> {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 200));
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(message);
         }

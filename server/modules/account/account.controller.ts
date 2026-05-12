@@ -189,17 +189,26 @@ async function exportData(request: AccountExportRequest): Promise<AccountExportR
     const usageRepo = Repository.instance<any>("UsageLog");
     const giftCardRepo = Repository.instance<any>("GiftCard");
 
-    const [accounts, models, providers, roles, accountRoles, records, tasks, usageLogs, giftCards] = await Promise.all([
+    // Small tables: load all at once
+    const [accounts, models, providers, roles, accountRoles, tasks, giftCards] = await Promise.all([
         accountRepo.findAllIgnoreDelete(),
         modelRepo.findAllIgnoreDelete(),
         providerRepo.findAllIgnoreDelete(),
         roleRepo.findAllIgnoreDelete(),
         accountRoleRepo.findAllIgnoreDelete(),
-        recordRepo.findAllIgnoreDelete(),
         taskRepo.findAllIgnoreDelete(),
-        usageRepo.findAllIgnoreDelete(),
         giftCardRepo.findAllIgnoreDelete(),
     ]);
+
+    // Large tables: batch read to avoid OOM
+    const transactions: any[] = [];
+    for await (const batch of recordRepo.findAllIgnoreDeleteBatch(2000)) {
+        transactions.push(...batch);
+    }
+    const usageLogs: any[] = [];
+    for await (const batch of usageRepo.findAllIgnoreDeleteBatch(2000)) {
+        usageLogs.push(...batch);
+    }
 
     return new AccountExportResponse({
         success: true,
@@ -208,15 +217,15 @@ async function exportData(request: AccountExportRequest): Promise<AccountExportR
             version: 1,
             exported_at: Date.now(),
             data: {
-                accounts: (accounts as any[] || []),
-                models: models as any[] || [],
-                providers: providers as any[] || [],
-                roles: roles as any[] || [],
-                account_roles: accountRoles as any[] || [],
-                transactions: records as any[] || [],
-                tasks: tasks as any[] || [],
-                usage_logs: usageLogs as any[] || [],
-                gift_cards: giftCards as any[] || [],
+                accounts: accounts || [],
+                models: models || [],
+                providers: providers || [],
+                roles: roles || [],
+                account_roles: accountRoles || [],
+                transactions,
+                tasks: tasks || [],
+                usage_logs: usageLogs,
+                gift_cards: giftCards || [],
             },
         },
     });
@@ -226,7 +235,11 @@ async function exportUsage(request: AccountExportRequest): Promise<AccountExport
     await requireAdmin(request.auth);
 
     const usageRepo = Repository.instance<any>("UsageLog");
-    const logs = await usageRepo.findAllIgnoreDelete();
+
+    const usageLogs: any[] = [];
+    for await (const batch of usageRepo.findAllIgnoreDeleteBatch(2000)) {
+        usageLogs.push(...batch);
+    }
 
     return new AccountExportResponse({
         success: true,
@@ -235,7 +248,7 @@ async function exportUsage(request: AccountExportRequest): Promise<AccountExport
             version: 1,
             exported_at: Date.now(),
             data: {
-                usage_logs: (logs as any[] || []),
+                usage_logs: usageLogs,
             },
         },
     });
@@ -254,7 +267,7 @@ async function exportTasks(request: AccountExportRequest): Promise<AccountExport
             version: 1,
             exported_at: Date.now(),
             data: {
-                tasks: (tasks as any[] || []),
+                tasks: tasks || [],
             },
         },
     });
@@ -292,9 +305,10 @@ async function importData(request: AccountImportRequest): Promise<AccountImportR
     async function importTable(repo: Repository<any>, items: any[] | undefined, name: string) {
         if (!items || items.length === 0) return;
         let count = 0;
-        for (const item of items) {
-            await repo.insert(item);
-            count++;
+        // Batch insert in chunks of 1000 to avoid excessive memory and transaction size
+        for (let i = 0; i < items.length; i += 1000) {
+            const chunk = items.slice(i, i + 1000);
+            count += await repo.batchInsert(chunk);
         }
         imported[name] = count;
     }
