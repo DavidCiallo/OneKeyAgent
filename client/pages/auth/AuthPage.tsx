@@ -12,7 +12,7 @@ import { LoginBody, LoginRequest, RegisterBody, RegisterRequest, AuthConfigReque
 import NeuralLogo from "../home/components/NeuralLogo";
 
 function getDefaultRoute(is_admin?: number, roles?: { name: string; type: string }[]): string {
-    if (is_admin) return "/profile";
+    if (is_admin) return "/account";
     if (roles && roles.length > 0) {
         const menuRole = roles.find(r => r.type === "menu");
         if (menuRole) return `/${menuRole.name}`;

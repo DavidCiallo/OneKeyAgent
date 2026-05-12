@@ -4,6 +4,7 @@ import Repository from "../../lib/repository";
 import { generateApiKey } from "../ai/ai.auth";
 import { RoleService, AccountRoleService } from "../role/role.service";
 import { sendEmail, buildVerificationEmail } from "../email/email.service";
+import { AccountService } from "../account/account.service";
 
 const ALL_MENUS = ["model", "usage", "account", "profile"];
 const accountRepository: Repository<AccountEntity> = Repository.instance("Account");
@@ -15,16 +16,38 @@ export async function loginUser(email: string, password: string): Promise<{ toke
         const roles = emailItem.is_admin
             ? ALL_MENUS.map(name => ({ name, type: "menu" }))
             : (await AccountRoleService.findByAccount(emailItem.id)).map(r => ({ name: r.name, type: r.type }));
-        // Daily login bonus: insert a redeemed gift card worth 0.2 tokens
+        // Daily login bonus: insert a redeemed gift card
         const now = Date.now();
         const lastDaily = emailItem.last_daily_time;
         const isNewDay = !lastDaily || new Date(lastDaily).toDateString() !== new Date(now).toDateString();
         if (isNewDay) {
             await accountRepository.update({ id: emailItem.id }, { last_daily_time: now } as any);
             const cardRepo = Repository.instance<any>("GiftCard");
+
+            // Calculate daily bonus amount with adaptive reduction
+            const dailyCards = await cardRepo.find({ redeemed_by: emailItem.id, status: "redeemed" });
+            const dailyTotal = dailyCards
+                .filter((c: any) => c.code && c.code.startsWith("daily_"))
+                .reduce((sum: number, c: any) => sum + (c.token_amount || 0), 0);
+
+            const balance = await AccountService.getBalance(emailItem.id);
+
+            let amount = 0.1;
+            if (dailyTotal > 0 && balance > 0) {
+                const ratio = dailyTotal / balance;
+                if (ratio > 0.15) {
+                    // Daily bonuses exceed 15% of balance — cut by ~50%
+                    amount = amount * (0.25 + Math.random() * 0.2); // 25-45% of original
+                } else {
+                    // Otherwise cut by ~10%
+                    amount = amount * (0.85 + Math.random() * 0.1); // 85-95% of original
+                }
+                amount = Math.round(amount * 100) / 100;
+            }
+
             await cardRepo.insert({
                 code: `daily_${emailItem.id}_${now}`,
-                token_amount: 0.1,
+                token_amount: amount,
                 status: "redeemed",
                 redeemed_by: emailItem.id,
                 redeemed_at: now,
