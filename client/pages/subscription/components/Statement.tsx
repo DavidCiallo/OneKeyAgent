@@ -28,7 +28,7 @@ function getTypeChip(type: string, locale: any): { color: "success" | "primary" 
         case "bonus":
             return { color: "primary", label: locale.BonusLabel || "Bonus" };
         case "gift_card":
-            return { color: "warning", label: locale.GiftCardLabel || "Gift Card" };
+            return { color: "warning", label: locale.GiftCardLabel || "Redeem" };
         case "usage":
             return { color: "danger", label: locale.UsageLabel || "Usage" };
         default:

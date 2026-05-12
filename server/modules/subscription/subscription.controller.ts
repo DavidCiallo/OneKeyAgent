@@ -194,6 +194,7 @@ async function statement(request: StatementRequest): Promise<StatementResponse> 
                 type: "gift_card",
                 amount: card.token_amount,
                 description: "Gift Card Redeemed",
+                remark: `#${card.code.slice(0, 20)}`,
                 create_time: card.redeemed_at || card.create_time,
             }));
         }
