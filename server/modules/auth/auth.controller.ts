@@ -9,8 +9,6 @@ import { AuthRouterInstance } from "../../../shared/modules/auth/auth.router";
 import { inject } from "../../lib/inject";
 import { getIdentifyByVerify, loginUser, preRegisterUser, completeRegistration, getAccountByEmail } from "./auth.service";
 import { AccountRoleService } from "../role/role.service";
-import Repository from "../../lib/repository";
-import { AccountEntity } from "../../../shared/modules/account/account.entity";
 
 const ALL_MENUS = ["model", "usage", "account", "profile"];
 

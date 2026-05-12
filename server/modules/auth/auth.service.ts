@@ -6,7 +6,7 @@ import { RoleService, AccountRoleService } from "../role/role.service";
 import { sendEmail, buildVerificationEmail } from "../email/email.service";
 import { AccountService } from "../account/account.service";
 
-const ALL_MENUS = ["model", "usage", "account", "profile"];
+const ALL_MENUS = ["profile", "model", "usage", "account"];
 const accountRepository: Repository<AccountEntity> = Repository.instance("Account");
 
 export async function loginUser(email: string, password: string): Promise<{ token?: string; is_admin?: number; roles?: { name: string; type: string }[]; needsVerification?: boolean }> {
@@ -24,17 +24,18 @@ export async function loginUser(email: string, password: string): Promise<{ toke
             await accountRepository.update({ id: emailItem.id }, { last_daily_time: now } as any);
             const cardRepo = Repository.instance<any>("GiftCard");
 
-            // Calculate daily bonus amount with adaptive reduction
-            const dailyCards = await cardRepo.find({ redeemed_by: emailItem.id, status: "redeemed" });
-            const dailyTotal = dailyCards
-                .filter((c: any) => c.code && c.code.startsWith("daily_"))
+            // Calculate daily bonus amount with adaptive reduction based on manual gift cards
+            const allRedeemed = await cardRepo.find({ redeemed_by: emailItem.id, status: "redeemed" });
+            // Only count manually created cards (not daily_ or register_ prefixes)
+            const manualTotal = allRedeemed
+                .filter((c: any) => c.code && !c.code.startsWith("daily_") && !c.code.startsWith("register_"))
                 .reduce((sum: number, c: any) => sum + (c.token_amount || 0), 0);
 
             const balance = await AccountService.getBalance(emailItem.id);
 
             let amount = 0.1;
-            if (dailyTotal > 0 && balance > 0) {
-                const ratio = dailyTotal / balance;
+            if (manualTotal > 0 && balance > 0) {
+                const ratio = manualTotal / balance;
                 if (ratio > 0.15) {
                     // Daily bonuses exceed 15% of balance — cut by ~50%
                     amount = amount * (0.25 + Math.random() * 0.2); // 25-45% of original

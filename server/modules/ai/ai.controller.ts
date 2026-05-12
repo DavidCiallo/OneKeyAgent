@@ -4,16 +4,13 @@ import {
 import { AiRouterInstance } from "../../../shared/modules/ai/ai.router";
 import { inject } from "../../lib/inject";
 import { AiService } from "./ai.service";
-import { validateApiKey, verifyApiKeyInDb, getAccountIdByApiKey } from "./ai.auth";
+import { validateApiKey, getAccountIdByApiKey } from "./ai.auth";
 import { getIdentifyByVerify } from "../auth/auth.service";
 import { AccountService } from "../account/account.service";
 
 export const aiController = new AiRouterInstance(inject, {
     async chatcompletions(request): Promise<any> {
         const apiKey = request.auth || "";
-        if (!validateApiKey(apiKey) || !(await verifyApiKeyInDb(apiKey))) {
-            throw new Error("Invalid API Key");
-        }
         const accountId = await getAccountIdByApiKey(apiKey);
         if (!accountId) throw new Error("Invalid API Key");
 
@@ -37,9 +34,6 @@ export const aiController = new AiRouterInstance(inject, {
 
     async completions(request): Promise<any> {
         const apiKey = request.auth || "";
-        if (!validateApiKey(apiKey) || !(await verifyApiKeyInDb(apiKey))) {
-            throw new Error("Invalid API Key");
-        }
         const accountId = await getAccountIdByApiKey(apiKey);
         if (!accountId) throw new Error("Invalid API Key");
 
@@ -85,9 +79,6 @@ export const aiController = new AiRouterInstance(inject, {
 
     async v1messages(request): Promise<any> {
         const apiKey = request.auth || "";
-        if (!validateApiKey(apiKey) || !(await verifyApiKeyInDb(apiKey))) {
-            throw new Error("Invalid API Key");
-        }
         const accountId = await getAccountIdByApiKey(apiKey);
         if (!accountId) throw new Error("Invalid API Key");
 

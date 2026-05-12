@@ -9,12 +9,6 @@ export function validateApiKey(key: string): boolean {
     return key.startsWith("sk-") && key.length === 39;
 }
 
-export async function verifyApiKeyInDb(key: string): Promise<boolean> {
-    if (!key) return false;
-    const account = await accountRepo.findOne({ apiKey: key });
-    return !!account;
-}
-
 export async function getAccountIdByApiKey(key: string): Promise<string | null> {
     if (!key) return null;
     const account = await accountRepo.findOne({ apiKey: key });
