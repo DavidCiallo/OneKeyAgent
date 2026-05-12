@@ -1,5 +1,6 @@
 import { AccountEntity } from "../../../shared/modules/account/account.entity";
 import Repository from "../../lib/repository";
+import crypto from "crypto";
 
 const accountRepo = Repository.instance<AccountEntity>("Account");
 

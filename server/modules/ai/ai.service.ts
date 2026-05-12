@@ -221,9 +221,7 @@ async function requireModelAccess(accountId: string, alias: string): Promise<voi
 }
 
 async function chatHex(body: Record<string, any>, accountId: string): Promise<any> {
-    const t0 = Date.now();
     const requestedAlias = body.model;
-    console.log("[chatHex] model:", requestedAlias, "accountId:", accountId, "stream:", body.stream);
 
     await requireModelAccess(accountId, requestedAlias);
 
@@ -246,7 +244,6 @@ async function chatHex(body: Record<string, any>, accountId: string): Promise<an
 
         ProviderService.recordSuccess(provider.id);
 
-        const ms = Date.now() - t0;
         const { inputPrice: input_price, outputPrice: output_price } = await getModelPrices(requestedAlias);
         const { usage } = data;
         // OpenAI format: prompt_tokens/completion_tokens; Anthropic format: input_tokens/output_tokens
@@ -289,12 +286,10 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
 
     await requireModelAccess(accountId, requestedAlias);
 
-    console.log("[chatHexStream] alias:", requestedAlias, "accountId:", accountId);
     const providers = await ProviderService.getProvidersByAlias(requestedAlias);
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
 
     for (const provider of providers) {
-        console.log("[chatHexStream] trying provider:", provider.id, "apiType:", provider.apiType, "model:", provider.model, "baseURL:", provider.baseURL);
         const requestBody: Record<string, any> = {
             ...body,
             stream: true,
@@ -312,41 +307,17 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
             provider.apiType
         );
         if (!bodyStream) {
-            console.log("[chatHexStream] provider", provider.id, "returned null, trying next");
             ProviderService.recordFail(provider.id);
             continue;
         }
 
-        console.log("[chatHexStream] provider", provider.id, "connected successfully, streaming...");
         ProviderService.recordSuccess(provider.id);
 
-        const t0 = Date.now();
         const [upstreamForward, parseStream] = (bodyStream.tee() as [ReadableStream<Uint8Array>, ReadableStream<Uint8Array>]);
-
-        // Log raw data from upstream to debug
-        const logStream = new TransformStream<Uint8Array, Uint8Array>();
-        (async () => {
-            const r = upstreamForward.getReader();
-            const w = logStream.writable.getWriter();
-            let totalBytes = 0;
-            let chunks: string[] = [];
-            while (true) {
-                const { done, value } = await r.read();
-                if (done) {
-                    console.log("[chatHexStream] stream done, bytes:", totalBytes, "chunks:", chunks.length);
-                    break;
-                }
-                totalBytes += value.length;
-                const text = new TextDecoder().decode(value);
-                chunks.push(text.substring(0, 100));
-                await w.write(value);
-            }
-            await w.close();
-        })();
 
         const ts = new TransformStream<Uint8Array, Uint8Array>();
         const forwardStream = ts.readable;
-        safePipe(logStream.readable.getReader(), ts.writable.getWriter());
+        safePipe(upstreamForward.getReader(), ts.writable.getWriter());
 
         // Background parse usage
         (async () => {
@@ -461,7 +432,6 @@ function requestJson(urlStr: string, apiKey: string | undefined, postBody: strin
 }
 
 async function completeHex(body: Record<string, any>, accountId: string): Promise<any> {
-    const t0 = Date.now();
     const requestedAlias = body.model;
 
     await requireModelAccess(accountId, requestedAlias);
@@ -477,7 +447,6 @@ async function completeHex(body: Record<string, any>, accountId: string): Promis
         }
 
         ProviderService.recordSuccess(provider.id);
-        const ms = Date.now() - t0;
         const { inputPrice: input_price, outputPrice: output_price } = await getModelPrices(requestedAlias);
         // OpenAI format: prompt_tokens/completion_tokens; Anthropic format: input_tokens/output_tokens
         const rawInput = data.usage?.input_tokens ?? data.usage?.prompt_tokens ?? 0;
@@ -502,7 +471,7 @@ async function completeHex(body: Record<string, any>, accountId: string): Promis
     throw new Error("All providers failed");
 }
 
-function requestStream(urlStr: string, apiKey: string | undefined, postBody: string, proxyURL: string | undefined, authType?: string): Promise<ReadableStream<Uint8Array> | null> {
+function requestStream(urlStr: string, apiKey: string | undefined, postBody: string, proxyURL: string | undefined, authType?: string, apiType?: string): Promise<ReadableStream<Uint8Array> | null> {
     const url = new URL(urlStr);
     const agent = proxyURL ? new HttpsProxyAgent(proxyURL) : undefined;
     return new Promise((resolve) => {
@@ -554,7 +523,7 @@ async function completeHexStream(body: Record<string, any>, accountId: string): 
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
 
     for (const provider of providers) {
-        const bodyStream = await requestStream(`${provider.baseURL}/completions`, provider.apiKey, JSON.stringify({ ...body, stream: true, model: provider.model }), provider.proxyURL, provider.authType);
+        const bodyStream = await requestStream(`${provider.baseURL}/completions`, provider.apiKey, JSON.stringify({ ...body, stream: true, model: provider.model }), provider.proxyURL, provider.authType, provider.apiType);
         if (!bodyStream) {
             ProviderService.recordFail(provider.id);
             continue;

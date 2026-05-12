@@ -16,22 +16,24 @@ export async function mounthttp(req: Request, controllers: BaseRouterInstance[])
                 let requestBody: Record<string, any> | null = {};
                 try {
                     const contentType = req.headers.get("content-type") || "";
+                    const rawHeaders = Object.fromEntries(req.headers.entries());
+                    const rawBody = await req.text();
                     if (contentType.includes("application/json")) {
-                        requestBody = await req.json();
+                        requestBody = JSON.parse(rawBody);
                     } else if (contentType.includes("application/x-www-form-urlencoded")) {
-                        const text = await req.text();
-                        const params = new URLSearchParams(text);
+                        const params = new URLSearchParams(rawBody);
                         requestBody = Object.fromEntries(params.entries());
                     } else {
-                        // Try JSON first, then form-urlencoded
-                        const text = await req.text();
                         try {
-                            requestBody = JSON.parse(text);
+                            requestBody = JSON.parse(rawBody);
                         } catch {
-                            const params = new URLSearchParams(text);
+                            const params = new URLSearchParams(rawBody);
                             requestBody = Object.fromEntries(params.entries());
                         }
                     }
+                    // 注入原始请求头和 body，供 webhook 签名验证使用
+                    (requestBody as any).__raw_body = rawBody;
+                    (requestBody as any).__headers = rawHeaders;
                 } catch (e) {
                     requestBody = null;
                 }

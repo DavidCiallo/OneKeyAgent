@@ -12,6 +12,13 @@ import { SubscriptionService } from "./subscription.service";
 import { createInvoice } from "./nowpayments.service";
 import { AccountService } from "../account/account.service";
 import Repository from "../../lib/repository";
+import crypto from "crypto";
+
+function verifyNowPaymentsSignature(rawBody: string, signature: string, secret: string): boolean {
+    const hmac = crypto.createHmac("sha512", secret);
+    hmac.update(rawBody);
+    return hmac.digest("hex") === signature;
+}
 
 async function resolveAccount(auth: string) {
     const email = getIdentifyByVerify(auth);
@@ -220,6 +227,21 @@ async function statement(request: StatementRequest): Promise<StatementResponse> 
  * NowPayments POSTs here when payment status changes.
  */
 async function ipnwebhook(request: Record<string, unknown>): Promise<{ success: boolean; message: string }> {
+    // Verify NowPayments HMAC signature
+    const rawBody = (request as any).__raw_body as string || "";
+    const headers = (request as any).__headers as Record<string, string> || {};
+    const signature = headers["x-nowpayments-sig"] || headers["x-nowpayments-signature"] || "";
+    const secret = process.env.NOWPAYMENTS_API_KEY || "";
+    if (secret && signature && rawBody) {
+        const valid = verifyNowPaymentsSignature(rawBody, signature, secret);
+        if (!valid) {
+            console.warn("[IPN] Invalid signature, rejecting webhook");
+            return { success: false, message: "invalid signature" };
+        }
+    } else {
+        console.warn("[IPN] Missing signature or secret, skipping verification");
+    }
+
     const paymentId = String(request.payment_id || "");
     const invoiceId = String(request.invoice_id || "");
     const paymentStatus = String(request.payment_status || "");
