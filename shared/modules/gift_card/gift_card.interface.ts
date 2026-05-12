@@ -95,14 +95,15 @@ export class GiftCardRedeemRequest implements BaseRequest {
     }
 }
 
-export class GiftCardRedeemResponse implements BaseResponse<undefined> {
+export class GiftCardRedeemResponse implements BaseResponse<{ token_amount: number }> {
     public success: boolean;
     public message: string;
-    public data?: undefined;
+    public data?: { token_amount: number };
 
     constructor(origin: GiftCardRedeemResponse) {
         this.success = origin.success;
         this.message = origin.message;
+        this.data = origin.data;
     }
 }
 

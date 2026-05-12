@@ -5,7 +5,7 @@ import {
     ProviderCreateRequest, ProviderCreateResponse,
     ProviderUpdateRequest, ProviderUpdateResponse,
     ProviderDeleteRequest, ProviderDeleteResponse,
-    ProviderSwapPriorityRequest, ProviderSwapPriorityResponse,
+    ProviderUpdatePriorityRequest, ProviderUpdatePriorityResponse,
 } from "../../../shared/modules/provider/provider.interface";
 import { ProviderRouterInstance } from "../../../shared/modules/provider/provider.router";
 import { inject } from "../../lib/inject";
@@ -91,15 +91,15 @@ async function del(request: ProviderDeleteRequest): Promise<ProviderDeleteRespon
     });
 }
 
-async function swappriority(request: ProviderSwapPriorityRequest): Promise<ProviderSwapPriorityResponse> {
-    request = ProviderSwapPriorityRequest.self(request);
+async function updatepriority(request: ProviderUpdatePriorityRequest): Promise<ProviderUpdatePriorityResponse> {
+    request = ProviderUpdatePriorityRequest.self(request);
     await requireAdmin(request.auth);
 
-    await ProviderService.swapPriority(request.id1, request.id2);
-    return new ProviderSwapPriorityResponse({
+    await ProviderService.updatePriority(request.id, request.delta);
+    return new ProviderUpdatePriorityResponse({
         success: true,
         message: "success",
     });
 }
 
-export const providerController = new ProviderRouterInstance(inject, { list, detail, create, update, swappriority, delete: del });
+export const providerController = new ProviderRouterInstance(inject, { list, detail, create, update, updatepriority, delete: del });

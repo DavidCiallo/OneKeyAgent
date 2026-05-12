@@ -216,12 +216,17 @@ export class TelegramService {
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
         }
+        // 清理已删除的消息，并防止数组无限增长
         waitDelMessage.filter(item => item.chat_id === chat_id).forEach(item => {
             this.deleteMessage(chat_id, item.message_id);
         });
+        // 移除已处理项并限制最大长度
+        const remaining = waitDelMessage.filter(item => item.chat_id !== chat_id);
         if (isJsonPayload && message_id) {
-            waitDelMessage.push({ chat_id, message_id });
+            remaining.push({ chat_id, message_id });
         }
+        waitDelMessage.length = 0;
+        waitDelMessage.push(...remaining.slice(-100));
         return message_id;
     }
 

@@ -193,6 +193,36 @@ class Repository<
         return result as T[];
     }
 
+    /** Stream all records in batches (including soft-deleted) — avoids loading entire table into memory */
+    async *findAllIgnoreDeleteBatch(batchSize = 1000): AsyncGenerator<T[], void, void> {
+        let offset = 0;
+        while (true) {
+            const result = await db
+                .select()
+                .from(this.table)
+                .limit(batchSize)
+                .offset(offset)
+                .execute();
+            if (result.length === 0) break;
+            yield result as T[];
+            offset += result.length;
+        }
+    }
+
+    /** Insert multiple rows in a single transaction */
+    async batchInsert(entities: Partial<T>[]): Promise<number> {
+        if (entities.length === 0) return 0;
+        const now = Date.now();
+        const rows = entities.map(e => ({
+            ...e,
+            id: e.id || nanoid(6),
+            create_time: e.create_time || now,
+            update_time: e.update_time || now,
+        }));
+        await db.insert(this.table).values(rows as any).execute();
+        return rows.length;
+    }
+
     async count(where?: Partial<T>, since?: number): Promise<number> {
         const filters: any[] = [isNull(this.table.delete_time)];
         if (since) {

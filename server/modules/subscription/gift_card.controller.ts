@@ -115,6 +115,7 @@ async function redeem(request: GiftCardRedeemRequest): Promise<GiftCardRedeemRes
     return new GiftCardRedeemResponse({
         success: true,
         message: "Gift card redeemed successfully",
+        data: { token_amount: card.token_amount },
     });
 }
 

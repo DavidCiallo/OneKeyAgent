@@ -28,9 +28,10 @@ export default function GiftCardModal({
                 code: code.trim(),
             });
             if (res.success) {
-                onSuccess();
-                onOpenChange();
                 setCode("");
+                setError(`Redeemed successfully! +${res.data?.token_amount || 0} tokens`);
+                onSuccess();
+                setTimeout(() => onOpenChange(), 2000);
             } else {
                 setError(res.message || t.GiftCardActivateFailed);
             }

@@ -7,8 +7,8 @@ type Props = {
     onEdit: (item: ProviderDTO) => void;
     onCopy: (item: ProviderDTO) => void;
     onDelete: (id: string) => void;
-    onMoveUp: (item: ProviderDTO, prev: ProviderDTO | undefined) => void;
-    onMoveDown: (item: ProviderDTO, next: ProviderDTO | undefined) => void;
+    onMoveUp: (item: ProviderDTO) => void;
+    onMoveDown: (item: ProviderDTO) => void;
 };
 
 export function ProviderTable({ list, onEdit, onCopy, onDelete, onMoveUp, onMoveDown }: Props) {
@@ -31,9 +31,6 @@ export function ProviderTable({ list, onEdit, onCopy, onDelete, onMoveUp, onMove
             </TableHeader>
             <TableBody emptyContent={locale.NoData}>
                 {list.map((item, i) => {
-                    const prev = i > 0 ? list[i - 1] : undefined;
-                    const next = i < list.length - 1 ? list[i + 1] : undefined;
-
                     return (
                         <TableRow key={item.id}>
                             <TableCell>{item.modelAlias}</TableCell>
@@ -67,8 +64,8 @@ export function ProviderTable({ list, onEdit, onCopy, onDelete, onMoveUp, onMove
                                     <div className="flex flex-row gap-1 items-center">
                                         <button
                                             className="text-gray-400 hover:text-gray-700 disabled:opacity-30 p-0.5"
-                                            disabled={!prev}
-                                            onClick={() => onMoveUp(item, prev)}
+                                            disabled={i === 0}
+                                            onClick={() => onMoveUp(item)}
                                         >
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                 <path d="M18 15l-6-6-6 6"/>
@@ -76,8 +73,8 @@ export function ProviderTable({ list, onEdit, onCopy, onDelete, onMoveUp, onMove
                                         </button>
                                         <button
                                             className="text-gray-400 hover:text-gray-700 disabled:opacity-30 p-0.5"
-                                            disabled={!next}
-                                            onClick={() => onMoveDown(item, next)}
+                                            disabled={i === list.length - 1}
+                                            onClick={() => onMoveDown(item)}
                                         >
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                 <path d="M6 9l6 6 6-6"/>

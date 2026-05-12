@@ -272,3 +272,30 @@ export class ProviderDeleteResponse implements BaseResponse<ProviderDTO> {
         this.message = origin.message;
     }
 }
+
+export class ProviderUpdatePriorityRequest implements BaseRequest {
+    public auth?: string;
+    public id: string;
+    public delta: number; // +1 or -1
+
+    constructor(origin: Partial<ProviderUpdatePriorityRequest>) {
+        if (!origin.id) throw new Error("id is required");
+        if (!origin.delta) throw new Error("delta is required");
+        origin.auth && (this.auth = origin.auth);
+        this.id = origin.id;
+        this.delta = origin.delta;
+    }
+    static self(unsafe: ProviderUpdatePriorityRequest) {
+        return new ProviderUpdatePriorityRequest(unsafe);
+    }
+}
+
+export class ProviderUpdatePriorityResponse implements BaseResponse<null> {
+    public success: boolean;
+    public message: string;
+
+    constructor(origin: ProviderUpdatePriorityResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+    }
+}
