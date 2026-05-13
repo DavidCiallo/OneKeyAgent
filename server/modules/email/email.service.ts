@@ -1,5 +1,4 @@
-import { config } from "dotenv";
-config();
+import { SettingsService } from "../settings/settings.service";
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 
@@ -10,13 +9,13 @@ interface SendEmailParams {
 }
 
 export async function sendEmail({ to, subject, html }: SendEmailParams): Promise<boolean> {
-    const apiKey = process.env.RESEND_API_KEY;
+    const apiKey = SettingsService.get("resend_api_key");
     if (!apiKey) {
         console.error("RESEND_API_KEY is not configured");
         return false;
     }
 
-    const from = process.env.EMAIL_FROM || "noreply@ehex.cc";
+    const from = SettingsService.get("email_from") || "noreply@ehex.cc";
 
     try {
         const response = await fetch(RESEND_API_URL, {

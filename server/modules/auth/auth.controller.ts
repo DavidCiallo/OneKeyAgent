@@ -8,6 +8,7 @@ import {
 import { AuthRouterInstance } from "../../../shared/modules/auth/auth.router";
 import { inject } from "../../lib/inject";
 import { getIdentifyByVerify, loginUser, preRegisterUser, completeRegistration, getAccountByEmail } from "./auth.service";
+import { SettingsService } from "../settings/settings.service";
 import { AccountRoleService } from "../role/role.service";
 
 const ALL_MENUS = ["model", "usage", "account", "profile"];
@@ -45,7 +46,7 @@ async function login(request: LoginRequest): Promise<LoginResponse> {
 }
 
 async function config(_request: AuthConfigRequest): Promise<AuthConfigResponse> {
-    const domains = process.env.ALLOWED_REGISTER_DOMAINS || "";
+    const domains = SettingsService.get("allowed_register_domains");
     const allowed_domains = domains ? domains.split(",").map(d => d.trim()).filter(Boolean) : [];
     return new AuthConfigResponse({
         success: true,

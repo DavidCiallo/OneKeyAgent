@@ -5,6 +5,7 @@ import { generateApiKey } from "../ai/ai.auth";
 import { RoleService, AccountRoleService } from "../role/role.service";
 import { sendEmail, buildVerificationEmail } from "../email/email.service";
 import { AccountService } from "../account/account.service";
+import { SettingsService } from "../settings/settings.service";
 
 const ALL_MENUS = ["profile", "model", "usage", "account"];
 const accountRepository: Repository<AccountEntity> = Repository.instance("Account");
@@ -62,7 +63,7 @@ export async function loginUser(email: string, password: string): Promise<{ toke
 }
 
 function checkAllowedDomain(email: string): string | null {
-    const allowedDomains = process.env.ALLOWED_REGISTER_DOMAINS;
+    const allowedDomains = SettingsService.get("allowed_register_domains");
     if (!allowedDomains) return null; // no restriction
     const domain = email.split("@")[1]?.toLowerCase();
     if (!domain) return "Invalid email format";
@@ -86,7 +87,7 @@ export async function preRegisterUser(name: string, email: string, password: str
     // Encrypt registration data into the token: name|-|email|-|password(plain)
     const payload = [name, email, password].join("|-|");
     const verificationToken = aesEncrypt(payload);
-    const verifyUrl = `${process.env.CLIENT_URL}/verify?token=${encodeURIComponent(verificationToken)}`;
+    const verifyUrl = `${SettingsService.get("client_url")}/verify?token=${encodeURIComponent(verificationToken)}`;
     const emailSent = await sendEmail({
         to: email,
         ...buildVerificationEmail(verifyUrl),

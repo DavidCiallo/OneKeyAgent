@@ -13,6 +13,7 @@ import { createInvoice } from "./nowpayments.service";
 import { AccountService } from "../account/account.service";
 import Repository from "../../lib/repository";
 import crypto from "crypto";
+import { SettingsService } from "../settings/settings.service";
 
 function verifyNowPaymentsSignature(rawBody: string, signature: string, secret: string): boolean {
     const hmac = crypto.createHmac("sha512", secret);
@@ -232,7 +233,7 @@ async function ipnwebhook(request: Record<string, unknown>): Promise<{ success: 
     const rawBody = (request as any).__raw_body as string || "";
     const headers = (request as any).__headers as Record<string, string> || {};
     const signature = headers["x-nowpayments-sig"] || headers["x-nowpayments-signature"] || "";
-    const secret = process.env.NOWPAYMENTS_API_KEY || "";
+    const secret = SettingsService.get("nowpayments_api_key");
     if (secret && signature && rawBody) {
         const valid = verifyNowPaymentsSignature(rawBody, signature, secret);
         if (!valid) {
