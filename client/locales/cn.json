@@ -20,6 +20,7 @@
         "Account": "账号管理",
         "Profile": "账户信息",
         "Subscription": "费用管理",
+        "Settings": "系统设置",
         "NoContent": "未授权",
         "Logout": "退出登录"
     },
