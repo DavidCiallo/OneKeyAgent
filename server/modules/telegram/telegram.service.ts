@@ -29,7 +29,7 @@ export class TelegramService {
             if (text.startsWith("/auth")) {
                 return await this.handleAuthCommand(chatId, text);
             }
-            await this.sendMessage(chatId, 'Please use /auth &lt;apiKey&gt;</code> first');
+            await this.sendMessage(chatId, 'Please use /auth [apiKey] first');
             return;
         }
 
@@ -43,7 +43,7 @@ export class TelegramService {
         const parts = text.trim().split(/\s+/);
         const apiKey = parts.slice(1).join(" ");
         if (!apiKey) {
-            await this.sendMessage(chatId, 'Usage: /auth &lt;apiKey&gt;</code>');
+            await this.sendMessage(chatId, 'Usage: /auth [apiKey]');
             return;
         }
         const account = await accountRepo.findOne({ apiKey });
@@ -53,7 +53,7 @@ export class TelegramService {
         }
 
         await accountRepo.update({ id: account.id }, { tg_chat_id: chatId });
-        await this.sendMessage(chatId, `Bound successfully!\nAccount: ${account.name}</code>\nYou can set a working directory and start publishing tasks`);
+        await this.sendMessage(chatId, `Bound successfully!\nAccount: ${account.name}\nYou can set a working directory and start publishing tasks`);
         return;
     }
 
@@ -69,9 +69,9 @@ export class TelegramService {
             case "/help": {
                 await this.sendMessage(account.tg_chat_id, [
                     "Available commands:",
-                    "/status</code> - Show current account, folder and task status",
-                    "/ls</code> - List contents of the system target folder",
-                    "/help</code> - Show this help message",
+                    "/status - Show current account, folder and task status",
+                    "/ls - List contents of the system target folder",
+                    "/help - Show this help message",
                 ].join("\n"));
                 return;
             }
@@ -94,9 +94,9 @@ export class TelegramService {
                     }
                 }
                 let result = "";
-                result += `Account: ${account.name}</code>\n`;
-                result += `Folder: ${status.folder || "none"}</code>\n`;
-                result += `Task: ${status.currentTask || "none"}</code>\n`;
+                result += `Account: ${account.name}\n`;
+                result += `Folder: ${status.folder || "none"}\n`;
+                result += `Task: ${status.currentTask || "none"}\n`;
                 await this.sendMessage(account.tg_chat_id, result);
                 return;
             }
@@ -116,7 +116,7 @@ export class TelegramService {
                 if (!args) {
                     await this.sendMessage(
                         account.tg_chat_id,
-                        'Usage: Please use /ls</code> to set a directory'
+                        'Usage: Please use /ls to set a directory'
                     );
                     return;
                 }
@@ -126,7 +126,7 @@ export class TelegramService {
                     folder: args,
                     status: "pending",
                 });
-                await this.sendMessage(account.tg_chat_id, `Switch directory task created\nID: ${task.id}</code>\nTarget: ${args}</code>`);
+                await this.sendMessage(account.tg_chat_id, `Switch directory task created\nID: ${task.id}\nTarget: ${args}`);
                 return;
             }
             default:
@@ -144,7 +144,7 @@ export class TelegramService {
         }
         if (!folder) {
             if (account.tg_chat_id) {
-                await this.sendMessage(account.tg_chat_id, 'Please use /ls</code> to set a directory');
+                await this.sendMessage(account.tg_chat_id, 'Please use /ls to set a directory');
                 return;
             }
         }

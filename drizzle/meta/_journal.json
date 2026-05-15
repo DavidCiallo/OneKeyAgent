@@ -15,6 +15,13 @@
       "when": 1778674126062,
       "tag": "0001_white_orphan",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1778832095615,
+      "tag": "0002_wild_shinobi_shaw",
+      "breakpoints": true
     }
   ]
 }

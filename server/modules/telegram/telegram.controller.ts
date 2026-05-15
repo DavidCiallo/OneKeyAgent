@@ -10,7 +10,6 @@ import { SettingsService } from "../settings/settings.service";
 async function webhook(request: TelegramWebhookRequest): Promise<TelegramWebhookResponse> {
     request = TelegramWebhookRequest.self(request);
     const body = request.raw; // raw TG body passed through mount.ts
-
     const callbackQuery = body.callback_query;
     if (callbackQuery) {
         const chatId = String(callbackQuery.message.chat.id);
