@@ -24,6 +24,7 @@ import { taskController } from "../modules/task/task.controller";
 import { telegramController } from "../modules/telegram/telegram.controller";
 import { subscriptionRecordController } from "../modules/subscription/subscription.controller";
 import { giftCardController } from "../modules/subscription/gift_card.controller";
+import { settingsController } from "../modules/settings/settings.controller";
 const PORT = parseInt(process.env.SERVER_PORT || "3300");
 await initialize();
 await seedDefaultModel();
@@ -48,6 +49,7 @@ Bun.serve({
             telegramController,
             subscriptionRecordController,
             giftCardController,
+            settingsController,
         ]);
         if (apiResponse) return apiResponse;
         const staticResponse = await mountstatic(staticPath, pathName);

@@ -19,3 +19,5 @@ import { TransactionRouterInstance } from "../../shared/modules/subscription_rec
 export const TransactionRouter = new TransactionRouterInstance(inject);
 import { GiftCardRouterInstance } from "../../shared/modules/gift_card/gift_card.router";
 export const GiftCardRouter = new GiftCardRouterInstance(inject);
+import { SettingsRouterInstance } from "../../shared/modules/settings/settings.router";
+export const SettingsRouter = new SettingsRouterInstance(inject);

@@ -135,6 +135,28 @@ export class AuthConfigResponse implements BaseResponse<{ allowed_domains: strin
     }
 }
 
+export class DailySigninRequest implements BaseRequest {
+    public auth?: string;
+    constructor(origin: Partial<DailySigninRequest>) {
+        origin.auth && (this.auth = origin.auth);
+    }
+    static self(unsafe: DailySigninRequest) {
+        return new DailySigninRequest(unsafe);
+    }
+}
+
+export class DailySigninResponse implements BaseResponse<{ amount: number }> {
+    public success: boolean;
+    public message: string;
+    public data?: { amount: number };
+
+    constructor(origin: DailySigninResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+        this.data = origin.data;
+    }
+}
+
 export class AliveResponse implements BaseResponse<{ is_admin?: number; roles?: { name: string; type: string }[] }> {
     public success: boolean;
     public message: string;

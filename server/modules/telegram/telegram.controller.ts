@@ -5,6 +5,7 @@ import {
 import { TelegramRouterInstance } from "../../../shared/modules/telegram/telegram.router";
 import { inject } from "../../lib/inject";
 import { TelegramService } from "./telegram.service";
+import { SettingsService } from "../settings/settings.service";
 
 async function webhook(request: TelegramWebhookRequest): Promise<TelegramWebhookResponse> {
     request = TelegramWebhookRequest.self(request);
@@ -15,7 +16,7 @@ async function webhook(request: TelegramWebhookRequest): Promise<TelegramWebhook
         const chatId = String(callbackQuery.message.chat.id);
         const data = callbackQuery.data;
         TelegramService.handleMessage(chatId, data);
-        await fetch(`${process.env.TG_BOT_API_BASE_URL}/answerCallbackQuery`, {
+        await fetch(`${SettingsService.get("tg_bot_api_base_url")}/answerCallbackQuery`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ callback_query_id: callbackQuery.id }),

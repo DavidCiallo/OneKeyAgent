@@ -1,6 +1,5 @@
-import { config } from "dotenv";
-config();
 import Repository from "../../lib/repository";
+import { SettingsService } from "../settings/settings.service";
 import { AccountEntity } from "../../../shared/modules/account/account.entity";
 import { TaskEntity } from "../../../shared/modules/task/task.entity";
 
@@ -161,7 +160,7 @@ export class TelegramService {
     }
 
     static async sendMessage(chat_id: string, text: string): Promise<string | null> {
-        const baseUrl = process.env.TG_BOT_API_BASE_URL;
+        const baseUrl = SettingsService.get("tg_bot_api_base_url");
         if (!baseUrl) {
             console.error(new Date().toISOString(), "TG_BOT_API_BASE_URL not configured");
             return null;
@@ -231,7 +230,7 @@ export class TelegramService {
     }
 
     static async setReaction(chat_id: string, message_id: string, emoji: string): Promise<void> {
-        const baseUrl = process.env.TG_BOT_API_BASE_URL;
+        const baseUrl = SettingsService.get("tg_bot_api_base_url");
         if (!baseUrl) return;
         await fetch(baseUrl + '/setMessageReaction', {
             method: 'POST',
@@ -241,7 +240,7 @@ export class TelegramService {
     }
 
     static async deleteMessage(chat_id: string, message_id: string): Promise<void> {
-        const baseUrl = process.env.TG_BOT_API_BASE_URL;
+        const baseUrl = SettingsService.get("tg_bot_api_base_url");
         if (!baseUrl) return;
         await fetch(baseUrl + '/deleteMessage', {
             method: 'POST',
