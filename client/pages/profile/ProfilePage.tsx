@@ -1,6 +1,6 @@
 import { Header } from "../../components/header/Header";
 import { useEffect, useState, useCallback } from "react";
-import { AccountRouter, AiRouter } from "../../api/instance";
+import { AccountRouter, AiRouter, AuthRouter } from "../../api/instance";
 import { Locale } from "../../methods/locale";
 import { AccountProfileRequest, AccountRegenerateRequest } from "../../../shared/modules/account/account.interface";
 import { ModelsRequest } from "../../../shared/modules/ai/ai.interface";
@@ -39,10 +39,26 @@ export default function ProfilePage() {
         }
     }, []);
 
+    // Auto daily sign-in
+    const tryDailySignin = useCallback(async () => {
+        const signDate = localStorage.getItem("sign_date");
+        const today = new Date().toDateString();
+        if (signDate === today) return;
+        const res = await AuthRouter.daily({ auth: getToken() });
+        if (res.success && res.data?.amount && res.data.amount > 0) {
+            localStorage.setItem("sign_date", today);
+            fetchProfile();
+        }
+    }, []);
+
     useEffect(() => {
         fetchProfile();
         fetchModels();
     }, [fetchProfile, fetchModels]);
+
+    useEffect(() => {
+        tryDailySignin();
+    }, [tryDailySignin]);
 
     const handleRegenerate = async () => {
         onConfirmClose();

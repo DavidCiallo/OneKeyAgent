@@ -17,49 +17,53 @@ export async function loginUser(email: string, password: string): Promise<{ toke
         const roles = emailItem.is_admin
             ? ALL_MENUS.map(name => ({ name, type: "menu" }))
             : (await AccountRoleService.findByAccount(emailItem.id)).map(r => ({ name: r.name, type: r.type }));
-        // Daily login bonus: insert a redeemed gift card
-        const now = Date.now();
-        const lastDaily = emailItem.last_daily_time;
-        const isNewDay = !lastDaily || new Date(lastDaily).toDateString() !== new Date(now).toDateString();
-        if (isNewDay) {
-            await accountRepository.update({ id: emailItem.id }, { last_daily_time: now } as any);
-            const cardRepo = Repository.instance<any>("GiftCard");
-
-            // Calculate daily bonus amount with adaptive reduction based on manual gift cards
-            const allRedeemed = await cardRepo.find({ redeemed_by: emailItem.id, status: "redeemed" });
-            // Only count manually created cards (not daily_ or register_ prefixes)
-            const manualTotal = allRedeemed
-                .filter((c: any) => c.code && !c.code.startsWith("daily_") && !c.code.startsWith("register_"))
-                .reduce((sum: number, c: any) => sum + (c.token_amount || 0), 0);
-
-            const balance = await AccountService.getBalance(emailItem.id);
-
-            let amount = 0.1;
-            if (manualTotal > 0 && balance > 0) {
-                const ratio = manualTotal / balance;
-                if (ratio > 0.15) {
-                    // Daily bonuses exceed 15% of balance — cut by ~50%
-                    amount = amount * (0.25 + Math.random() * 0.2); // 25-45% of original
-                } else {
-                    // Otherwise cut by ~10%
-                    amount = amount * (0.85 + Math.random() * 0.1); // 85-95% of original
-                }
-                amount = Math.round(amount * 100) / 100;
-            }
-
-            await cardRepo.insert({
-                code: `daily_${emailItem.id}_${now}`,
-                token_amount: amount,
-                status: "redeemed",
-                redeemed_by: emailItem.id,
-                redeemed_at: now,
-                create_time: now,
-            } as any);
-        }
         return { token: genTokenForIdentify(email), is_admin: emailItem.is_admin, roles };
     } else {
         return {};
     }
+}
+
+/** Claim daily sign-in bonus for an account. Returns the bonus amount. */
+export async function claimDailyBonus(accountId: string): Promise<number> {
+    const now = Date.now();
+    const account = await accountRepository.findOne({ id: accountId } as any);
+    if (!account) return 0;
+
+    const lastDaily = account.last_daily_time;
+    const isNewDay = !lastDaily || new Date(lastDaily).toDateString() !== new Date(now).toDateString();
+    if (!isNewDay) return 0;
+
+    await accountRepository.update({ id: accountId }, { last_daily_time: now } as any);
+    const cardRepo = Repository.instance<any>("GiftCard");
+
+    const allRedeemed = await cardRepo.find({ redeemed_by: accountId, status: "redeemed" });
+    const manualTotal = allRedeemed
+        .filter((c: any) => c.code && !c.code.startsWith("daily_") && !c.code.startsWith("register_"))
+        .reduce((sum: number, c: any) => sum + (c.token_amount || 0), 0);
+
+    const balance = await AccountService.getBalance(accountId);
+
+    let amount = 0.1;
+    if (manualTotal > 0 && balance > 0) {
+        const ratio = manualTotal / balance;
+        if (ratio > 0.15) {
+            amount = amount * (0.25 + Math.random() * 0.2);
+        } else {
+            amount = amount * (0.85 + Math.random() * 0.1);
+        }
+        amount = Math.round(amount * 100) / 100;
+    }
+
+    await cardRepo.insert({
+        code: `daily_${accountId}_${now}`,
+        token_amount: amount,
+        status: "redeemed",
+        redeemed_by: accountId,
+        redeemed_at: now,
+        create_time: now,
+    } as any);
+
+    return amount;
 }
 
 function checkAllowedDomain(email: string): string | null {

@@ -4,10 +4,11 @@ import {
     RegisterRequest, RegisterResponse,
     AuthConfigRequest, AuthConfigResponse,
     VerifyEmailRequest, VerifyEmailResponse,
+    DailySigninRequest, DailySigninResponse,
 } from "../../../shared/modules/auth/auth.interface";
 import { AuthRouterInstance } from "../../../shared/modules/auth/auth.router";
 import { inject } from "../../lib/inject";
-import { getIdentifyByVerify, loginUser, preRegisterUser, completeRegistration, getAccountByEmail } from "./auth.service";
+import { getIdentifyByVerify, loginUser, preRegisterUser, completeRegistration, getAccountByEmail, claimDailyBonus } from "./auth.service";
 import { SettingsService } from "../settings/settings.service";
 import { AccountRoleService } from "../role/role.service";
 
@@ -83,4 +84,18 @@ async function verify(request: VerifyEmailRequest): Promise<VerifyEmailResponse>
     return new VerifyEmailResponse({ success: true, message: "Registration completed! You can now log in.", data: {} });
 }
 
-export const authController = new AuthRouterInstance(inject, { alive, login, register, config, verify });
+async function dailySignin(request: DailySigninRequest): Promise<DailySigninResponse> {
+    request = DailySigninRequest.self(request);
+    const email = getIdentifyByVerify(request.auth || "");
+    if (!email) throw "Authorization failed";
+    const account = await getAccountByEmail(email);
+    if (!account) throw "Account not found";
+
+    const amount = await claimDailyBonus(account.id);
+    if (amount === 0) {
+        return new DailySigninResponse({ success: true, message: "Already claimed today", data: { amount: 0 } });
+    }
+    return new DailySigninResponse({ success: true, message: "Daily bonus claimed", data: { amount } });
+}
+
+export const authController = new AuthRouterInstance(inject, { alive, login, register, config, verify, daily: dailySignin });
