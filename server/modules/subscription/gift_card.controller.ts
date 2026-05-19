@@ -80,10 +80,11 @@ async function list(request: GiftCardListRequest): Promise<GiftCardListResponse>
     await requireAdmin(request.auth);
 
     const cards = await GiftCardService.list();
+    // Special filter because of low price
     return new GiftCardListResponse({
         success: true,
         message: "success",
-        data: { list: cards.map(c => new GiftCardDTO(c)) },
+        data: { list: cards.filter(c => c.token_amount > 1).map(c => new GiftCardDTO(c)) },
     });
 }
 
