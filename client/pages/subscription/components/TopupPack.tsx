@@ -54,10 +54,9 @@ export default function TopupPack({ onSuccess }: TopupPackProps) {
         <>
             <div className="flex flex-col gap-2">
                 <p className="text-sm font-medium">{locale.Recharge}</p>
-                <div className="flex justify-between items-start gap-4">
-                    {/* Left: preset buttons + custom input */}
-                    <div className="space-y-2 w-76">
-                        <div className="flex flex-wrap justify-between gap-1">
+                <div className="w-full flex justify-between items-start gap-2">
+                    <div className="space-y-2 w-1/2">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                             {PRESET_AMOUNTS.map((amount) => (
                                 <Button
                                     key={amount}
@@ -86,9 +85,7 @@ export default function TopupPack({ onSuccess }: TopupPackProps) {
                             isInvalid={!isCustomValid}
                         />
                     </div>
-
-                    {/* Right: buy button */}
-                    <div className="flex flex-col items-end gap-1 min-w-[180px]">
+                    <div className="flex flex-col items-end gap-1 min-w-1/2 md:min-w-[180px]">
                         <span className="text-lg font-bold text-primary mx-1">
                             {finalPrice > 0 ? formatPrice(finalPrice) : "—"}
                         </span>
