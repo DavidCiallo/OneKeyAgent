@@ -60,9 +60,7 @@ export default function SubscriptionPage() {
             <Header name={menuLocale.Subscription || "Subscription"} />
             <div className="flex-1 overflow-y-auto p-6">
                 <div className="max-w-3xl mx-auto space-y-6">
-                    {account && (
-                        <CurrentPlanCard tokens={account.balance || 0} />
-                    )}
+                    <CurrentPlanCard tokens={account?.balance || 0} />
 
                     <PlanSelector onGiftCardActivated={handleRefresh}>
                         <TopupPack onSuccess={handleRefresh} />

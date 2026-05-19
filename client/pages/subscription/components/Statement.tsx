@@ -32,7 +32,7 @@ function getTypeChip(type: string, locale: any): { color: "success" | "primary" 
         case "usage":
             return { color: "danger", label: locale.UsageLabel || "Usage" };
         default:
-            return { color: "default" as const, label: type };
+            return { color: "warning", label: type };
     }
 }
 
