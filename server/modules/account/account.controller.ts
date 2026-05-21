@@ -45,11 +45,7 @@ async function list(request: AccountListRequest): Promise<AccountListResponse> {
     if (request.filter?.email) search.email = request.filter.email;
 
     const { list: data, total } = await AccountService.find(page, search);
-    const list = await Promise.all(data.map(async item => {
-        const dto = new AccountDTO(item);
-        dto.balance = await AccountService.getBalance(item.id);
-        return dto;
-    }));
+    const list = data.map(item => new AccountDTO(item));
 
     return new AccountListResponse({
         success: true,
@@ -154,7 +150,7 @@ async function profile(request: AccountProfileRequest): Promise<AccountProfileRe
         data: {
             account: new AccountDTO(account),
             weeklyUsage: AccountService.computeUsageCost(logs),
-            balance: await AccountService.getBalance(account.id),
+            balance: account.balance,
         },
     });
 }

@@ -46,7 +46,7 @@ export default function UsagePage() {
     const [groups, setGroups] = useState<UserSessionGroup[]>([]);
     const [totals, setTotals] = useState<UsageSessionTotals>({ totalTokens: 0, totalCost: 0, totalRequests: 0 });
     const [recentSessions, setRecentSessions] = useState<UserSession[]>([]);
-    const [gapMinutes, setGapMinutes] = useState(1);
+    const [gapMinutes, setGapMinutes] = useState(60);
     const [timePreset, setTimePreset] = useState<number>(0);
     const [selectedAccountIds, setSelectedAccountIds] = useState<Set<string>>(new Set());
     const [accounts, setAccounts] = useState<{ id: string; name: string; email: string }[]>([]);

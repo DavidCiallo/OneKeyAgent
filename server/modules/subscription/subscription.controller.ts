@@ -271,6 +271,9 @@ async function ipnwebhook(request: Record<string, unknown>): Promise<{ success: 
                 confirmations: 1,
             });
 
+            // Update account balance atomically
+            await AccountService.updateBalance(record.account_id, record.amount);
+
             console.log(`[IPN] Account ${record.account_id} topped up ${record.amount} tokens`);
         } else if (paymentStatus === "failed" || paymentStatus === "expired" || paymentStatus === "refunded") {
             await SubscriptionService.updateRecordByTxid(record.txid, { status: "expired" });

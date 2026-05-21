@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import Repository from "../../lib/repository";
 import { GiftCardEntity } from "../../../shared/modules/gift_card/gift_card.entity";
+import { AccountService } from "../account/account.service";
 
 const cardRepo = Repository.instance<GiftCardEntity>("GiftCard");
 
@@ -45,7 +46,8 @@ export class GiftCardService {
             update_time: now,
         });
 
-        // Balance is computed from gift card table — no manual update needed
+        // Update account balance atomically
+        await AccountService.updateBalance(accountId, card.token_amount);
     }
 
     // ─── Hard delete expired unused cards ───
