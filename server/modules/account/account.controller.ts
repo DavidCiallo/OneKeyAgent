@@ -318,6 +318,11 @@ async function importData(request: AccountImportRequest): Promise<AccountImportR
         await importTable(repo, items, name);
     }
 
+    // Recalculate balances for imported accounts
+    if (data.accounts && data.accounts.length > 0) {
+        await AccountService.initBalances();
+    }
+
     return new AccountImportResponse({
         success: true,
         message: "import completed",
