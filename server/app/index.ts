@@ -3,6 +3,7 @@ import { fileURLToPath } from "url";
 import path from "path";
 import { runMigrations } from "../lib/migrate";
 import { initialize } from "./initialize";
+import { AccountService } from "../modules/account/account.service";
 import { seedDefaultModel } from "../modules/ai/ai.session";
 import { startMonitor } from "../modules/subscription/monitor";
 
@@ -27,6 +28,7 @@ import { giftCardController } from "../modules/subscription/gift_card.controller
 import { settingsController } from "../modules/settings/settings.controller";
 const PORT = parseInt(process.env.SERVER_PORT || "3300");
 await initialize();
+await AccountService.initBalances();
 await seedDefaultModel();
 startMonitor();
 // @ts-ignore

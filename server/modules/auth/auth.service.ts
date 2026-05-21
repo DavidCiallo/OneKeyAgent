@@ -41,7 +41,7 @@ export async function claimDailyBonus(accountId: string): Promise<number> {
         .filter((c: any) => c.code && !c.code.startsWith("daily_") && !c.code.startsWith("register_"))
         .reduce((sum: number, c: any) => sum + (c.token_amount || 0), 0);
 
-    const balance = await AccountService.getBalance(accountId);
+    const balance = account.balance;
 
     let amount = 0.1;
     if (manualTotal > 0 && balance > 0) {
@@ -62,6 +62,9 @@ export async function claimDailyBonus(accountId: string): Promise<number> {
         redeemed_at: now,
         create_time: now,
     } as any);
+
+    // Update account balance atomically
+    await AccountService.updateBalance(accountId, amount);
 
     return amount;
 }
@@ -138,6 +141,10 @@ export async function completeRegistration(token: string): Promise<{ account?: A
         redeemed_at: now,
         create_time: now,
     } as any);
+
+    // Update account balance atomically
+    await AccountService.updateBalance(account.id, 1);
+
     return { account, apiKey };
 }
 

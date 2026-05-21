@@ -42,12 +42,14 @@ async function checkPendingPayments() {
             }
             const { status } = await checkPaymentStatus(record.payment_id);
             if (status === "confirmed") {
-                // Balance is computed from transaction records — no manual update needed
-
                 await SubscriptionService.updateRecordByTxid(record.txid, {
                     status: "confirmed",
                     confirmations: 1,
                 });
+
+                // Update account balance atomically
+                await AccountService.updateBalance(record.account_id, record.amount);
+
                 console.log(`[Monitor] Payment confirmed for ${record.account_id}`);
             } else if (status === "expired") {
                 await SubscriptionService.updateRecordByTxid(record.txid, { status: "expired" });
