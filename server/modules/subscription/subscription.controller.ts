@@ -13,6 +13,7 @@ import { createInvoice } from "./nowpayments.service";
 import { AccountService } from "../account/account.service";
 import Repository from "../../lib/repository";
 import crypto from "crypto";
+import { SettingsService } from "../settings/settings.service";
 
 function verifyNowPaymentsSignature(rawBody: string, signature: string, secret: string): boolean {
     const hmac = crypto.createHmac("sha512", secret);
@@ -228,19 +229,21 @@ async function statement(request: StatementRequest): Promise<StatementResponse> 
  * NowPayments POSTs here when payment status changes.
  */
 async function ipnwebhook(request: Record<string, unknown>): Promise<{ success: boolean; message: string }> {
-    // Verify NowPayments HMAC signature
+    // Verify NowPayments HMAC signature — required when IPN secret is configured
     const rawBody = (request as any).__raw_body as string || "";
     const headers = (request as any).__headers as Record<string, string> || {};
     const signature = headers["x-nowpayments-sig"] || headers["x-nowpayments-signature"] || "";
-    const secret = process.env.NOWPAYMENTS_API_KEY || "";
-    if (secret && signature && rawBody) {
+    const secret = SettingsService.get("ipn_secret");
+    if (secret) {
+        if (!signature || !rawBody) {
+            console.warn("[IPN] Missing signature or raw body, rejecting webhook");
+            return { success: false, message: "missing signature" };
+        }
         const valid = verifyNowPaymentsSignature(rawBody, signature, secret);
         if (!valid) {
             console.warn("[IPN] Invalid signature, rejecting webhook");
             return { success: false, message: "invalid signature" };
         }
-    } else {
-        console.warn("[IPN] Missing signature or secret, skipping verification");
     }
 
     const paymentId = String(request.payment_id || "");
@@ -269,6 +272,9 @@ async function ipnwebhook(request: Record<string, unknown>): Promise<{ success: 
                 status: "confirmed",
                 confirmations: 1,
             });
+
+            // Update account balance atomically
+            await AccountService.updateBalance(record.account_id, record.amount);
 
             console.log(`[IPN] Account ${record.account_id} topped up ${record.amount} tokens`);
         } else if (paymentStatus === "failed" || paymentStatus === "expired" || paymentStatus === "refunded") {

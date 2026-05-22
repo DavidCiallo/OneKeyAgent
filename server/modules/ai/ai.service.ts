@@ -262,6 +262,7 @@ async function chatHex(body: Record<string, any>, accountId: string): Promise<an
             inputPrice: input_price,
             outputPrice: output_price,
         });
+        await AccountService.updateBalance(accountId, -cost);
         data.model = requestedAlias;
         return data;
     }
@@ -388,6 +389,7 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
                     inputPrice: input_price,
                     outputPrice: output_price,
                 });
+                await AccountService.updateBalance(accountId, -cost);
             } catch (err) {
             }
         })();
@@ -465,6 +467,7 @@ async function completeHex(body: Record<string, any>, accountId: string): Promis
             inputPrice: input_price,
             outputPrice: output_price,
         });
+        await AccountService.updateBalance(accountId, -cost);
         return data;
     }
 
@@ -592,6 +595,7 @@ async function completeHexStream(body: Record<string, any>, accountId: string): 
                     inputPrice: input_price,
                     outputPrice: output_price,
                 });
+                await AccountService.updateBalance(accountId, -cost);
             } catch (err) {
             }
         })();

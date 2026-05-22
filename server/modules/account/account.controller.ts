@@ -22,18 +22,11 @@ import {
 } from "../../../shared/modules/account/account.interface";
 import { AccountRouterInstance } from "../../../shared/modules/account/account.router"
 import { inject } from "../../lib/inject";
-import { getIdentifyByVerify, getAccountByEmail } from "../auth/auth.service";
+import { getIdentifyByVerify, getAccountByEmail, requireAdmin } from "../auth/auth.service";
 import { AccountService } from "./account.service";
 import { generateApiKey } from "../ai/ai.auth";
 import Repository from "../../lib/repository";
-
-async function requireAdmin(auth?: string): Promise<void> {
-    if (!auth) throw "Authorization failed";
-    const email = getIdentifyByVerify(auth);
-    if (!email) throw "Authorization failed";
-    const account = await getAccountByEmail(email);
-    if (!account || !account.is_admin) throw "Permission denied";
-}
+import { hashGenerate } from "../../methods/crypto";
 
 async function list(request: AccountListRequest): Promise<AccountListResponse> {
     request = AccountListRequest.self(request);
@@ -45,11 +38,7 @@ async function list(request: AccountListRequest): Promise<AccountListResponse> {
     if (request.filter?.email) search.email = request.filter.email;
 
     const { list: data, total } = await AccountService.find(page, search);
-    const list = await Promise.all(data.map(async item => {
-        const dto = new AccountDTO(item);
-        dto.balance = await AccountService.getBalance(item.id);
-        return dto;
-    }));
+    const list = data.map(item => new AccountDTO(item));
 
     return new AccountListResponse({
         success: true,
@@ -61,9 +50,7 @@ async function list(request: AccountListRequest): Promise<AccountListResponse> {
 async function detail(request: AccountDetailRequest): Promise<AccountDetailResponse> {
     request = AccountDetailRequest.self(request);
     const { id, auth } = request;
-    if (!auth || !getIdentifyByVerify(auth)) {
-        throw "Authorization failed"
-    }
+    await requireAdmin(auth);
     const data = await AccountService.findOne(id);
     if (!data) {
         throw "account not found";
@@ -84,8 +71,6 @@ async function create(request: AccountCreateRequest): Promise<AccountCreateRespo
     await requireAdmin(request.auth);
 
     const apiKey = generateApiKey();
-    const { hashGenerate } = await import("../auth/auth.utils");
-    const { AccountService } = await import("./account.service");
     const account = await AccountService.create({
         name: request.account.name,
         email: request.account.email,
@@ -154,7 +139,7 @@ async function profile(request: AccountProfileRequest): Promise<AccountProfileRe
         data: {
             account: new AccountDTO(account),
             weeklyUsage: AccountService.computeUsageCost(logs),
-            balance: await AccountService.getBalance(account.id),
+            balance: account.balance,
         },
     });
 }
@@ -320,6 +305,11 @@ async function importData(request: AccountImportRequest): Promise<AccountImportR
         }
         await repo.hardDelete({});
         await importTable(repo, items, name);
+    }
+
+    // Recalculate balances for imported accounts
+    if (data.accounts && data.accounts.length > 0) {
+        await AccountService.initBalances();
     }
 
     return new AccountImportResponse({

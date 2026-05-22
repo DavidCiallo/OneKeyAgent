@@ -5,6 +5,7 @@ CREATE TABLE `account` (
 	`password` text NOT NULL,
 	`api_key` text,
 	`is_admin` integer DEFAULT 0 NOT NULL,
+	`tg_chat_id` text,
 	`last_daily_time` integer,
 	`create_time` integer NOT NULL,
 	`update_time` integer,

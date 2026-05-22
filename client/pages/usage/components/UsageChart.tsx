@@ -39,7 +39,7 @@ export function UsageChart({ today, last24h, last7Days }: Props) {
     }));
 
     const last24hData = last24h.amounts.map((d) => ({
-        hour: formatTodayMin(d.ts),
+        hour: formatWeekDay(d.ts),
         amount: d.amount < 0.01 ? null : d.amount,
     }));
 

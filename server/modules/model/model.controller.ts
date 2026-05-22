@@ -13,7 +13,7 @@ import {
 } from "../../../shared/modules/model/model.interface";
 import { ModelRouterInstance } from "../../../shared/modules/model/model.router";
 import { inject } from "../../lib/inject";
-import { getIdentifyByVerify } from "../auth/auth.service";
+import { getIdentifyByVerify, requireAdmin } from "../auth/auth.service";
 import { ModelService } from "./model.service";
 
 async function list(request: ModelListRequest): Promise<ModelListResponse> {
@@ -38,10 +38,8 @@ async function list(request: ModelListRequest): Promise<ModelListResponse> {
 
 async function detail(request: ModelDetailRequest): Promise<ModelDetailResponse> {
     request = ModelDetailRequest.self(request);
-    const { id, auth } = request;
-    if (!auth || !getIdentifyByVerify(auth)) {
-        throw "Authorization failed";
-    }
+    await requireAdmin(request?.auth);
+    const { id } = request;
     const data = await ModelService.findOne(id);
     if (!data) {
         throw "model not found";
@@ -56,15 +54,8 @@ async function detail(request: ModelDetailRequest): Promise<ModelDetailResponse>
 
 async function create(request: ModelCreateRequest): Promise<ModelCreateResponse> {
     request = ModelCreateRequest.self(request);
-    if (!request.model) {
-        throw "miss params";
-    }
-    const { auth } = request;
-    if (!auth || !getIdentifyByVerify(auth)) {
-        throw "Authorization failed";
-    }
+    await requireAdmin(request?.auth);
     const data = await ModelService.create(request.model);
-    console.log(data)
     const model = new ModelDTO(data);
     return new ModelCreateResponse({
         success: true,
@@ -75,10 +66,7 @@ async function create(request: ModelCreateRequest): Promise<ModelCreateResponse>
 
 async function update(request: ModelUpdateRequest): Promise<ModelUpdateResponse> {
     request = ModelUpdateRequest.self(request);
-    const { auth } = request;
-    if (!auth || !getIdentifyByVerify(auth)) {
-        throw "Authorization failed";
-    }
+    await requireAdmin(request?.auth);
     if (!request.id || !request.model) {
         throw "miss params";
     }
@@ -96,11 +84,10 @@ async function update(request: ModelUpdateRequest): Promise<ModelUpdateResponse>
 
 async function del(request: ModelDeleteRequest): Promise<ModelDeleteResponse> {
     request = ModelDeleteRequest.self(request);
+    await requireAdmin(request?.auth);
+
     if (!request.id) {
         throw "Id is required";
-    }
-    if (!request.auth || !getIdentifyByVerify(request.auth)) {
-        throw "Authorization failed";
     }
     await ModelService.delete(request.id);
     return new ModelDeleteResponse({

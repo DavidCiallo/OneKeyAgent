@@ -4,14 +4,9 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "3300:3300"
+      - "${SERVER_PORT}:${SERVER_PORT}"
     volumes:
       - ./data:/app/data
-    environment:
-      - SERVER_PORT=3300
-      - SECRET=MySecretPassphrase1234567890abcABCEFGefg
-      - NONCE_LENGTH=8
-      - ADMIN_NAME=Administrator
-      - ADMIN_EMAIL=mail@example.com
-      - ADMIN_PASSWORD=demo123@
+    env_file:
+      - .env
     restart: unless-stopped

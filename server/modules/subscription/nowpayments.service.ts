@@ -1,13 +1,11 @@
-import { config } from "dotenv";
-config();
-
 import { PAYMENT_CURRENCIES } from "../../../shared/modules/subscription_record/subscription_record.interface";
+import { SettingsService } from "../settings/settings.service";
 import type { PaymentCurrency } from "../../../shared/modules/subscription_record/subscription_record.interface";
 export { PAYMENT_CURRENCIES };
 
 const NOWPAYMENTS_API_URL = "https://api.nowpayments.io/v1";
 function getApiKey(): string {
-    const key = process.env.NOWPAYMENTS_API_KEY;
+    const key = SettingsService.get("nowpayments_api_key");
     if (!key) throw new Error("NOWPAYMENTS_API_KEY not configured");
     return key;
 }
@@ -40,7 +38,7 @@ export function buildPaymentBody(params: {
         pay_currency: params.payCurrency,
         order_id: params.accountId,
         order_description: "ehex token topup",
-        ipn_callback_url: `${process.env.IPN_CALLBACK_URL || ""}/api/subscription/ipnwebhook`,
+        ipn_callback_url: `${SettingsService.get("ipn_callback_url")}/api/subscription/ipnwebhook`,
         is_fixed_rate: false,
     };
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `account` ADD `tg_chat_id` text;

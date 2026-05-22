@@ -8,7 +8,6 @@ CREATE TABLE IF NOT EXISTS `account` (
 	`password` text NOT NULL,
 	`api_key` text,
 	`is_admin` integer DEFAULT 0 NOT NULL,
-	`sub_wallet_address` text,
 	`tg_chat_id` text,
 	`last_daily_time` integer,
 	`create_time` integer NOT NULL,
