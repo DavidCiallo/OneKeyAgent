@@ -165,3 +165,11 @@ export function getIdentifyByVerify(token: string): string | null {
     if (Date.now() > Number(expried)) return null;
     return identity;
 }
+
+export async function requireAdmin(auth?: string): Promise<void> {
+    if (!auth) throw "Authorization failed";
+    const email = getIdentifyByVerify(auth);
+    if (!email) throw "Authorization failed";
+    const account = await getAccountByEmail(email);
+    if (!account || !account.is_admin) throw "Permission denied";
+}

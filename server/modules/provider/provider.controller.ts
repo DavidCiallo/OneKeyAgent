@@ -9,20 +9,12 @@ import {
 } from "../../../shared/modules/provider/provider.interface";
 import { ProviderRouterInstance } from "../../../shared/modules/provider/provider.router";
 import { inject } from "../../lib/inject";
-import { getIdentifyByVerify, getAccountByEmail } from "../auth/auth.service";
+import { requireAdmin } from "../auth/auth.service";
 import { ProviderService } from "./provider.service";
-
-async function requireAdmin(auth?: string): Promise<void> {
-    if (!auth) throw "Authorization failed";
-    const email = getIdentifyByVerify(auth);
-    if (!email) throw "Authorization failed";
-    const account = await getAccountByEmail(email);
-    if (!account || !account.is_admin) throw "Permission denied";
-}
 
 async function list(request: ProviderListRequest): Promise<ProviderListResponse> {
     request = ProviderListRequest.self(request);
-    await requireAdmin(request.auth);
+    await requireAdmin(request?.auth);
 
     const search: Partial<Record<string, any>> = {};
     if (request.filter?.modelAlias) search.modelAlias = request.filter.modelAlias;

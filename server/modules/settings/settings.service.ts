@@ -11,6 +11,7 @@ const SETTING_KEYS: Record<string, string> = {
     "tg_bot_api_base_url": "TG_BOT_API_BASE_URL",
     "tg_user_id": "TG_USER_ID",
     "nowpayments_api_key": "NOWPAYMENTS_API_KEY",
+    "ipn_secret": "IPN_SECRET",
     "ipn_callback_url": "IPN_CALLBACK_URL",
     "resend_api_key": "RESEND_API_KEY",
     "email_from": "EMAIL_FROM",
