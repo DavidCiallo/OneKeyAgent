@@ -5,16 +5,13 @@ import {
     SettingsEntry,
 } from "../../../shared/modules/settings/settings.interface";
 import { inject } from "../../lib/inject";
-import { getAccountByEmail } from "../auth/auth.service";
+import { getAccountByEmail, requireAdmin } from "../auth/auth.service";
 import { getIdentifyByVerify } from "../auth/auth.service";
 import { SettingsService } from "./settings.service";
 
 async function list(request: SettingsListRequest): Promise<SettingsListResponse> {
     request = SettingsListRequest.self(request);
-    const email = getIdentifyByVerify(request.auth || "");
-    if (!email) throw "Authorization failed";
-    const account = await getAccountByEmail(email);
-    if (!account || !account.is_admin) throw "Admin only";
+    await requireAdmin(request?.auth);
 
     const all = SettingsService.getAll();
     const entries: SettingsEntry[] = Object.entries(all).map(([key, value]) => ({ key, value }));
