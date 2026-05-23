@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Button, Input } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
-import { TransactionRouter } from "../../../api/instance";
-import { SubscriptionTopupRequest } from "../../../../shared/modules/subscription_record/subscription_record.interface";
+import { subscriptionApi } from "../../../api/instance";
 import PaymentModal from "./PaymentModal";
 
 interface TopupPackProps {
@@ -13,7 +12,6 @@ const PRESET_AMOUNTS = [50, 100, 500, 1000]; // USD
 
 export default function TopupPack({ onSuccess }: TopupPackProps) {
     const locale = Locale("SubscriptionPage");
-    const getToken = () => localStorage.getItem("access_token") || "";
 
     const [selectedAmount, setSelectedAmount] = useState<number>(PRESET_AMOUNTS[0]);
     const [customAmount, setCustomAmount] = useState("");
@@ -32,11 +30,10 @@ export default function TopupPack({ onSuccess }: TopupPackProps) {
         if (amount <= 0) return;
         setPaying(true);
         try {
-            const res = await TransactionRouter.createtopup(new SubscriptionTopupRequest({
-                auth: getToken(),
+            const res = await subscriptionApi.createtopup({
                 token_amount: amount,
                 pay_currency: payCurrency,
-            }));
+            } as any);
             if (res.success && res.data) {
                 window.open(res.data.invoice_url, "_blank");
                 onSuccess();

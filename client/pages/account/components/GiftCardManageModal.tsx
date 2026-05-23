@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Chip, Divider, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Pagination } from "@heroui/react";
-import { GiftCardRouter } from "../../../api/instance";
+import { giftCardApi } from "../../../api/instance";
 import { Locale } from "../../../methods/locale";
 import { GiftCardDTO } from "../../../../shared/modules/gift_card/gift_card.interface";
 
@@ -23,12 +23,10 @@ export default function GiftCardManageModal({
     const [page, setPage] = useState(1);
     const pageSize = 10;
 
-    const getToken = () => localStorage.getItem("access_token") || "";
-
     const fetchCards = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await GiftCardRouter.list({ auth: getToken() });
+            const res = await giftCardApi.list({} as any);
             if (res.success && res.data) {
                 setCards(res.data.list.sort((a, b) => b.create_time - a.create_time));
             }
@@ -48,7 +46,7 @@ export default function GiftCardManageModal({
         setError("");
         setNewCardCode("");
         try {
-            const res = await GiftCardRouter.create({ auth: getToken(), token_amount: tokenAmount });
+            const res = await giftCardApi.create({ token_amount: tokenAmount } as any);
             if (res.success && res.data?.card) {
                 setNewCardCode(res.data.card.code);
                 setAmount("");

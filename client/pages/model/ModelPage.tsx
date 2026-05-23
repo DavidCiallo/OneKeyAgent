@@ -1,19 +1,10 @@
 import { Header } from "../../components/header/Header";
 import { useEffect, useState, useCallback } from "react";
 import { ModelDTO } from "../../../shared/modules/model/model.entity";
-import { ModelRouter, UsageRouter } from "../../api/instance";
+import { modelApi, usageApi } from "../../api/instance";
 import { Locale } from "../../methods/locale";
 import { useDisclosure, Button } from "@heroui/react";
-import {
-    ModelListRequest,
-    ModelCreateRequest,
-    ModelCreateBody,
-    ModelUpdateRequest,
-    ModelUpdateBody,
-    ModelDeleteRequest,
-    ModelQueryBody,
-} from "../../../shared/modules/model/model.interface";
-import { UsageStatsRequest, UsageStatsPeriod } from "../../../shared/modules/usage/usage.interface";
+import { UsageStatsPeriod } from "../../../shared/modules/usage/usage.interface";
 import { ModelCardGrid } from "./components/ModelCardGrid";
 import { ModelPagination } from "./components/ModelPagination";
 import { ModelFormModal } from "./components/ModelFormModal";
@@ -42,13 +33,10 @@ export default function ModelPage() {
     const [form, setForm] = useState<ModelForm>({ input_price: 0, output_price: 0 });
 
 
-    const getToken = () => localStorage.getItem("access_token") || "";
-
     const fetchList = useCallback(async (p: number) => {
         const filter: Record<string, string | number> = {};
 
-        const req = new ModelListRequest({ page: p, filter: new ModelQueryBody(filter), auth: getToken() });
-        const res = await ModelRouter.list(req);
+        const res = await modelApi.list({ page: p, filter } as any);
         if (res.success && res.data) {
             setList(res.data.list);
             setTotal(res.data.total);
@@ -57,8 +45,7 @@ export default function ModelPage() {
             const map: Record<string, { todayPeriod: UsageStatsPeriod; last24hPeriod: UsageStatsPeriod; weekPeriod: UsageStatsPeriod }> = {};
             await Promise.all(res.data.list.map(async (item) => {
                 try {
-                    const statsReq = new UsageStatsRequest({ model_alias: item.alias, auth: getToken() });
-                    const statsRes = await UsageRouter.stats(statsReq);
+                    const statsRes = await usageApi.stats({ model_alias: item.alias } as any);
                     if (statsRes.success && statsRes.data) {
                         map[item.id] = {
                             todayPeriod: statsRes.data.today,
@@ -96,33 +83,29 @@ export default function ModelPage() {
 
     const handleFormConfirm = async () => {
         if (formMode === "create") {
-            const req = new ModelCreateRequest({
-                model: new ModelCreateBody({
+            const res = await modelApi.create({
+                model: {
                     alias: form.alias || "",
                     input_price: form.input_price,
                     output_price: form.output_price,
                     is_public: form.is_public ?? 0,
-                }),
-                auth: getToken(),
-            });
-            const res = await ModelRouter.create(req);
+                },
+            } as any);
             if (res.success) {
                 onFormClose();
                 fetchList(1);
                 setPage(1);
             }
         } else {
-            const req = new ModelUpdateRequest({
+            const res = await modelApi.update({
                 id: editId,
-                model: new ModelUpdateBody({
+                model: {
                     alias: form.alias || undefined,
                     input_price: form.input_price,
                     output_price: form.output_price,
                     is_public: form.is_public,
-                }),
-                auth: getToken(),
-            });
-            const res = await ModelRouter.update(req);
+                },
+            } as any);
             if (res.success) {
                 onFormClose();
                 fetchList(page);
@@ -131,8 +114,7 @@ export default function ModelPage() {
     };
 
     const handleDelete = async (id: string) => {
-        const req = new ModelDeleteRequest({ id, auth: getToken() });
-        const res = await ModelRouter.delete(req);
+        const res = await modelApi.delete({ id } as any);
         if (res.success) {
             fetchList(page);
         }

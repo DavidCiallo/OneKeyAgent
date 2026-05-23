@@ -1,37 +1,12 @@
-import { BaseRouterInstance } from "../../lib/default/decorator";
 import { LoginRequest, LoginResponse, AliveRequest, AliveResponse, RegisterRequest, RegisterResponse, AuthConfigRequest, AuthConfigResponse, VerifyEmailRequest, VerifyEmailResponse, DailySigninRequest, DailySigninResponse } from "./auth.interface";
 
-export class AuthRouterInstance extends BaseRouterInstance {
-    base = "/api";
-    prefix = "/auth";
-    router = [
-        { path: "/login", handler: Function },
-        { path: "/alive", handler: Function },
-        { path: "/register", handler: Function },
-        { path: "/config", handler: Function },
-        { path: "/verify", handler: Function },
-        { path: "/daily", handler: Function },
-    ];
-
-    login!: (request: LoginRequest) => Promise<LoginResponse>;
-    alive!: (request: AliveRequest) => Promise<AliveResponse>;
-    register!: (request: RegisterRequest) => Promise<RegisterResponse>;
-    config!: (request: AuthConfigRequest) => Promise<AuthConfigResponse>;
-    verify!: (request: VerifyEmailRequest) => Promise<VerifyEmailResponse>;
-    daily!: (request: DailySigninRequest) => Promise<DailySigninResponse>;
-
-    constructor(
-        inject: Function,
-        functions?: {
-            login: (request: LoginRequest) => Promise<LoginResponse>;
-            alive: (request: AliveRequest) => Promise<AliveResponse>;
-            register: (request: RegisterRequest) => Promise<RegisterResponse>;
-            config: (request: AuthConfigRequest) => Promise<AuthConfigResponse>;
-            verify: (request: VerifyEmailRequest) => Promise<VerifyEmailResponse>;
-            daily: (request: DailySigninRequest) => Promise<DailySigninResponse>;
-        }
-    ) {
-        super();
-        inject(this, functions);
-    }
-}
+export const authRoutes = {
+    base: "/api",
+    prefix: "/auth",
+    login:    { path: "/login",    request: {} as LoginRequest,            response: {} as LoginResponse },
+    alive:    { path: "/alive",    request: {} as AliveRequest,            response: {} as AliveResponse },
+    register: { path: "/register", request: {} as RegisterRequest,         response: {} as RegisterResponse },
+    config:   { path: "/config",   request: {} as AuthConfigRequest,       response: {} as AuthConfigResponse },
+    verify:   { path: "/verify",   request: {} as VerifyEmailRequest,      response: {} as VerifyEmailResponse },
+    daily:    { path: "/daily",    request: {} as DailySigninRequest,       response: {} as DailySigninResponse },
+} as const;

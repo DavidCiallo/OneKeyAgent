@@ -1,7 +1,7 @@
 import { Input, Button, useDisclosure } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
 import { isAdmin } from "../../../methods/auth";
-import { AccountRouter } from "../../../api/instance";
+import { accountApi } from "../../../api/instance";
 import GiftCardManageModal from "./GiftCardManageModal";
 
 type Props = {
@@ -13,9 +13,8 @@ type Props = {
 };
 
 async function handleExport() {
-    const token = localStorage.getItem("access_token") || "";
     try {
-        const res = await AccountRouter.export({ auth: token });
+        const res = await accountApi.export({} as any);
         if (res.success && res.data) {
             const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: "application/json" });
             const url = URL.createObjectURL(blob);
@@ -33,7 +32,6 @@ async function handleExport() {
 }
 
 async function handleImport() {
-    const token = localStorage.getItem("access_token") || "";
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".json";
@@ -43,7 +41,7 @@ async function handleImport() {
         try {
             const text = await file.text();
             const data = JSON.parse(text);
-            const res = await AccountRouter.import({ auth: token, data });
+            const res = await accountApi.import({ data } as any);
             if (res.success) {
                 const details = res.data?.imported
                     ? Object.entries(res.data.imported)

@@ -1,12 +1,11 @@
 import {
-    GiftCardCreateRequest, GiftCardCreateResponse,
-    GiftCardListRequest, GiftCardListResponse,
-    GiftCardRedeemRequest, GiftCardRedeemResponse,
-    GiftCardCleanupRequest, GiftCardCleanupResponse,
+    GiftCardCreateRequest,
+    GiftCardListRequest,
+    GiftCardRedeemRequest,
+    GiftCardCleanupRequest,
     GiftCardDTO,
 } from "../../../shared/modules/gift_card/gift_card.interface";
-import { GiftCardRouterInstance } from "../../../shared/modules/gift_card/gift_card.router";
-import { inject } from "../../lib/inject";
+import { giftCardRoutes } from "../../../shared/modules/gift_card/gift_card.router";
 import { getIdentifyByVerify, getAccountByEmail } from "../auth/auth.service";
 import { GiftCardService } from "./gift_card.service";
 
@@ -29,8 +28,8 @@ async function resolveAccount(auth: string) {
 // ─── Brute-force protection ───
 
 const redeemAttempts = new Map<string, { count: number; windowStart: number }>();
-const REDEEM_WINDOW_MS = 60_000; // 1 minute
-const REDEEM_MAX_ATTEMPTS = 5;   // max 5 attempts per window
+const REDEEM_WINDOW_MS = 60_000;
+const REDEEM_MAX_ATTEMPTS = 5;
 
 function checkRedeemRateLimit(key: string): boolean {
     const now = Date.now();
@@ -41,15 +40,12 @@ function checkRedeemRateLimit(key: string): boolean {
         return true;
     }
 
-    if (entry.count >= REDEEM_MAX_ATTEMPTS) {
-        return false;
-    }
+    if (entry.count >= REDEEM_MAX_ATTEMPTS) return false;
 
     entry.count++;
     return true;
 }
 
-// Clean up stale entries every 2 minutes
 setInterval(() => {
     const now = Date.now();
     for (const [key, entry] of redeemAttempts) {
@@ -61,86 +57,57 @@ setInterval(() => {
 
 // ─── Admin: Create a gift card ───
 
-async function create(request: GiftCardCreateRequest): Promise<GiftCardCreateResponse> {
+async function create(request: GiftCardCreateRequest) {
     request = GiftCardCreateRequest.self(request);
     await requireAdmin(request.auth);
 
     const card = await GiftCardService.create(request.token_amount);
-    return new GiftCardCreateResponse({
-        success: true,
-        message: "success",
-        data: { card: new GiftCardDTO(card) },
-    });
+    return { card: new GiftCardDTO(card) };
 }
 
 // ─── Admin: List all gift cards ───
 
-async function list(request: GiftCardListRequest): Promise<GiftCardListResponse> {
+async function list(request: GiftCardListRequest) {
     request = GiftCardListRequest.self(request);
     await requireAdmin(request.auth);
 
     const cards = await GiftCardService.list();
-    // Special filter because of low price
-    return new GiftCardListResponse({
-        success: true,
-        message: "success",
-        data: { list: cards.filter(c => c.token_amount > 1).map(c => new GiftCardDTO(c)) },
-    });
+    return { list: cards.filter(c => c.token_amount > 1).map(c => new GiftCardDTO(c)) };
 }
 
 // ─── User: Redeem a gift card ───
 
-async function redeem(request: GiftCardRedeemRequest): Promise<GiftCardRedeemResponse> {
+async function redeem(request: GiftCardRedeemRequest) {
     request = GiftCardRedeemRequest.self(request);
     const account = await resolveAccount(request.auth || "");
 
-    // Rate limit: max 5 attempts per minute per account
     if (!checkRedeemRateLimit(`redeem:${account.id}`)) {
-        return new GiftCardRedeemResponse({
-            success: false,
-            message: "Too many attempts, please try again later",
-        });
+        throw "Too many attempts, please try again later";
     }
 
     const card = await GiftCardService.findByCode(request.code);
     if (!card || card.status !== "unused") {
-        // Deliberately vague error — don't reveal whether the code exists or is just already used
-        return new GiftCardRedeemResponse({
-            success: false,
-            message: "Invalid or already redeemed gift card code",
-        });
+        throw "Invalid or already redeemed gift card code";
     }
 
     await GiftCardService.redeem(card, account.id);
 
-    return new GiftCardRedeemResponse({
-        success: true,
-        message: "Gift card redeemed successfully",
-        data: { token_amount: card.token_amount },
-    });
+    return { token_amount: card.token_amount };
 }
 
 // ─── Admin: Cleanup expired unused cards ───
 
-async function cleanup(request: GiftCardCleanupRequest): Promise<GiftCardCleanupResponse> {
+async function cleanup(request: GiftCardCleanupRequest) {
     request = GiftCardCleanupRequest.self(request);
     await requireAdmin(request.auth);
 
     const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
     const deleted = await GiftCardService.cleanupExpired(thirtyDaysAgo);
 
-    return new GiftCardCleanupResponse({
-        success: true,
-        message: "success",
-        data: { deleted_count: deleted },
-    });
+    return { deleted_count: deleted };
 }
 
-// ─── Export ───
-
-export const giftCardController = new GiftCardRouterInstance(inject, {
-    create,
-    list,
-    redeem,
-    cleanup,
-});
+export const giftCardMount = {
+    routes: giftCardRoutes,
+    handlers: { create, list, redeem, cleanup },
+};

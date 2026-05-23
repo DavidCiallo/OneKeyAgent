@@ -1,17 +1,13 @@
 import { UsageLogEntity } from "../../../shared/modules/usage/usage.entity";
 import {
     UsageListRequest,
-    UsageListResponse,
     UsageDTO,
     UsageStatsRequest,
-    UsageStatsResponse,
     UsageSessionsRequest,
-    UsageSessionsResponse,
     UserSessionGroup,
     UserSession,
 } from "../../../shared/modules/usage/usage.interface";
-import { UsageRouterInstance } from "../../../shared/modules/usage/usage.router";
-import { inject } from "../../lib/inject";
+import { usageRoutes } from "../../../shared/modules/usage/usage.router";
 import { getIdentifyByVerify, getAccountByEmail } from "../auth/auth.service";
 import { AccountService } from "../account/account.service";
 import { UsageService } from "./usage.service";
@@ -24,7 +20,7 @@ async function resolveAccount(auth: string): Promise<{ id: string; is_admin: num
     return { id: account.id, is_admin: account.is_admin };
 }
 
-async function list(request: UsageListRequest): Promise<UsageListResponse> {
+async function list(request: UsageListRequest) {
     request = UsageListRequest.self(request);
     const { page, auth, filter } = request;
     if (!auth) throw "Authorization failed";
@@ -42,14 +38,12 @@ async function list(request: UsageListRequest): Promise<UsageListResponse> {
     const since = Date.now() - 30 * 86400000;
     const { list: data, total } = await UsageService.find(page, search, since);
 
-    // Resolve account_id to account name (email)
     const account_ids = [...new Set(data.map(item => item.account_id))];
     const accounts = await Promise.all(
         account_ids.map(id => AccountService.findOne(id).then(a => ({ id, name: a ? `${a.name} (${a.email})` : id })))
     );
     const accountMap = new Map(accounts.map(a => [a.id, a.name]));
 
-    // Resolve provider_id to provider name (include soft-deleted ones for history display)
     const provider_ids = [...new Set(data.map(item => item.provider_id).filter(Boolean))] as string[];
     const providerService = await import("../provider/provider.service").then(m => m.ProviderService);
     const providers = await Promise.all(
@@ -67,27 +61,19 @@ async function list(request: UsageListRequest): Promise<UsageListResponse> {
         });
     });
 
-    return new UsageListResponse({
-        success: true,
-        message: "success",
-        data: { list, total },
-    });
+    return { list, total };
 }
 
-async function stats(request: UsageStatsRequest): Promise<UsageStatsResponse> {
+async function stats(request: UsageStatsRequest) {
     request = UsageStatsRequest.self(request);
     const { auth, model_alias } = request;
     if (!auth) throw "Authorization failed";
     const account = await resolveAccount(auth);
     const data = await UsageService.stats(model_alias, account.is_admin ? undefined : account.id);
-    return new UsageStatsResponse({
-        success: true,
-        message: "success",
-        data,
-    });
+    return data;
 }
 
-async function sessions(request: UsageSessionsRequest): Promise<UsageSessionsResponse> {
+async function sessions(request: UsageSessionsRequest) {
     request = UsageSessionsRequest.self(request);
     const { auth } = request;
     if (!auth) throw "Authorization failed";
@@ -96,10 +82,8 @@ async function sessions(request: UsageSessionsRequest): Promise<UsageSessionsRes
 
     const { groups, totals } = await UsageService.getUserSessions(request.gapMinutes, request.since, effectiveAccountIds, account.is_admin ? true : false);
 
-    // Fetch 1min-granularity sessions for the recent list
     const { groups: rawGroups } = await UsageService.getUserSessions(1, request.since, effectiveAccountIds, account.is_admin ? true : false);
 
-    // Resolve account names
     const allGroupIds = [...new Set([...groups, ...rawGroups].map(g => g.account_id))];
     const accounts = await Promise.all(
         allGroupIds.map(id => AccountService.findOne(id).then(a => ({ id, name: a ? `${a.name} (${a.email})` : id })))
@@ -127,7 +111,6 @@ async function sessions(request: UsageSessionsRequest): Promise<UsageSessionsRes
         );
         providerMap = new Map(providers.map(p => [p.id, p.name]));
     } else {
-        // Non-admin: providerName is actually model_alias, use as-is
         providerMap = new Map(allProviderIds.map(id => [id, id]));
     }
 
@@ -143,13 +126,10 @@ async function sessions(request: UsageSessionsRequest): Promise<UsageSessionsRes
         })),
     }));
 
-    return new UsageSessionsResponse({
-        success: true,
-        message: "success",
-        data,
-        totals,
-        recentSessions,
-    });
+    return { list: data, totals, recentSessions };
 }
 
-export const usageController = new UsageRouterInstance(inject, { list, stats, sessions });
+export const usageMount = {
+    routes: usageRoutes,
+    handlers: { list, stats, sessions },
+};
