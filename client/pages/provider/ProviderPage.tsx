@@ -20,15 +20,15 @@ import { ProviderPagination } from "./components/ProviderPagination";
 import { ProviderFormModal } from "./components/ProviderFormModal";
 
 type ProviderForm = {
-    modelAlias: string;
+    model_alias: string;
     priority: number;
     name: string;
-    baseURL: string;
+    base_url: string;
     model: string;
-    apiKey?: string;
-    authType: string;
-    apiType: string;
-    proxyURL?: string;
+    api_key?: string;
+    auth_type: string;
+    api_type: string;
+    proxy_url?: string;
     enabled: number;
 };
 
@@ -43,13 +43,13 @@ export default function ProviderPage() {
     const { isOpen: isFormOpen, onOpen: onFormOpen, onClose: onFormClose, onOpenChange: onFormOpenChange } = useDisclosure();
     const [formMode, setFormMode] = useState<"create" | "edit">("create");
     const [editId, setEditId] = useState<string>("");
-    const [form, setForm] = useState<ProviderForm>({ modelAlias: "", priority: 1, name: "", baseURL: "", model: "", authType: "bearer", apiType: "openai", enabled: 1 });
+    const [form, setForm] = useState<ProviderForm>({ model_alias: "", priority: 1, name: "", base_url: "", model: "", auth_type: "bearer", api_type: "openai", enabled: 1 });
 
     const getToken = () => localStorage.getItem("access_token") || "";
 
     const fetchList = useCallback(async (p: number) => {
         const filter: Record<string, string | number> = {};
-        if (filterModelAlias) filter.modelAlias = filterModelAlias;
+        if (filterModelAlias) filter.model_alias = filterModelAlias;
 
         const req = new ProviderListRequest({ page: p, filter: new ProviderQueryBody(filter), auth: getToken() });
         const res = await ProviderRouter.list(req);
@@ -63,9 +63,9 @@ export default function ProviderPage() {
         fetchList(page);
     }, [page, fetchList]);
 
-    // Sort by modelAlias ASC first, then by priority ASC
+    // Sort by model_alias ASC first, then by priority ASC
     const sortedList = useMemo(() => {
-        return [...list].sort((a, b) => a.modelAlias.localeCompare(b.modelAlias) || a.priority - b.priority);
+        return [...list].sort((a, b) => a.model_alias.localeCompare(b.model_alias) || a.priority - b.priority);
     }, [list]);
 
     const handleMoveUp = async (id: string) => {
@@ -82,22 +82,22 @@ export default function ProviderPage() {
 
     const openCreate = () => {
         setFormMode("create");
-        setForm({ modelAlias: "", priority: 1, name: "", baseURL: "", model: "", authType: "bearer", apiType: "openai", enabled: 1 });
+        setForm({ model_alias: "", priority: 1, name: "", base_url: "", model: "", auth_type: "bearer", api_type: "openai", enabled: 1 });
         onFormOpen();
     };
 
     const handleCopy = async (item: ProviderDTO) => {
         const req = new ProviderCreateRequest({
             provider: new ProviderCreateBody({
-                modelAlias: item.modelAlias,
+                model_alias: item.model_alias,
                 priority: item.priority,
                 name: item.name,
-                baseURL: item.baseURL,
+                base_url: item.base_url,
                 model: item.model,
-                apiKey: item.apiKey || undefined,
-                authType: item.authType || undefined,
-                apiType: item.apiType || undefined,
-                proxyURL: item.proxyURL || undefined,
+                api_key: item.api_key || undefined,
+                auth_type: item.auth_type || undefined,
+                api_type: item.api_type || undefined,
+                proxy_url: item.proxy_url || undefined,
                 enabled: item.enabled,
             }),
             auth: getToken(),
@@ -112,15 +112,15 @@ export default function ProviderPage() {
         setFormMode("edit");
         setEditId(item.id);
         setForm({
-            modelAlias: item.modelAlias,
+            model_alias: item.model_alias,
             priority: item.priority,
             name: item.name,
-            baseURL: item.baseURL,
+            base_url: item.base_url,
             model: item.model,
-            apiKey: item.apiKey || "",
-            authType: item.authType || "bearer",
-            apiType: item.apiType || "openai",
-            proxyURL: item.proxyURL || "",
+            api_key: item.api_key || "",
+            auth_type: item.auth_type || "bearer",
+            api_type: item.api_type || "openai",
+            proxy_url: item.proxy_url || "",
             enabled: item.enabled,
         });
         onFormOpen();
@@ -130,15 +130,15 @@ export default function ProviderPage() {
         if (formMode === "create") {
             const req = new ProviderCreateRequest({
                 provider: new ProviderCreateBody({
-                    modelAlias: form.modelAlias,
+                    model_alias: form.model_alias,
                     priority: form.priority,
                     name: form.name,
-                    baseURL: form.baseURL,
+                    base_url: form.base_url,
                     model: form.model,
-                    apiKey: form.apiKey || undefined,
-                    authType: form.authType,
-                    apiType: form.apiType,
-                    proxyURL: form.proxyURL || undefined,
+                    api_key: form.api_key || undefined,
+                    auth_type: form.auth_type,
+                    api_type: form.api_type,
+                    proxy_url: form.proxy_url || undefined,
                     enabled: form.enabled,
                 }),
                 auth: getToken(),
@@ -153,15 +153,15 @@ export default function ProviderPage() {
             const req = new ProviderUpdateRequest({
                 id: editId,
                 provider: new ProviderUpdateBody({
-                    modelAlias: form.modelAlias || undefined,
+                    model_alias: form.model_alias || undefined,
                     priority: form.priority !== undefined ? form.priority : undefined,
                     name: form.name || undefined,
-                    baseURL: form.baseURL || undefined,
+                    base_url: form.base_url || undefined,
                     model: form.model || undefined,
-                    apiKey: form.apiKey !== undefined ? form.apiKey : undefined,
-                    authType: form.authType,
-                    apiType: form.apiType,
-                    proxyURL: form.proxyURL !== undefined ? form.proxyURL : undefined,
+                    api_key: form.api_key !== undefined ? form.api_key : undefined,
+                    auth_type: form.auth_type,
+                    api_type: form.api_type,
+                    proxy_url: form.proxy_url !== undefined ? form.proxy_url : undefined,
                     enabled: form.enabled !== undefined ? form.enabled : undefined,
                 }),
                 auth: getToken(),

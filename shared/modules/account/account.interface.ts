@@ -11,7 +11,7 @@ export class AccountDTO {
     public id: string;
     public name: string;
     public email: string;
-    public apiKey: string;
+    public api_key: string;
     public is_admin: number;
     public tg_chat_id: string | null;
     public balance: number;
@@ -20,7 +20,7 @@ export class AccountDTO {
         this.id = origin.id;
         this.name = origin.name;
         this.email = origin.email;
-        this.apiKey = origin.apiKey || "";
+        this.api_key = origin.api_key || "";
         this.is_admin = origin.is_admin;
         this.tg_chat_id = origin.tg_chat_id || null;
         this.balance = origin.balance ?? 0;
@@ -54,17 +54,17 @@ export class AccountCreateBody {
     public name: string;
     public email: string;
     public password: string;
-    public apiKey: string;
+    public api_key: string;
     public is_admin: number;
 
-    constructor(origin: Pick<AccountEntity, "name" | "email" | "password"> & Partial<Pick<AccountEntity, "apiKey" | "is_admin">>) {
+    constructor(origin: Pick<AccountEntity, "name" | "email" | "password"> & Partial<Pick<AccountEntity, "api_key" | "is_admin">>) {
         if (!origin.name || !origin.email || !origin.password) {
             throw new Error("Name and email are required");
         }
         this.name = origin.name;
         this.email = origin.email;
         this.password = origin.password;
-        this.apiKey = origin.apiKey || "";
+        this.api_key = origin.api_key || "";
         this.is_admin = origin.is_admin ?? 0;
     }
 
@@ -280,7 +280,7 @@ export class AccountRegenerateResponse implements BaseResponse<AccountDTO> {
     public success: boolean;
     public message: string;
     public data: {
-        apiKey: string
+        api_key: string
     };
 
     constructor(origin: AccountRegenerateResponse) {

@@ -57,7 +57,7 @@ export default function ModelPage() {
             const map: Record<string, { todayPeriod: UsageStatsPeriod; last24hPeriod: UsageStatsPeriod; weekPeriod: UsageStatsPeriod }> = {};
             await Promise.all(res.data.list.map(async (item) => {
                 try {
-                    const statsReq = new UsageStatsRequest({ modelAlias: item.alias, auth: getToken() });
+                    const statsReq = new UsageStatsRequest({ model_alias: item.alias, auth: getToken() });
                     const statsRes = await UsageRouter.stats(statsReq);
                     if (statsRes.success && statsRes.data) {
                         map[item.id] = {

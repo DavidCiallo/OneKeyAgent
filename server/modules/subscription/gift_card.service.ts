@@ -3,7 +3,7 @@ import Repository from "../../lib/repository";
 import { GiftCardEntity } from "../../../shared/modules/gift_card/gift_card.entity";
 import { AccountService } from "../account/account.service";
 
-const cardRepo = Repository.instance<GiftCardEntity>("GiftCard");
+const cardRepo = Repository.instance<GiftCardEntity>("gift_card");
 
 export class GiftCardService {
 

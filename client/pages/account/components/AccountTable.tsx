@@ -20,7 +20,7 @@ const columns = (locale: Record<string, string>, is_admin: boolean) => {
         <TableColumn key="email">{locale.Email}</TableColumn>,
         <TableColumn key="balance">Balance</TableColumn>,
         <TableColumn key="is_admin" align="center">{locale.IsAdmin}</TableColumn>,
-        <TableColumn key="apiKey" align="center">{locale.ApiKey}</TableColumn>,
+        <TableColumn key="api_key" align="center">{locale.ApiKey}</TableColumn>,
     ];
     if (is_admin) {
         cols.push(<TableColumn key="actions" align="center">{locale.Actions}</TableColumn>);
@@ -35,7 +35,7 @@ const rows = (list: AccountDTO[], locale: Record<string, string>, is_admin: bool
             <TableCell key="email">{item.email}</TableCell>,
             <TableCell key="balance">{formatBalance(item.balance)}</TableCell>,
             <TableCell key="is_admin">{item.is_admin ? locale.IsAdmin : locale.User}</TableCell>,
-            <TableCell key="apiKey">{item.apiKey}</TableCell>,
+            <TableCell key="api_key">{item.api_key}</TableCell>,
         ];
         if (is_admin) {
             cells.push(

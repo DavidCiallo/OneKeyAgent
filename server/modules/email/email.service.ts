@@ -9,8 +9,8 @@ interface SendEmailParams {
 }
 
 export async function sendEmail({ to, subject, html }: SendEmailParams): Promise<boolean> {
-    const apiKey = SettingsService.get("resend_api_key");
-    if (!apiKey) {
+    const api_key = SettingsService.get("resend_api_key");
+    if (!api_key) {
         console.error("RESEND_API_KEY is not configured");
         return false;
     }
@@ -21,7 +21,7 @@ export async function sendEmail({ to, subject, html }: SendEmailParams): Promise
         const response = await fetch(RESEND_API_URL, {
             method: "POST",
             headers: {
-                "Authorization": `Bearer ${apiKey}`,
+                "Authorization": `Bearer ${api_key}`,
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({

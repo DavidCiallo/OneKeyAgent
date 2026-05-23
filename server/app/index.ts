@@ -1,15 +1,12 @@
 import { config } from "dotenv";
 import { fileURLToPath } from "url";
 import path from "path";
-import { runMigrations } from "../lib/migrate";
 import { initialize } from "./initialize";
 import { AccountService } from "../modules/account/account.service";
 import { seedDefaultModel } from "../modules/ai/ai.session";
 import { startMonitor } from "../modules/subscription/monitor";
 
 config();
-
-runMigrations();
 
 const staticPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../dist");
 

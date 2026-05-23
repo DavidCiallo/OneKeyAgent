@@ -3,13 +3,13 @@ import { Button, Card, CardBody, CardHeader, Divider } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
 
 export default function ApiKeyCard({
-    apiKey,
+    api_key,
     regenerating,
     onConfirmOpen,
     endpoint,
     onCopy,
 }: {
-    apiKey: string;
+    api_key: string;
     regenerating: boolean;
     onConfirmOpen: () => void;
     endpoint: string;
@@ -35,12 +35,12 @@ export default function ApiKeyCard({
             <CardBody className="px-6 py-4 space-y-4">
                 <div className="flex items-center gap-1 sm:gap-2">
                     <code className="flex-1 text-xs sm:text-sm bg-gray-100 px-3 py-2 rounded-lg font-mono truncate select-all">
-                        {maskedKey(apiKey)}
+                        {maskedKey(api_key)}
                     </code>
                     <Button size="sm" variant="flat" className="min-w-0 px-4 sm:px-3" onPress={() => setShowApiKey(!showApiKey)}>
                         {showApiKey ? locale.Hide : locale.Show}
                     </Button>
-                    <Button size="sm" variant="flat" className="min-w-0 px-4 sm:px-3" onPress={() => handleCopy(apiKey)}>
+                    <Button size="sm" variant="flat" className="min-w-0 px-4 sm:px-3" onPress={() => handleCopy(api_key)}>
                         {locale.Copy}
                     </Button>
                 </div>

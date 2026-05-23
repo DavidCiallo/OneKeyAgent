@@ -17,7 +17,7 @@ export async function initialize() {
             name: ADMIN_NAME,
             email: ADMIN_EMAIL,
             password: hashGenerate(ADMIN_PASSWORD),
-            apiKey: generateApiKey(),
+            api_key: generateApiKey(),
             is_admin: 1,
         });
     }

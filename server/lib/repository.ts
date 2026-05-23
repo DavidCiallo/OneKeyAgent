@@ -1,32 +1,155 @@
 // @ts-nocheck
-import { eq, and, isNull, sql, desc, gte, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { db } from "./migrate";
-import * as schema from "./schema";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 
-// Automatically map all tables from schema
-const tables: Record<string, any> = {};
-Object.entries(schema).forEach(([key, val]) => {
-    if (key.endsWith("Table")) {
-        const tableName = key.replace("Table", "").toLowerCase();
-        tables[tableName] = val;
+const _filename = fileURLToPath(import.meta.url);
+const SERVER_DIR = path.resolve(path.dirname(_filename), "..");
+const DATA_DIR = path.join(path.resolve(SERVER_DIR, ".."), "data");
+
+if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+type Row = Record<string, any>;
+
+function collectionFile(name: string): string {
+    return path.join(DATA_DIR, `${name}.jsonl`);
+}
+
+function hardDeleteFile(name: string): string {
+    return path.join(DATA_DIR, `${name}.deleted`);
+}
+
+function readDeleted(name: string): Set<string> {
+    const file = hardDeleteFile(name);
+    if (!fs.existsSync(file)) return new Set();
+    const ids = fs.readFileSync(file, "utf-8").trim().split("\n").filter(Boolean);
+    return new Set(ids);
+}
+
+function appendDeleted(name: string, id: string) {
+    fs.appendFileSync(hardDeleteFile(name), id + "\n");
+}
+
+/** Read lines from end to start (newest first) — used for paginated find() with DESC order */
+async function* readLinesReverse(name: string, skipDeleted: boolean): AsyncGenerator<Row, void, void> {
+    const file = collectionFile(name);
+    if (!fs.existsSync(file)) return;
+
+    const deleted = skipDeleted ? readDeleted(name) : new Set<string>();
+    const stat = fs.statSync(file);
+    if (stat.size === 0) return;
+
+    const fd = fs.openSync(file, "r");
+    const buf = Buffer.alloc(65536);
+    let pos = stat.size;
+    let remainder = "";
+
+    try {
+        while (pos > 0) {
+            const readSize = Math.min(65536, pos);
+            pos -= readSize;
+            fs.readSync(fd, buf, 0, readSize, pos);
+            let chunk = buf.toString("utf-8", 0, readSize) + remainder;
+            remainder = "";
+
+            const lines = chunk.split("\n");
+            remainder = lines[0];
+            for (let i = lines.length - 1; i >= 1; i--) {
+                const trimmed = lines[i].trim();
+                if (!trimmed) continue;
+                const row = JSON.parse(trimmed);
+                if (skipDeleted && row.id && deleted.has(row.id)) continue;
+                yield row;
+            }
+        }
+        if (remainder.trim()) {
+            const row = JSON.parse(remainder.trim());
+            if (!(skipDeleted && row.id && deleted.has(row.id))) {
+                yield row;
+            }
+        }
+    } finally {
+        fs.closeSync(fd);
     }
-});
+}
+
+/** Read lines forward — used for findOne(), count(), findAllIgnoreDelete() */
+async function* readLines(name: string, skipDeleted: boolean): AsyncGenerator<Row, void, void> {
+    const file = collectionFile(name);
+    if (!fs.existsSync(file)) return;
+
+    const deleted = skipDeleted ? readDeleted(name) : new Set<string>();
+
+    const stream = Bun.file(file).stream();
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed) continue;
+                const row = JSON.parse(trimmed);
+                if (skipDeleted && row.id && deleted.has(row.id)) continue;
+                yield row;
+            }
+        }
+        if (buffer.trim()) {
+            const row = JSON.parse(buffer.trim());
+            if (!(skipDeleted && row.id && deleted.has(row.id))) {
+                yield row;
+            }
+        }
+    } finally {
+        reader.cancel().catch(() => {});
+    }
+}
+
+/** Check if a row matches the where conditions */
+function matches<T extends Row>(row: T, where: Record<string, any>): boolean {
+    for (const [key, val] of Object.entries(where)) {
+        if (val === undefined || val === null || val === "") continue;
+        if (row[key] !== val) return false;
+    }
+    return true;
+}
 
 class Repository<
     T extends { id?: string; create_time?: number | null; update_time?: number | null; delete_time?: number | null },
 > {
-    private table: any;
+    private collection: string;
     private static instances = new Map<string, any>();
+    private writeLock = Promise.resolve();
 
-    private constructor(entityName: string) {
-        const key = entityName.toLowerCase().replace("entity", "");
-        this.table = tables[key];
-        if (!this.table) {
-            throw new Error(
-                `Table for ${entityName} not found in schema. Ensure it is exported as '${key}Table' in schema.ts`,
-            );
+    private constructor(collection: string) {
+        this.collection = collection;
+    }
+
+    private async withLock<R>(fn: () => Promise<R>): Promise<R> {
+        const prev = this.writeLock;
+        let release: () => void;
+        this.writeLock = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        await prev;
+        try {
+            return await fn();
+        } finally {
+            release!();
         }
+    }
+
+    private filePath(): string {
+        return collectionFile(this.collection);
     }
 
     public static instance<
@@ -36,213 +159,270 @@ class Repository<
             update_time?: number | null;
             delete_time?: number | null;
         },
-    >(entityName: string): Repository<T> {
-        const key = entityName.toLowerCase();
+    >(collection: string): Repository<T> {
+        const key = collection.toLowerCase();
         if (!Repository.instances.has(key)) {
-            Repository.instances.set(key, new Repository(entityName));
+            Repository.instances.set(key, new Repository(key));
         }
         return Repository.instances.get(key);
     }
 
-    async find(where?: Partial<T>, config?: { limit?: number; offset?: number; since?: number }): Promise<T[]> {
-        const filters: any[] = [isNull(this.table.delete_time)];
-        if (config?.since) {
-            filters.push(gte(this.table.create_time, config.since));
-        }
-        if (where) {
-            Object.entries(where).forEach(([key, val]) => {
-                if (val !== undefined && val !== null && val !== "" && this.table[key]) {
-                    filters.push(eq(this.table[key], val));
-                }
-            });
-        }
-        let query = db
-            .select()
-            .from(this.table)
-            .where(and(...filters))
-            .orderBy(desc(this.table.create_time));
+    async find(
+        where?: Partial<T>,
+        config?: { limit?: number; offset?: number; since?: number },
+    ): Promise<T[]> {
+        const results: T[] = [];
+        const since = config?.since;
+        const limit = config?.limit;
+        const offset = config?.offset || 0;
 
-        if (config?.limit !== undefined) query = query.limit(config.limit);
-        if (config?.offset !== undefined) query = query.offset(config.offset);
+        // Use reverse read to get newest-first (matches previous Drizzle DESC order)
+        for await (const row of readLinesReverse(this.collection, true)) {
+            if (row.delete_time) continue;
+            if (since && row.create_time < since) continue;
 
-        const result = await query.execute();
-        return result as T[];
+            if (where && !matches(row, where as Record<string, any>)) continue;
+
+            results.push(row as T);
+            // If limit is set, stop reading when we have enough to satisfy offset+limit
+            if (limit !== undefined && results.length >= offset + limit) break;
+        }
+
+        if (offset > 0 || limit !== undefined) {
+            return results.slice(offset, limit !== undefined ? offset + limit : undefined);
+        }
+        return results;
     }
 
     async findOne(where: Partial<T>): Promise<T | null> {
-        const results = await this.find(where, { limit: 1 });
-        return results.length > 0 ? results[0] : null;
+        for await (const row of readLines(this.collection, true)) {
+            if (row.delete_time) continue;
+            if (matches(row, where as Record<string, any>)) return row as T;
+        }
+        return null;
     }
 
     async findIgnoreDelete(where: Partial<T>): Promise<T | null> {
-        const filters: any[] = [];
-        if (where) {
-            Object.entries(where).forEach(([key, val]) => {
-                if (val !== undefined && val !== null && val !== "" && this.table[key]) {
-                    filters.push(eq(this.table[key], val));
-                }
-            });
+        for await (const row of readLines(this.collection, false)) {
+            if (matches(row, where as Record<string, any>)) return row as T;
         }
-        const result = await db
-            .select()
-            .from(this.table)
-            .where(filters.length > 0 ? and(...filters) : undefined)
-            .limit(1)
-            .get();
-        return (result as T) || null;
+        return null;
     }
 
     /** Get ALL records (including soft-deleted) — used for data export */
     async findAllIgnoreDelete(): Promise<T[]> {
-        const result = await db
-            .select()
-            .from(this.table)
-            .execute();
-        return result as T[];
-    }
-
-    async insert(entity: Partial<T>): Promise<T> {
-        const now = Date.now();
-        const data = {
-            ...entity,
-            id: entity.id || nanoid(6),
-            create_time: entity.create_time || now,
-            update_time: entity.update_time || now,
-        };
-
-        const result = await db
-            .insert(this.table)
-            .values(data as any)
-            .returning()
-            .get();
-        return result as T;
-    }
-
-    async update(where: Partial<T>, updateData: Partial<T>, includeDeleted = false): Promise<boolean> {
-        const filters: any[] = [];
-        if (!includeDeleted) {
-            filters.push(isNull(this.table.delete_time));
+        const results: T[] = [];
+        for await (const row of readLines(this.collection, false)) {
+            results.push(row as T);
         }
-        if (where) {
-            Object.entries(where).forEach(([key, val]) => {
-                if (val !== undefined && val !== null && val !== "" && this.table[key]) {
-                    filters.push(eq(this.table[key], val));
-                }
-            });
-        }
-
-        const now = Date.now();
-        const data = {
-            ...updateData,
-            update_time: now,
-        };
-
-        await db
-            .update(this.table)
-            .set(data)
-            .where(and(...filters))
-            .execute();
-
-        return true;
-    }
-
-    async delete(where: Partial<T>): Promise<boolean> {
-        const filters: any[] = [isNull(this.table.delete_time)];
-        if (where) {
-            Object.entries(where).forEach(([key, val]) => {
-                if (val !== undefined && val !== null && val !== "" && this.table[key]) {
-                    filters.push(eq(this.table[key], val));
-                }
-            });
-        }
-
-        const now = Date.now();
-        await db
-            .update(this.table)
-            .set({ delete_time: now } as any)
-            .where(and(...filters))
-            .execute();
-
-        return true;
-    }
-
-    /** Permanently delete records (used for replace during import) */
-    async hardDelete(where: Partial<T>): Promise<boolean> {
-        const filters: any[] = [];
-        if (where) {
-            Object.entries(where).forEach(([key, val]) => {
-                if (val !== undefined && val !== null && val !== "" && this.table[key]) {
-                    filters.push(eq(this.table[key], val));
-                }
-            });
-        }
-        await db
-            .delete(this.table)
-            .where(filters.length > 0 ? and(...filters) : undefined)
-            .execute();
-        return true;
+        return results;
     }
 
     async findByIds(ids: string[]): Promise<T[]> {
         if (ids.length === 0) return [];
-        const result = await db
-            .select()
-            .from(this.table)
-            .where(and(isNull(this.table.delete_time), inArray(this.table.id, ids)))
-            .execute();
-        return result as T[];
+        const idSet = new Set(ids);
+        const results: T[] = [];
+        for await (const row of readLines(this.collection, true)) {
+            if (row.delete_time) continue;
+            if (row.id && idSet.has(row.id)) {
+                results.push(row as T);
+            }
+        }
+        return results;
     }
 
     /** Stream all records in batches (including soft-deleted) — avoids loading entire table into memory */
     async *findAllIgnoreDeleteBatch(batchSize = 1000): AsyncGenerator<T[], void, void> {
-        let offset = 0;
-        while (true) {
-            const result = await db
-                .select()
-                .from(this.table)
-                .limit(batchSize)
-                .offset(offset)
-                .execute();
-            if (result.length === 0) break;
-            yield result as T[];
-            offset += result.length;
+        let batch: T[] = [];
+        for await (const row of readLines(this.collection, false)) {
+            batch.push(row as T);
+            if (batch.length >= batchSize) {
+                yield batch;
+                batch = [];
+            }
         }
+        if (batch.length > 0) yield batch;
     }
 
-    /** Insert multiple rows in a single transaction */
-    async batchInsert(entities: Partial<T>[]): Promise<number> {
-        if (entities.length === 0) return 0;
+    async insert(entity: Partial<T>): Promise<T> {
+        return this.withLock(async () => {
+            const now = Date.now();
+            const id = (entity as any)?.id || nanoid(6);
+            const row = {
+                ...entity,
+                id,
+                create_time: (entity as any)?.create_time || now,
+                update_time: (entity as any)?.update_time || now,
+                delete_time: null,
+            };
+            fs.appendFileSync(this.filePath(), JSON.stringify(row) + "\n");
+            return row as T;
+        });
+    }
+
+    async update(where: Partial<T>, updateData: Partial<T>, includeDeleted = false): Promise<boolean> {
+        return this.withLock(async () => {
+            const now = Date.now();
+            let updated = false;
+            const file = this.filePath();
+            if (!fs.existsSync(file)) return false;
+
+            const deleted = readDeleted(this.collection);
+            const content = fs.readFileSync(file, "utf-8");
+            const lines = content.split("\n");
+            const out: string[] = [];
+
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed) continue;
+                const row = JSON.parse(trimmed);
+                if (row.id && deleted.has(row.id)) continue;
+                if (!includeDeleted && row.delete_time) {
+                    out.push(line);
+                    continue;
+                }
+
+                let match = true;
+                for (const [key, val] of Object.entries(where)) {
+                    if (row[key] !== val) {
+                        match = false;
+                        break;
+                    }
+                }
+
+                if (match) {
+                    Object.assign(row, updateData, { update_time: now });
+                    out.push(JSON.stringify(row));
+                    updated = true;
+                } else {
+                    out.push(line);
+                }
+            }
+
+            fs.writeFileSync(file, out.join("\n") + "\n");
+            return updated;
+        });
+    }
+
+    async delete(where: Partial<T>): Promise<boolean> {
+        // Soft delete via update — the existing behavior
         const now = Date.now();
-        const rows = entities.map(e => ({
-            ...e,
-            id: e.id || nanoid(6),
-            create_time: e.create_time || now,
-            update_time: e.update_time || now,
-        }));
-        await db.insert(this.table).values(rows as any).execute();
-        return rows.length;
+        return this.update(where, { delete_time: now } as any);
+    }
+
+    /** Permanently delete records (used for replace during import) */
+    async hardDelete(where: Partial<T>): Promise<boolean> {
+        return this.withLock(async () => {
+            let deleted = false;
+            const file = this.filePath();
+            if (!fs.existsSync(file)) return false;
+
+            const content = fs.readFileSync(file, "utf-8");
+            const lines = content.split("\n");
+            const out: string[] = [];
+
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed) continue;
+                const row = JSON.parse(trimmed);
+
+                let match = true;
+                for (const [key, val] of Object.entries(where)) {
+                    if (row[key] !== val) {
+                        match = false;
+                        break;
+                    }
+                }
+
+                if (match) {
+                    appendDeleted(this.collection, row.id);
+                    deleted = true;
+                } else {
+                    out.push(line);
+                }
+            }
+
+            fs.writeFileSync(file, out.join("\n") + "\n");
+            return deleted;
+        });
+    }
+
+    /**
+     * Atomic read-modify-write patch: apply a function to the matched row inside the write lock.
+     * The callback receives the current row (or null) and returns the new row (or null to skip).
+     */
+    async atomicPatch(
+        where: Partial<T>,
+        patch: (row: T | null) => Partial<T> | null,
+        includeDeleted = false,
+    ): Promise<boolean> {
+        return this.withLock(async () => {
+            const file = this.filePath();
+            if (!fs.existsSync(file)) return false;
+
+            const deleted = readDeleted(this.collection);
+            const content = fs.readFileSync(file, "utf-8");
+            const lines = content.split("\n");
+            const now = Date.now();
+            let updated = false;
+
+            for (let i = 0; i < lines.length; i++) {
+                const trimmed = lines[i].trim();
+                if (!trimmed) continue;
+                const row = JSON.parse(trimmed);
+                if (row.id && deleted.has(row.id)) continue;
+                if (!includeDeleted && row.delete_time) continue;
+
+                let match = true;
+                for (const [key, val] of Object.entries(where)) {
+                    if (row[key] !== val) { match = false; break; }
+                }
+
+                if (match) {
+                    const patchData = patch(row);
+                    if (patchData) {
+                        Object.assign(row, patchData, { update_time: now });
+                        lines[i] = JSON.stringify(row);
+                        updated = true;
+                    }
+                }
+            }
+
+            if (updated) {
+                fs.writeFileSync(file, lines.join("\n") + "\n");
+            }
+            return updated;
+        });
+    }
+
+    /** Insert multiple rows in one write */
+    async batchInsert(entities: Partial<T>[]): Promise<number> {
+        return this.withLock(async () => {
+            if (entities.length === 0) return 0;
+            const now = Date.now();
+            const rows = entities.map((e) => {
+                return {
+                    ...e,
+                    id: (e as any)?.id || nanoid(6),
+                    create_time: (e as any)?.create_time || now,
+                    update_time: (e as any)?.update_time || now,
+                    delete_time: null,
+                };
+            });
+            fs.appendFileSync(this.filePath(), rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+            return rows.length;
+        });
     }
 
     async count(where?: Partial<T>, since?: number): Promise<number> {
-        const filters: any[] = [isNull(this.table.delete_time)];
-        if (since) {
-            filters.push(gte(this.table.create_time, since));
+        let count = 0;
+        for await (const row of readLines(this.collection, true)) {
+            if (row.delete_time) continue;
+            if (since && row.create_time < since) continue;
+            if (where && !matches(row, where as Record<string, any>)) continue;
+            count++;
         }
-        if (where) {
-            Object.entries(where).forEach(([key, val]) => {
-                if (val !== undefined && val !== null && val !== "" && this.table[key]) {
-                    filters.push(eq(this.table[key], val));
-                }
-            });
-        }
-
-        const result = await db
-            .select({ count: sql`count(*)` })
-            .from(this.table)
-            .where(and(...filters))
-            .get();
-
-        return Number(result?.count || 0);
+        return count;
     }
 }
 

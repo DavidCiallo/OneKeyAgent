@@ -2,7 +2,7 @@ import Repository from "../../lib/repository";
 import { RoleEntity, AccountRoleEntity, RoleType } from "../../../shared/modules/role/role.entity";
 
 const roleRepository: Repository<RoleEntity> = Repository.instance("Role");
-const accountRoleRepository: Repository<AccountRoleEntity> = Repository.instance("AccountRole");
+const accountRoleRepository: Repository<AccountRoleEntity> = Repository.instance("account_role");
 
 export class RoleService {
     static async find(page: number, filter: Partial<RoleEntity>): Promise<{ list: RoleEntity[], total: number }> {

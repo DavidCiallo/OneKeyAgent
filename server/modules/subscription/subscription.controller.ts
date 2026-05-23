@@ -134,18 +134,18 @@ async function statement(request: StatementRequest): Promise<StatementResponse> 
     const txs = await txRepo.find({ account_id: account.id, status: "confirmed", delete_time: null });
 
     // 2. Redeemed gift cards (bonus & redeemed codes)
-    const cardRepo = Repository.instance<any>("GiftCard");
+    const cardRepo = Repository.instance<any>("gift_card");
     const cards = await cardRepo.find({ redeemed_by: account.id, status: "redeemed" });
 
     // 3. Usage logs (AI call costs) — grouped by day + model
-    const usageRepo = Repository.instance<any>("UsageLog");
-    const usageLogs = await usageRepo.find({ accountId: account.id, delete_time: null });
+    const usageRepo = Repository.instance<any>("usage_log");
+    const usageLogs = await usageRepo.find({ account_id: account.id, delete_time: null });
 
     // Group by "day|modelAlias"
     const dailyModelUsage = new Map<string, { logs: any[]; maxTimestamp: number }>();
     for (const log of usageLogs) {
         const day = new Date(log.create_time).toISOString().slice(0, 10); // "2026-05-12"
-        const model = log.modelAlias || "Unknown";
+        const model = log.model_alias || "Unknown";
         const key = `${day}|${model}`;
         if (!dailyModelUsage.has(key)) {
             dailyModelUsage.set(key, { logs: [], maxTimestamp: 0 });

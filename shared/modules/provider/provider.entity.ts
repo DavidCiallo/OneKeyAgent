@@ -2,15 +2,15 @@ import { BaseEntity } from "../../lib/default/base.entity";
 
 export interface ProviderEntity extends BaseEntity {
     id: string;
-    modelAlias: string;
+    model_alias: string;
     priority: number;
     name: string;
-    baseURL: string;
+    base_url: string;
     model: string;
-    apiKey?: string;
-    authType?: string;
-    apiType?: string;
-    proxyURL?: string;
+    api_key?: string;
+    auth_type?: string;
+    api_type?: string;
+    proxy_url?: string;
     enabled: number;
     create_time: number;
     update_time: number;
