@@ -38,23 +38,23 @@ export class RoleService {
 }
 
 export class AccountRoleService {
-    static async findByAccount(accountId: string): Promise<RoleEntity[]> {
-        const relations = await accountRoleRepository.find({ account_id: accountId });
+    static async findByAccount(account_id: string): Promise<RoleEntity[]> {
+        const relations = await accountRoleRepository.find({ account_id: account_id });
         if (relations.length === 0) return [];
         const roleIds = relations.map(r => r.role_id);
         return await roleRepository.findByIds(roleIds);
     }
 
-    static async assignPermissions(accountId: string, permissions: { name: string; type: string }[]): Promise<void> {
+    static async assignPermissions(account_id: string, permissions: { name: string; type: string }[]): Promise<void> {
         // Delete existing assignments in a single batch
-        const existing = await accountRoleRepository.find({ account_id: accountId });
+        const existing = await accountRoleRepository.find({ account_id: account_id });
         for (const rel of existing) {
             await accountRoleRepository.delete({ id: rel.id });
         }
         // Find or create each role, then assign
         for (const perm of permissions) {
             const roleId = await RoleService.findOrCreate(perm.name, perm.type as RoleType);
-            await accountRoleRepository.insert({ account_id: accountId, role_id: roleId });
+            await accountRoleRepository.insert({ account_id: account_id, role_id: roleId });
         }
     }
 }

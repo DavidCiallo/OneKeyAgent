@@ -78,13 +78,13 @@ export default function AccountPage() {
         onFormOpen();
     };
 
-    const assignPermissions = async (accountId: string, perms: string[]) => {
+    const assignPermissions = async (account_id: string, perms: string[]) => {
         const permissions = perms.map(key => {
             const [type, name] = key.split(":");
             return { name, type };
         });
         await RoleRouter.assign(new AssignRolesRequest({
-            account_id: accountId,
+            account_id: account_id,
             roles: new AssignRolesBody({ permissions }),
             auth: getToken(),
         }));

@@ -141,7 +141,7 @@ async function statement(request: StatementRequest): Promise<StatementResponse> 
     const usageRepo = Repository.instance<any>("usage_log");
     const usageLogs = await usageRepo.find({ account_id: account.id, delete_time: null });
 
-    // Group by "day|modelAlias"
+    // Group by "day|model_alias"
     const dailyModelUsage = new Map<string, { logs: any[]; maxTimestamp: number }>();
     for (const log of usageLogs) {
         const day = new Date(log.create_time).toISOString().slice(0, 10); // "2026-05-12"

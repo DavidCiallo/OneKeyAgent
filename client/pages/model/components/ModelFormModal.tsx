@@ -22,8 +22,8 @@ export function ModelFormModal({ isOpen, onOpenChange, mode, form, onFormChange,
     const locale = Locale("ModelPage");
     const common = Locale("Common");
 
-    const [inputPriceStr, setInputPriceStr] = useState(String(form.input_price));
-    const [outputPriceStr, setOutputPriceStr] = useState(String(form.output_price));
+    const [input_priceStr, setInputPriceStr] = useState(String(form.input_price));
+    const [output_priceStr, setOutputPriceStr] = useState(String(form.output_price));
 
     // Sync from parent form when opening
     useEffect(() => {
@@ -32,8 +32,8 @@ export function ModelFormModal({ isOpen, onOpenChange, mode, form, onFormChange,
     }, [isOpen]);
 
     const commitPrices = () => {
-        const ip = parseFloat(inputPriceStr);
-        const op = parseFloat(outputPriceStr);
+        const ip = parseFloat(input_priceStr);
+        const op = parseFloat(output_priceStr);
         if (!isNaN(ip) && !isNaN(op)) {
             onFormChange({ ...form, input_price: ip, output_price: op });
         }
@@ -53,7 +53,7 @@ export function ModelFormModal({ isOpen, onOpenChange, mode, form, onFormChange,
                         />
                         <Input
                             label={locale.InputPrice || "Input Price"}
-                            value={inputPriceStr}
+                            value={input_priceStr}
                             onValueChange={setInputPriceStr}
                             onBlur={commitPrices}
                             startContent={<span className="text-default-400 text-sm font-mono">$</span>}
@@ -61,7 +61,7 @@ export function ModelFormModal({ isOpen, onOpenChange, mode, form, onFormChange,
                         />
                         <Input
                             label={locale.OutputPrice || "Output Price"}
-                            value={outputPriceStr}
+                            value={output_priceStr}
                             onValueChange={setOutputPriceStr}
                             onBlur={commitPrices}
                             startContent={<span className="text-default-400 text-sm font-mono">$</span>}

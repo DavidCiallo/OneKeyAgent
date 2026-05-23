@@ -81,7 +81,7 @@ export class UsageService {
         return { list, total };
     }
 
-    static async stats(modelAlias?: string, accountId?: string): Promise<UsageStatsResult> {
+    static async stats(model_alias?: string, account_id?: string): Promise<UsageStatsResult> {
         const now = Date.now();
 
         const todayStart = localDayStart(now); // local-timezone midnight
@@ -90,10 +90,10 @@ export class UsageService {
         const weekStart = todayStart - 7 * DAY;
 
         const filter: Partial<UsageLogEntity> = {};
-        if (modelAlias) filter.model_alias = modelAlias;
+        if (model_alias) filter.model_alias = model_alias;
 
         const allLogs = await usageRepo.find(filter, { since: now - MONTH });
-        const accountLogs = accountId ? allLogs.filter(l => l.account_id === accountId) : allLogs;
+        const accountLogs = account_id ? allLogs.filter(l => l.account_id === account_id) : allLogs;
         const todayLogs = accountLogs.filter(l => l.create_time >= todayStart && l.create_time < nowTenMin + TEN_MIN);
         const last24hLogs = accountLogs.filter(l => l.create_time >= last24hStart && l.create_time < nowTenMin + TEN_MIN);
         const weekLogs = accountLogs.filter(l => l.create_time >= weekStart && l.create_time < nowTenMin + TEN_MIN);
@@ -134,12 +134,12 @@ export class UsageService {
         return `${MM}/${DD} ${hh}:${mm}-${ehh}:${emm}`;
     }
 
-    static async getUserSessions(gapMinutes?: number, since?: number, accountIds?: string[], isAdmin?: boolean): Promise<{ groups: UserSessionGroup[]; totals: { totalTokens: number; totalCost: number; totalRequests: number } }> {
+    static async getUserSessions(gapMinutes?: number, since?: number, account_ids?: string[], isAdmin?: boolean): Promise<{ groups: UserSessionGroup[]; totals: { totalTokens: number; totalCost: number; totalRequests: number } }> {
         let allLogs: UsageLogEntity[];
-        if (accountIds && accountIds.length > 0) {
+        if (account_ids && account_ids.length > 0) {
             // Fetch logs per account and merge
             const results = await Promise.all(
-                accountIds.map(id => usageRepo.find({ account_id: id } as Partial<UsageLogEntity>, { since: since ?? Date.now() - MONTH }))
+                account_ids.map(id => usageRepo.find({ account_id: id } as Partial<UsageLogEntity>, { since: since ?? Date.now() - MONTH }))
             );
             allLogs = results.flat();
         } else {
@@ -157,7 +157,7 @@ export class UsageService {
         }
         totalCost = Math.round(totalCost * 1_000_000) / 1_000_000;
 
-        // Group by accountId
+        // Group by account_id
         const byAccount = new Map<string, UsageLogEntity[]>();
         for (const log of allLogs) {
             if (!byAccount.has(log.account_id)) byAccount.set(log.account_id, []);
@@ -166,11 +166,11 @@ export class UsageService {
 
         const groups: UserSessionGroup[] = [];
 
-        for (const [accountId, logs] of byAccount) {
+        for (const [account_id, logs] of byAccount) {
             // Sort by time ASC
             logs.sort((a, b) => a.create_time - b.create_time);
 
-            // Group by windowStart only (not by modelAlias)
+            // Group by windowStart only (not by model_alias)
             const byWindow = new Map<number, UsageLogEntity[]>();
 
             for (const log of logs) {
@@ -182,18 +182,18 @@ export class UsageService {
             const sessions: UserSession[] = [];
 
             for (const [wStart, windowLogs] of byWindow) {
-                const modelAliases = [...new Set(windowLogs.map(l => l.model_alias || "default"))];
-                let inputTokens = 0;
-                let outputTokens = 0;
+                const model_aliases = [...new Set(windowLogs.map(l => l.model_alias || "default"))];
+                let input_tokens = 0;
+                let output_tokens = 0;
                 const providerMap = new Map<string, ProviderUsage>();
                 const modelMap = new Map<string, ModelUsage>();
 
                 for (const log of windowLogs) {
-                    inputTokens += getRawInputTokens(log);
-                    outputTokens += getRawOutputTokens(log);
+                    input_tokens += getRawInputTokens(log);
+                    output_tokens += getRawOutputTokens(log);
                     const providerKey = log.provider_id || "unknown";
                     if (!providerMap.has(providerKey)) {
-                        providerMap.set(providerKey, { providerName: providerKey, inputTokens: 0, outputTokens: 0 });
+                        providerMap.set(providerKey, { providerName: providerKey, input_tokens: 0, output_tokens: 0 });
                     }
                     const p = providerMap.get(providerKey)!;
                     p.input_tokens += getRawInputTokens(log);
@@ -201,7 +201,7 @@ export class UsageService {
 
                     const modelKey = log.model_alias || "default";
                     if (!modelMap.has(modelKey)) {
-                        modelMap.set(modelKey, { modelAlias: modelKey, inputTokens: 0, outputTokens: 0 });
+                        modelMap.set(modelKey, { model_alias: modelKey, input_tokens: 0, output_tokens: 0 });
                     }
                     const m = modelMap.get(modelKey)!;
                     m.input_tokens += getRawInputTokens(log);
@@ -217,10 +217,10 @@ export class UsageService {
                 sessions.push({
                     startTime: wStart,
                     endTime: wStart + gapMs,
-                    modelAliases,
+                    model_aliases,
                     requestCount: windowLogs.length,
-                    inputTokens,
-                    outputTokens,
+                    input_tokens,
+                    output_tokens,
                     cost,
                     providerUsage: Array.from(providerMap.values()),
                     modelUsage: Array.from(modelMap.values()),
@@ -234,9 +234,9 @@ export class UsageService {
             const totalTokens = sessions.reduce((sum, s) => sum + s.input_tokens + s.output_tokens, 0);
             const totalRequests = sessions.reduce((sum, s) => sum + s.requestCount, 0);
 
-            const acct = await accountRepository.findIgnoreDelete({ id: accountId });
+            const acct = await accountRepository.findIgnoreDelete({ id: account_id });
             const accountName = acct ? acct.name : "--";
-            groups.push({ accountId, accountName, sessions, totalTokens, totalRequests });
+            groups.push({ account_id, accountName, sessions, totalTokens, totalRequests });
         }
 
         // Sort by latest session startTime DESC
@@ -274,8 +274,8 @@ export class UsageService {
             sessions: g.sessions
                 .map(s => ({
                     ...s,
-                    providerUsage: accountIds && accountIds.length > 0 && !isAdmin
-                        ? s.modelUsage.map(mu => ({ providerName: mu.model_alias, inputTokens: mu.input_tokens, outputTokens: mu.output_tokens }))
+                    providerUsage: account_ids && account_ids.length > 0 && !isAdmin
+                        ? s.modelUsage.map(mu => ({ providerName: mu.model_alias, input_tokens: mu.input_tokens, output_tokens: mu.output_tokens }))
                         : s.providerUsage.filter(pu => activeProviderIds.has(pu.providerName)),
                 }))
                 .filter(s => s.providerUsage.length > 0 && s.model_aliases.some(m => activeModelAliases.has(m))),

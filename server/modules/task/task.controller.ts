@@ -20,10 +20,10 @@ const accountRepo = Repository.instance<AccountEntity>("Account");
 
 async function poll(request: TaskPollRequest): Promise<TaskPollResponse> {
     request = TaskPollRequest.self(request);
-    const accountId = await getAccountIdByApiKey(request.auth || "");
-    if (!accountId) throw "Authorization failed";
+    const account_id = await getAccountIdByApiKey(request.auth || "");
+    if (!account_id) throw "Authorization failed";
 
-    const task = await TaskService.pollByAccount(accountId);
+    const task = await TaskService.pollByAccount(account_id);
     if (!task) {
         return new TaskPollResponse({
             success: true,

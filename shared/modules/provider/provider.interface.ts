@@ -49,7 +49,7 @@ export class ProviderCreateBody {
 
     constructor(origin: Pick<ProviderEntity, "model_alias" | "base_url" | "model" | "priority" | "name"> & Partial<Pick<ProviderEntity, "api_key" | "auth_type" | "api_type" | "proxy_url" | "enabled">>) {
         if (!origin.model_alias || !origin.base_url || !origin.model || origin.priority === undefined) {
-            throw new Error("modelAlias, baseURL, model and priority are required");
+            throw new Error("model_alias, baseURL, model and priority are required");
         }
         this.model_alias = origin.model_alias;
         this.priority = origin.priority;

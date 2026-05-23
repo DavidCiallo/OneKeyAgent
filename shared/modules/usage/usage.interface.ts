@@ -125,23 +125,23 @@ export class UsageListResponse implements BaseResponse<UsageDTO> {
 
 export interface ProviderUsage {
     providerName: string;
-    inputTokens: number;
-    outputTokens: number;
+    input_tokens: number;
+    output_tokens: number;
 }
 
 export interface ModelUsage {
-    modelAlias: string;
-    inputTokens: number;
-    outputTokens: number;
+    model_alias: string;
+    input_tokens: number;
+    output_tokens: number;
 }
 
 export interface UserSession {
     startTime: number;
     endTime: number;
-    modelAliases: string[];
+    model_aliases: string[];
     requestCount: number;
-    inputTokens: number;
-    outputTokens: number;
+    input_tokens: number;
+    output_tokens: number;
     cost: number;
     providerUsage: ProviderUsage[];
     modelUsage: ModelUsage[];
@@ -150,7 +150,7 @@ export interface UserSession {
 }
 
 export interface UserSessionGroup {
-    accountId: string;
+    account_id: string;
     accountName: string;
     sessions: UserSession[];
     totalTokens: number;

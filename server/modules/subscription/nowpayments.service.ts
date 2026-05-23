@@ -29,7 +29,7 @@ interface NowPaymentsInvoiceResponse {
  */
 export function buildPaymentBody(params: {
     priceDollars: number;
-    accountId: string;
+    account_id: string;
     payCurrency: PaymentCurrency;
 }): Record<string, unknown> {
     return {
@@ -49,11 +49,11 @@ export function buildPaymentBody(params: {
  */
 export async function createInvoice(
     priceDollars: number,
-    accountId: string,
+    account_id: string,
     payCurrency: PaymentCurrency = "USDTERC20",
 ): Promise<{ invoice_url: string; payment_id: string; invoice_id: string }> {
     const api_key = getApiKey();
-    const body = buildPaymentBody({ priceDollars, accountId, payCurrency });
+    const body = buildPaymentBody({ priceDollars, account_id, payCurrency });
 
     const resp = await fetch(`${NOWPAYMENTS_API_URL}/invoice`, {
         method: "POST",
