@@ -63,23 +63,23 @@ async function getModelPrices(alias: string): Promise<{ input_price: number; out
 }
 
 /** Build Authorization header value based on auth type */
-function buildAuthHeader(api_key: string | undefined, authType?: string): string {
+function buildAuthHeader(api_key: string | undefined, auth_type?: string): string {
     if (!api_key) return "";
-    if (authType === "custom") return api_key;
+    if (auth_type === "custom") return api_key;
     return `Bearer ${api_key}`;
 }
 
 /** Build request headers and URL path based on api type */
 function buildRequestConfig(
-    baseURL: string,
+    base_url: string,
     api_key: string | undefined,
-    authType: string | undefined,
+    auth_type: string | undefined,
     apiType: string | undefined,
     body: Record<string, any>,
 ): { url: URL; headers: Record<string, string>; requestBody: string } {
     const isAnthropic = apiType === "anthropic";
     const path = isAnthropic ? "/messages" : "/chat/completions";
-    const url = new URL(`${baseURL}${path}`);
+    const url = new URL(`${base_url}${path}`);
 
     const postBody = isAnthropic
         ? JSON.stringify(toAnthropicBody(body))
@@ -94,7 +94,7 @@ function buildRequestConfig(
         headers["x-api-key"] = api_key || "";
         headers["anthropic-version"] = "2023-06-01";
     } else {
-        headers["Authorization"] = buildAuthHeader(api_key, authType);
+        headers["Authorization"] = buildAuthHeader(api_key, auth_type);
     }
 
     return { url, headers, requestBody: postBody };
@@ -102,16 +102,16 @@ function buildRequestConfig(
 
 /** Try to call upstream provider, returns response data or null */
 async function tryProvider(
-    baseURL: string,
+    base_url: string,
     model: string,
     api_key: string | undefined,
-    proxyURL: string | undefined,
+    proxy_url: string | undefined,
     body: Record<string, any>,
-    authType?: string,
+    auth_type?: string,
     apiType?: string,
 ): Promise<any> {
-    const { url, headers, requestBody: postBody } = buildRequestConfig(baseURL, api_key, authType, apiType, body);
-    const agent = proxyURL ? new HttpsProxyAgent(proxyURL) : undefined;
+    const { url, headers, requestBody: postBody } = buildRequestConfig(base_url, api_key, auth_type, apiType, body);
+    const agent = proxy_url ? new HttpsProxyAgent(proxy_url) : undefined;
 
     return new Promise((resolve) => {
         const lib = url.protocol === "https:" ? https : http;
@@ -148,16 +148,16 @@ async function tryProvider(
 
 /** Try to call upstream provider for streaming, returns the body stream or null */
 async function tryProviderStream(
-    baseURL: string,
+    base_url: string,
     model: string,
     api_key: string | undefined,
-    proxyURL: string | undefined,
+    proxy_url: string | undefined,
     body: Record<string, any>,
-    authType?: string,
+    auth_type?: string,
     apiType?: string,
 ): Promise<ReadableStream<Uint8Array> | null> {
-    const { url, headers, requestBody: postBody } = buildRequestConfig(baseURL, api_key, authType, apiType, body);
-    const agent = proxyURL ? new HttpsProxyAgent(proxyURL) : undefined;
+    const { url, headers, requestBody: postBody } = buildRequestConfig(base_url, api_key, auth_type, apiType, body);
+    const agent = proxy_url ? new HttpsProxyAgent(proxy_url) : undefined;
 
     return new Promise((resolve) => {
         const lib = url.protocol === "https:" ? https : http;
@@ -400,9 +400,9 @@ async function chatHexStream(body: Record<string, any>, account_id: string): Pro
     throw new Error("All providers failed for streaming");
 }
 
-function requestJson(urlStr: string, api_key: string | undefined, postBody: string, proxyURL: string | undefined, authType?: string): Promise<any> {
+function requestJson(urlStr: string, api_key: string | undefined, postBody: string, proxy_url: string | undefined, auth_type?: string): Promise<any> {
     const url = new URL(urlStr);
-    const agent = proxyURL ? new HttpsProxyAgent(proxyURL) : undefined;
+    const agent = proxy_url ? new HttpsProxyAgent(proxy_url) : undefined;
     return new Promise((resolve) => {
         const lib = url.protocol === "https:" ? https : http;
         const opts: http.RequestOptions = {
@@ -412,7 +412,7 @@ function requestJson(urlStr: string, api_key: string | undefined, postBody: stri
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "Authorization": buildAuthHeader(api_key, authType),
+                "Authorization": buildAuthHeader(api_key, auth_type),
                 "Content-Length": Buffer.byteLength(postBody).toString(),
             },
             agent,
@@ -474,9 +474,9 @@ async function completeHex(body: Record<string, any>, account_id: string): Promi
     throw new Error("All providers failed");
 }
 
-function requestStream(urlStr: string, api_key: string | undefined, postBody: string, proxyURL: string | undefined, authType?: string, apiType?: string): Promise<ReadableStream<Uint8Array> | null> {
+function requestStream(urlStr: string, api_key: string | undefined, postBody: string, proxy_url: string | undefined, auth_type?: string, apiType?: string): Promise<ReadableStream<Uint8Array> | null> {
     const url = new URL(urlStr);
-    const agent = proxyURL ? new HttpsProxyAgent(proxyURL) : undefined;
+    const agent = proxy_url ? new HttpsProxyAgent(proxy_url) : undefined;
     return new Promise((resolve) => {
         const lib = url.protocol === "https:" ? https : http;
         const opts: http.RequestOptions = {
@@ -486,7 +486,7 @@ function requestStream(urlStr: string, api_key: string | undefined, postBody: st
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "Authorization": buildAuthHeader(api_key, authType),
+                "Authorization": buildAuthHeader(api_key, auth_type),
                 "Content-Length": Buffer.byteLength(postBody).toString(),
             },
             agent,
