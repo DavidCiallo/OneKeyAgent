@@ -34,7 +34,7 @@ OneKey Agent is a self-hosted AI gateway that seamlessly routes requests across 
 
 The core capability of OneKey Agent is **model-level automatic failover**:
 
-1. **Model Configuration**: Each model has an `alias`, `model` name, `baseURL`, `api_key`, and `tier` (priority level)
+1. **Model Configuration**: Each model has an `alias`, `model` name, `base_url`, `api_key`, and `tier` (priority level)
 2. **Request Routing**: Clients specify a model alias (e.g. `gpt-4`); the gateway finds all models under that alias
 3. **Failover**: Models are tried by tier priority; if one fails (network error, HTTP error, etc.), the next is tried automatically
 4. **Transparent Proxy**: The entire failover process is invisible to the client; responses follow OpenAI format
@@ -95,7 +95,7 @@ bun run serve      # Start server
 
 ## 🔌 API Endpoints
 
-Follows OpenAI API format. Clients only need to replace the `baseURL`:
+Follows OpenAI API format. Clients only need to replace the `base_url`:
 
 ```bash
 # Chat completions
