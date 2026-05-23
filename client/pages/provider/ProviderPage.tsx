@@ -1,19 +1,9 @@
 import { Header } from "../../components/header/Header";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { ProviderDTO } from "../../../shared/modules/provider/provider.interface";
-import { ProviderRouter } from "../../api/instance";
+import { providerApi } from "../../api/instance";
 import { Locale } from "../../methods/locale";
 import { useDisclosure } from "@heroui/react";
-import {
-    ProviderListRequest,
-    ProviderCreateRequest,
-    ProviderCreateBody,
-    ProviderUpdateRequest,
-    ProviderUpdateBody,
-    ProviderDeleteRequest,
-    ProviderQueryBody,
-    ProviderUpdatePriorityRequest,
-} from "../../../shared/modules/provider/provider.interface";
 import { ProviderFilter } from "./components/ProviderFilter";
 import { ProviderTable } from "./components/ProviderTable";
 import { ProviderPagination } from "./components/ProviderPagination";
@@ -45,14 +35,11 @@ export default function ProviderPage() {
     const [editId, setEditId] = useState<string>("");
     const [form, setForm] = useState<ProviderForm>({ model_alias: "", priority: 1, name: "", base_url: "", model: "", auth_type: "bearer", api_type: "openai", enabled: 1 });
 
-    const getToken = () => localStorage.getItem("access_token") || "";
-
     const fetchList = useCallback(async (p: number) => {
         const filter: Record<string, string | number> = {};
         if (filterModelAlias) filter.model_alias = filterModelAlias;
 
-        const req = new ProviderListRequest({ page: p, filter: new ProviderQueryBody(filter), auth: getToken() });
-        const res = await ProviderRouter.list(req);
+        const res = await providerApi.list({ page: p, filter } as any);
         if (res.success && res.data) {
             setList(res.data.list);
             setTotal(res.data.total);
@@ -69,14 +56,12 @@ export default function ProviderPage() {
     }, [list]);
 
     const handleMoveUp = async (id: string) => {
-        const req = new ProviderUpdatePriorityRequest({ id, delta: -1, auth: getToken() });
-        const res = await ProviderRouter.updatepriority(req);
+        const res = await providerApi.updatepriority({ id, delta: -1 } as any);
         if (res.success) fetchList(page);
     };
 
     const handleMoveDown = async (id: string) => {
-        const req = new ProviderUpdatePriorityRequest({ id, delta: 1, auth: getToken() });
-        const res = await ProviderRouter.updatepriority(req);
+        const res = await providerApi.updatepriority({ id, delta: 1 } as any);
         if (res.success) fetchList(page);
     };
 
@@ -87,8 +72,8 @@ export default function ProviderPage() {
     };
 
     const handleCopy = async (item: ProviderDTO) => {
-        const req = new ProviderCreateRequest({
-            provider: new ProviderCreateBody({
+        const res = await providerApi.create({
+            provider: {
                 model_alias: item.model_alias,
                 priority: item.priority,
                 name: item.name,
@@ -99,10 +84,8 @@ export default function ProviderPage() {
                 api_type: item.api_type || undefined,
                 proxy_url: item.proxy_url || undefined,
                 enabled: item.enabled,
-            }),
-            auth: getToken(),
-        });
-        const res = await ProviderRouter.create(req);
+            },
+        } as any);
         if (res.success) {
             fetchList(page);
         }
@@ -128,8 +111,8 @@ export default function ProviderPage() {
 
     const handleFormConfirm = async () => {
         if (formMode === "create") {
-            const req = new ProviderCreateRequest({
-                provider: new ProviderCreateBody({
+            const res = await providerApi.create({
+                provider: {
                     model_alias: form.model_alias,
                     priority: form.priority,
                     name: form.name,
@@ -140,19 +123,17 @@ export default function ProviderPage() {
                     api_type: form.api_type,
                     proxy_url: form.proxy_url || undefined,
                     enabled: form.enabled,
-                }),
-                auth: getToken(),
-            });
-            const res = await ProviderRouter.create(req);
+                },
+            } as any);
             if (res.success) {
                 onFormClose();
                 fetchList(1);
                 setPage(1);
             }
         } else {
-            const req = new ProviderUpdateRequest({
+            const res = await providerApi.update({
                 id: editId,
-                provider: new ProviderUpdateBody({
+                provider: {
                     model_alias: form.model_alias || undefined,
                     priority: form.priority !== undefined ? form.priority : undefined,
                     name: form.name || undefined,
@@ -163,10 +144,8 @@ export default function ProviderPage() {
                     api_type: form.api_type,
                     proxy_url: form.proxy_url !== undefined ? form.proxy_url : undefined,
                     enabled: form.enabled !== undefined ? form.enabled : undefined,
-                }),
-                auth: getToken(),
-            });
-            const res = await ProviderRouter.update(req);
+                },
+            } as any);
             if (res.success) {
                 onFormClose();
                 fetchList(page);
@@ -175,8 +154,7 @@ export default function ProviderPage() {
     };
 
     const handleDelete = async (id: string) => {
-        const req = new ProviderDeleteRequest({ id, auth: getToken() });
-        const res = await ProviderRouter.delete(req);
+        const res = await providerApi.delete({ id } as any);
         if (res.success) {
             fetchList(page);
         }

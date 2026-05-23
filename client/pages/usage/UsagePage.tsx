@@ -1,12 +1,11 @@
 import { Header } from "../../components/header/Header";
 import { useEffect, useState, useCallback } from "react";
 import {
-    UsageSessionsRequest,
     UsageSessionTotals,
     UserSessionGroup,
     UserSession,
 } from "../../../shared/modules/usage/usage.interface";
-import { UsageRouter, AccountRouter } from "../../api/instance";
+import { usageApi, accountApi } from "../../api/instance";
 import { Locale } from "../../methods/locale";
 import { Select, SelectItem, Button, ButtonGroup } from "@heroui/react";
 import { useAuth } from "../../methods/auth-context";
@@ -53,12 +52,10 @@ export default function UsagePage() {
 
     const [loading, setLoading] = useState(true);
 
-    const getToken = () => localStorage.getItem("access_token") || "";
-
     // Fetch accounts list for admin selector
     useEffect(() => {
         if (!isAdmin()) return;
-        AccountRouter.list({ auth: getToken(), page: 1, filter: {} }).then((res) => {
+        accountApi.list({ page: 1, filter: {} } as any).then((res) => {
             if (res.success && res.data) {
                 // Fetch all pages to get all accounts
                 const totalPages = Math.ceil(res.data.total / 40);
@@ -67,7 +64,7 @@ export default function UsagePage() {
                 } else {
                     Promise.all(
                         Array.from({ length: totalPages - 1 }, (_, i) =>
-                            AccountRouter.list({ auth: getToken(), page: i + 2, filter: {} })
+                            accountApi.list({ page: i + 2, filter: {} } as any)
                         )
                     ).then((pages) => {
                         const all = [res.data.list, ...pages.map((p: any) => p.data?.list || [])].flat();
@@ -81,13 +78,11 @@ export default function UsagePage() {
     const fetchSessions = useCallback(async (gap: number, preset: number, ids: Set<string>) => {
         setLoading(true);
         const since = computeSince(preset);
-        const req = new UsageSessionsRequest({
-            auth: getToken(),
+        const res = await usageApi.sessions({
             gapMinutes: gap,
             since,
             account_ids: ids.size > 0 ? Array.from(ids) : undefined,
-        });
-        const res = await UsageRouter.sessions(req);
+        } as any);
         if (res.success && res.data) {
             setGroups(res.data);
             setTotals(res.totals);

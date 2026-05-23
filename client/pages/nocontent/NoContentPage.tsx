@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Header } from "../../components/header/Header";
 import { Locale } from "../../methods/locale";
 import { useAuth } from "../../methods/auth-context";
-import { AuthRouter } from "../../api/instance";
-import { AliveRequest } from "../../../shared/modules/auth/auth.interface";
+import { authApi } from "../../api/instance";
 import { setUserInfo } from "../../methods/auth";
 
 export default function NoContentPage() {
@@ -13,7 +12,7 @@ export default function NoContentPage() {
     const { setAuthInfo } = useAuth();
 
     useEffect(() => {
-        AuthRouter.alive(new AliveRequest({ auth: localStorage.getItem("access_token")! })).then(({ success, data }) => {
+        authApi.alive({}).then(({ success, data }) => {
             if (success && data) {
                 setUserInfo({ email: localStorage.getItem("user_email") || "", is_admin: data.is_admin, roles: data.roles });
                 setAuthInfo({ is_admin: data.is_admin, roles: data.roles });

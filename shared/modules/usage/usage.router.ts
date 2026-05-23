@@ -1,25 +1,9 @@
-import { BaseRouterInstance } from "../../lib/default/decorator";
 import { UsageListRequest, UsageListResponse, UsageStatsRequest, UsageStatsResponse, UsageSessionsRequest, UsageSessionsResponse } from "./usage.interface";
 
-export class UsageRouterInstance extends BaseRouterInstance {
-    base = "/api";
-    prefix = "/usage";
-    router = [
-        { path: "/list", handler: Function },
-        { path: "/stats", handler: Function },
-        { path: "/sessions", handler: Function },
-    ];
-
-    list!: (query: UsageListRequest) => Promise<UsageListResponse>;
-    stats!: (query: UsageStatsRequest) => Promise<UsageStatsResponse>;
-    sessions!: (query: UsageSessionsRequest) => Promise<UsageSessionsResponse>;
-
-    constructor(inject: Function, functions?: {
-        list: (query: UsageListRequest) => Promise<UsageListResponse>,
-        stats: (query: UsageStatsRequest) => Promise<UsageStatsResponse>,
-        sessions: (query: UsageSessionsRequest) => Promise<UsageSessionsResponse>,
-    }) {
-        super();
-        inject(this, functions);
-    }
-}
+export const usageRoutes = {
+    base: "/api",
+    prefix: "/usage",
+    list:     { path: "/list",     request: {} as UsageListRequest,     response: {} as UsageListResponse },
+    stats:    { path: "/stats",    request: {} as UsageStatsRequest,    response: {} as UsageStatsResponse },
+    sessions: { path: "/sessions", request: {} as UsageSessionsRequest, response: {} as UsageSessionsResponse },
+} as const;

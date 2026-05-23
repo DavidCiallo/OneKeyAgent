@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { AuthRouter } from "../../api/instance";
-import { VerifyEmailRequest } from "../../../shared/modules/auth/auth.interface";
+import { authApi } from "../../api/instance";
 import { Locale } from "../../methods/locale";
 import NeuralLogo from "../home/components/NeuralLogo";
 
@@ -21,7 +20,7 @@ export default function VerifyEmailPage() {
             setMessage("Invalid verification link");
             return;
         }
-        AuthRouter.verify(new VerifyEmailRequest({ token })).then(res => {
+        authApi.verify({ token }).then(res => {
             if (res.success) {
                 setStatus("success");
                 setMessage(res.message || "Registration completed!");

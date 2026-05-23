@@ -1,6 +1,6 @@
 import { Header } from "../../components/header/Header";
 import { useEffect, useState } from "react";
-import { SettingsRouter } from "../../api/instance";
+import { settingsApi } from "../../api/instance";
 import { SettingsEntry } from "../../../shared/modules/settings/settings.interface";
 import { Locale } from "../../methods/locale";
 import { Button, Input } from "@heroui/react";
@@ -22,12 +22,10 @@ export default function SettingsPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [msg, setMsg] = useState("");
-    const getToken = () => localStorage.getItem("access_token") || "";
 
     const fetchSettings = async () => {
         setLoading(true);
-        const req = { auth: getToken() };
-        const res = await SettingsRouter.list(req);
+        const res = await settingsApi.list({} as any);
         if (res.success && res.data) {
             setEntries(res.data.entries);
         }
@@ -41,8 +39,7 @@ export default function SettingsPage() {
     const handleSave = async () => {
         setSaving(true);
         setMsg("");
-        const req = { auth: getToken(), entries };
-        const res = await SettingsRouter.save(req);
+        const res = await settingsApi.save({ entries } as any);
         if (res.success) {
             setMsg("Saved!");
         } else {

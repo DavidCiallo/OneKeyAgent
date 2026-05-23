@@ -1,49 +1,17 @@
-import { BaseRouterInstance } from "../../lib/default/decorator";
 import { AccountListRequest, AccountListResponse, AccountDetailRequest, AccountDetailResponse, AccountCreateRequest, AccountCreateResponse, AccountUpdateRequest, AccountUpdateResponse, AccountDeleteRequest, AccountDeleteResponse, AccountProfileRequest, AccountProfileResponse, AccountRegenerateRequest, AccountRegenerateResponse, AccountExportRequest, AccountExportResponse, AccountImportRequest, AccountImportResponse } from "./account.interface";
 
-export class AccountRouterInstance extends BaseRouterInstance {
-    base = "/api";
-    prefix = "/account";
-    router = [
-        { path: "/list", handler: Function },
-        { path: "/detail", handler: Function },
-        { path: "/create", handler: Function },
-        { path: "/update", handler: Function },
-        { path: "/delete", handler: Function },
-        { path: "/profile", handler: Function },
-        { path: "/regenerate", handler: Function },
-        { path: "/export", handler: Function },
-        { path: "/export_usage", handler: Function },
-        { path: "/export_tasks", handler: Function },
-        { path: "/import", handler: Function },
-    ];
-
-    list!: (query: AccountListRequest) => Promise<AccountListResponse>;
-    detail!: (query: AccountDetailRequest) => Promise<AccountDetailResponse>;
-    create!: (body: AccountCreateRequest) => Promise<AccountCreateResponse>;
-    update!: (body: AccountUpdateRequest) => Promise<AccountUpdateResponse>;
-    delete!: (body: AccountDeleteRequest) => Promise<AccountDeleteResponse>;
-    profile!: (query: AccountProfileRequest) => Promise<AccountProfileResponse>;
-    regenerate!: (query: AccountRegenerateRequest) => Promise<AccountRegenerateResponse>;
-    export!: (query: AccountExportRequest) => Promise<AccountExportResponse>;
-    export_usage!: (query: AccountExportRequest) => Promise<AccountExportResponse>;
-    export_tasks!: (query: AccountExportRequest) => Promise<AccountExportResponse>;
-    import!: (body: AccountImportRequest) => Promise<AccountImportResponse>;
-
-    constructor(inject: Function, functions?: {
-        list: (query: AccountListRequest) => Promise<AccountListResponse>,
-        detail: (query: AccountDetailRequest) => Promise<AccountDetailResponse>,
-        create: (body: AccountCreateRequest) => Promise<AccountCreateResponse>,
-        update: (body: AccountUpdateRequest) => Promise<AccountUpdateResponse>,
-        delete: (body: AccountDeleteRequest) => Promise<AccountDeleteResponse>,
-        profile: (query: AccountProfileRequest) => Promise<AccountProfileResponse>,
-        regenerate: (query: AccountRegenerateRequest) => Promise<AccountRegenerateResponse>,
-        export: (query: AccountExportRequest) => Promise<AccountExportResponse>,
-        export_usage: (query: AccountExportRequest) => Promise<AccountExportResponse>,
-        export_tasks: (query: AccountExportRequest) => Promise<AccountExportResponse>,
-        import: (body: AccountImportRequest) => Promise<AccountImportResponse>,
-    }) {
-        super();
-        inject(this, functions);
-    }
-}
+export const accountRoutes = {
+    base: "/api",
+    prefix: "/account",
+    list:         { path: "/list",         request: {} as AccountListRequest,         response: {} as AccountListResponse },
+    detail:       { path: "/detail",       request: {} as AccountDetailRequest,       response: {} as AccountDetailResponse },
+    create:       { path: "/create",       request: {} as AccountCreateRequest,       response: {} as AccountCreateResponse },
+    update:       { path: "/update",       request: {} as AccountUpdateRequest,       response: {} as AccountUpdateResponse },
+    delete:       { path: "/delete",       request: {} as AccountDeleteRequest,       response: {} as AccountDeleteResponse },
+    profile:      { path: "/profile",      request: {} as AccountProfileRequest,      response: {} as AccountProfileResponse },
+    regenerate:   { path: "/regenerate",   request: {} as AccountRegenerateRequest,   response: {} as AccountRegenerateResponse },
+    export:       { path: "/export",       request: {} as AccountExportRequest,       response: {} as AccountExportResponse },
+    export_usage: { path: "/export_usage", request: {} as AccountExportRequest,       response: {} as AccountExportResponse },
+    export_tasks: { path: "/export_tasks", request: {} as AccountExportRequest,       response: {} as AccountExportResponse },
+    import:       { path: "/import",       request: {} as AccountImportRequest,       response: {} as AccountImportResponse },
+} as const;

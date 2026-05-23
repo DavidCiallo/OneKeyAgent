@@ -1,4 +1,3 @@
-import { BaseRouterInstance } from "../../lib/default/decorator";
 import {
     ChatCompletionsRequest,
     ChatCompletionsResponse,
@@ -8,31 +7,11 @@ import {
     ModelsResponse,
 } from "./ai.interface";
 
-export class AiRouterInstance extends BaseRouterInstance {
-    base = "/api";
-    prefix = "";
-    router = [
-        { path: "/chat/completions", handler: Function },
-        { path: "/completions", handler: Function },
-        { path: "/models", handler: Function },
-        { path: "/v1/messages", handler: Function },
-    ];
-
-    chatcompletions!: (request: ChatCompletionsRequest) => Promise<ChatCompletionsResponse>;
-    completion!: (request: CompletionRequest) => Promise<CompletionResponse>;
-    models!: (request: ModelsRequest) => Promise<ModelsResponse>;
-    v1messages!: (request: any) => Promise<any>;
-
-    constructor(
-        inject: Function,
-        functions?: {
-            chatcompletions: (request: ChatCompletionsRequest) => Promise<ChatCompletionsResponse>;
-            completions: (request: CompletionRequest) => Promise<CompletionResponse>;
-            models: (request: ModelsRequest) => Promise<ModelsResponse>;
-            v1messages?: (request: any) => Promise<any>;
-        }
-    ) {
-        super();
-        inject(this, functions);
-    }
-}
+export const aiRoutes = {
+    base: "/api",
+    prefix: "",
+    chatcompletions: { path: "/chat/completions", request: {} as ChatCompletionsRequest, response: {} as ChatCompletionsResponse, raw: true },
+    completions:     { path: "/completions",      request: {} as CompletionRequest,      response: {} as CompletionResponse,      raw: true },
+    models:          { path: "/models",           request: {} as ModelsRequest,           response: {} as ModelsResponse,          raw: true },
+    v1messages:      { path: "/v1/messages",      request: {} as any,                     response: {} as any,                     raw: true },
+} as const;

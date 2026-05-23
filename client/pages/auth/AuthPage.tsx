@@ -2,13 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { Button, Input, Form, Select, SelectItem } from "@heroui/react";
-import { AuthRouter } from "../../api/instance";
+import { authApi } from "../../api/instance";
 import { useNavigate } from "react-router-dom";
 import { toast } from "../../methods/notify";
 import { setAuthStatus, setUserInfo } from "../../methods/auth";
 import { Locale } from "../../methods/locale";
 import { useAuth } from "../../methods/auth-context";
-import { LoginBody, LoginRequest, RegisterBody, RegisterRequest, AuthConfigRequest } from "../../../shared/modules/auth/auth.interface";
 import NeuralLogo from "../home/components/NeuralLogo";
 
 function getDefaultRoute(is_admin?: number, roles?: { name: string; type: string }[]): string {
@@ -31,7 +30,7 @@ export default function Component() {
     const [emailLocal, setEmailLocal] = useState<string>("");
 
     useEffect(() => {
-        AuthRouter.config(new AuthConfigRequest()).then(res => {
+        authApi.config({} as any).then(res => {
             if (res.success && res.data?.allowed_domains?.length > 0) {
                 setAllowedDomains(res.data.allowed_domains);
                 setEmailDomain(res.data.allowed_domains[0]);
@@ -42,12 +41,12 @@ export default function Component() {
     const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const { email, password } = Object.fromEntries(new FormData(event.currentTarget) as unknown as Iterable<[string, string]>);
-        const { success, data, message } = await AuthRouter.login(new LoginRequest({
-            identify: new LoginBody({
+        const { success, data, message } = await authApi.login({
+            identify: {
                 email: email.toString(),
                 password: password.toString(),
-            })
-        }));
+            }
+        } as any);
         if (!success || !data) {
             toast({ title: message || locale.LoginFailed, color: "danger" });
             return;
@@ -65,13 +64,13 @@ export default function Component() {
         event.preventDefault();
         const { name, password } = Object.fromEntries(new FormData(event.currentTarget) as unknown as Iterable<[string, string]>);
         const emailStr = `${emailLocal}@${emailDomain}`;
-        const { success, data, message } = await AuthRouter.register(new RegisterRequest({
-            identify: new RegisterBody({
+        const { success, data, message } = await authApi.register({
+            identify: {
                 name: name.toString(),
                 email: emailStr,
                 password: password.toString(),
-            })
-        }));
+            }
+        } as any);
         if (!success || !data) {
             toast({ title: message || locale.RegisterFailed, color: "danger" });
             return;

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
-import { GiftCardRouter } from "../../../api/instance";
+import { giftCardApi } from "../../../api/instance";
 
 export default function GiftCardModal({
     isOpen,
@@ -23,10 +23,7 @@ export default function GiftCardModal({
         setActivating(true);
         setError("");
         try {
-            const res = await GiftCardRouter.redeem({
-                auth: localStorage.getItem("access_token") || "",
-                code: code.trim(),
-            });
+            const res = await giftCardApi.redeem({ code: code.trim() } as any);
             if (res.success) {
                 setCode("");
                 setError(`Redeemed successfully! +${res.data?.token_amount || 0} tokens`);
