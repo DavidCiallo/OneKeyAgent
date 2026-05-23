@@ -1,14 +1,13 @@
 import { Header } from "../../components/header/Header";
 import { useEffect, useState, useCallback } from "react";
-import { AccountDTO, AccountListRequest, AccountCreateRequest, AccountCreateBody, AccountUpdateRequest, AccountUpdateBody, AccountDeleteRequest, AccountQueryBody } from "../../../shared/modules/account/account.interface";
-import { AccountRouter, RoleRouter } from "../../api/instance";
+import { AccountDTO } from "../../../shared/modules/account/account.interface";
+import { accountApi, roleApi } from "../../api/instance";
 import { Locale } from "../../methods/locale";
 import { useDisclosure } from "@heroui/react";
 import { AccountFilter } from "./components/AccountFilter";
 import { AccountTable } from "./components/AccountTable";
 import { AccountPagination } from "./components/AccountPagination";
 import { AccountFormModal, permToKey } from "./components/AccountFormModal";
-import { AssignRolesRequest, AssignRolesBody, AccountRolesRequest } from "../../../shared/modules/role/role.interface";
 
 type AccountForm = {
     name: string;
@@ -33,15 +32,12 @@ export default function AccountPage() {
     const [editId, setEditId] = useState<string>("");
     const [form, setForm] = useState<AccountForm>({ name: "", email: "", password: "", is_admin: 0, permissions: [] });
 
-    const getToken = () => localStorage.getItem("access_token") || "";
-
     const fetchList = useCallback(async (p: number) => {
         const filter: Record<string, string> = {};
         if (filterName) filter.name = filterName;
         if (filterEmail) filter.email = filterEmail;
 
-        const req = new AccountListRequest({ page: p, filter: new AccountQueryBody(filter), auth: getToken() });
-        const res = await AccountRouter.list(req);
+        const res = await accountApi.list({ page: p, filter } as any);
         if (res.success && res.data) {
             setList(res?.data?.list.sort((a, _) => a.is_admin ? -1 : 1));
             setTotal(res.data.total);
@@ -67,7 +63,7 @@ export default function AccountPage() {
         let permissions: string[] = [];
         if (!item.is_admin) {
             try {
-                const rolesRes = await RoleRouter.account_roles(new AccountRolesRequest({ account_id: item.id, auth: getToken() }));
+                const rolesRes = await roleApi.account_roles({ account_id: item.id } as any);
                 if (rolesRes.success && rolesRes.data) {
                     permissions = rolesRes.data.roles.map(r => permToKey({ name: r.name, type: r.type }));
                 }
@@ -78,31 +74,28 @@ export default function AccountPage() {
         onFormOpen();
     };
 
-    const assignPermissions = async (accountId: string, perms: string[]) => {
+    const assignPermissions = async (account_id: string, perms: string[]) => {
         const permissions = perms.map(key => {
             const [type, name] = key.split(":");
             return { name, type };
         });
-        await RoleRouter.assign(new AssignRolesRequest({
-            account_id: accountId,
-            roles: new AssignRolesBody({ permissions }),
-            auth: getToken(),
-        }));
+        await roleApi.assign({
+            account_id,
+            roles: { permissions },
+        } as any);
     };
 
     const handleFormConfirm = async () => {
         if (formMode === "create") {
-            const req = new AccountCreateRequest({
-                account: new AccountCreateBody({
+            const res = await accountApi.create({
+                account: {
                     name: form.name,
                     email: form.email,
                     password: form.password,
-                    apiKey: "",
+                    api_key: "",
                     is_admin: 0,
-                }),
-                auth: getToken(),
-            });
-            const res = await AccountRouter.create(req);
+                },
+            } as any);
             if (res.success && res.data?.account) {
                 if (!form.is_admin && form.permissions.length > 0) {
                     await assignPermissions(res.data.account.id, form.permissions);
@@ -118,12 +111,10 @@ export default function AccountPage() {
             if (form.password) updateData.password = form.password;
             updateData.is_admin = form.is_admin;
 
-            const req = new AccountUpdateRequest({
+            const res = await accountApi.update({
                 id: editId,
-                account: new AccountUpdateBody(updateData),
-                auth: getToken(),
-            });
-            const res = await AccountRouter.update(req);
+                account: updateData,
+            } as any);
             if (res.success) {
                 await assignPermissions(editId, form.permissions);
                 onFormClose();
@@ -133,8 +124,7 @@ export default function AccountPage() {
     };
 
     const handleDelete = async (id: string) => {
-        const req = new AccountDeleteRequest({ id, auth: getToken() });
-        const res = await AccountRouter.delete(req);
+        const res = await accountApi.delete({ id } as any);
         if (res.success) {
             fetchList(page);
         }

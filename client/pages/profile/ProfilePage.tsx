@@ -1,9 +1,7 @@
 import { Header } from "../../components/header/Header";
 import { useEffect, useState, useCallback } from "react";
-import { AccountRouter, AiRouter, AuthRouter } from "../../api/instance";
+import { accountApi, aiApi, authApi } from "../../api/instance";
 import { Locale } from "../../methods/locale";
-import { AccountProfileRequest, AccountRegenerateRequest } from "../../../shared/modules/account/account.interface";
-import { ModelsRequest } from "../../../shared/modules/ai/ai.interface";
 import { AccountDTO } from "../../../shared/modules/account/account.interface";
 import AccountInfoCard from "./components/AccountInfoCard";
 import ApiKeyCard from "./components/ApiKeyCard";
@@ -13,7 +11,6 @@ import { useDisclosure } from "@heroui/react";
 
 export default function ProfilePage() {
     const menuLocale = Locale("Menu");
-    const getToken = () => localStorage.getItem("access_token") || "";
 
     const [account, setAccount] = useState<AccountDTO | null>(null);
     const [balance, setBalance] = useState(0);
@@ -23,7 +20,7 @@ export default function ProfilePage() {
     const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onClose: onConfirmClose, onOpenChange: onConfirmChange } = useDisclosure();
 
     const fetchProfile = useCallback(async () => {
-        const res = await AccountRouter.profile(new AccountProfileRequest({ auth: getToken() }));
+        const res = await accountApi.profile({} as any);
         if (res.success && res.data?.account) {
             setAccount(res.data.account);
             setBalance(res.data.balance ?? 0);
@@ -32,7 +29,7 @@ export default function ProfilePage() {
     }, []);
 
     const fetchModels = useCallback(async () => {
-        const res = await AiRouter.models(new ModelsRequest({ auth: getToken() }));
+        const res = await aiApi.models({} as any);
         if (res.success && res.data) {
             const allModels = res.data.map((m: any) => ({ id: m.id, input_price: m.input_price, output_price: m.output_price }));
             setModels(allModels);
@@ -44,7 +41,7 @@ export default function ProfilePage() {
         const signDate = localStorage.getItem("sign_date");
         const today = new Date().toDateString();
         if (signDate === today) return;
-        const res = await AuthRouter.daily({ auth: getToken() });
+        const res = await authApi.daily({} as any);
         if (res.success && res.data?.amount && res.data.amount > 0) {
             localStorage.setItem("sign_date", today);
             fetchProfile();
@@ -64,7 +61,7 @@ export default function ProfilePage() {
         onConfirmClose();
         setRegenerating(true);
         try {
-            const res = await AccountRouter.regenerate(new AccountRegenerateRequest({ auth: getToken() }));
+            const res = await accountApi.regenerate({} as any);
             if (res.success && res.data) {
                 await fetchProfile();
             }
@@ -88,7 +85,7 @@ export default function ProfilePage() {
                 <div className="max-w-2xl mx-auto space-y-6">
                     <AccountInfoCard account={account} weeklyUsage={weeklyUsage} balance={balance} />
                     <ApiKeyCard
-                        apiKey={account.apiKey}
+                        api_key={account.api_key}
                         regenerating={regenerating}
                         onConfirmOpen={onConfirmOpen}
                         endpoint={endpoint}

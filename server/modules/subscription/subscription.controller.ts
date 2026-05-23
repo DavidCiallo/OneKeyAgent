@@ -1,12 +1,11 @@
 import {
-    TransactionListRequest, TransactionListResponse,
-    SubscriptionTopupRequest, SubscriptionTopupResponse,
+    TransactionListRequest,
+    SubscriptionTopupRequest,
     TransactionDTO,
-    StatementRequest, StatementResponse, StatementItem,
+    StatementRequest, StatementItem,
     PaymentCurrency,
 } from "../../../shared/modules/subscription_record/subscription_record.interface";
-import { TransactionRouterInstance } from "../../../shared/modules/subscription_record/subscription_record.router";
-import { inject } from "../../lib/inject";
+import { subscriptionRoutes } from "../../../shared/modules/subscription_record/subscription_record.router";
 import { getIdentifyByVerify, getAccountByEmail } from "../auth/auth.service";
 import { SubscriptionService } from "./subscription.service";
 import { createInvoice } from "./nowpayments.service";
@@ -32,8 +31,8 @@ async function resolveAccount(auth: string) {
 // ─── Rate limiter ───
 
 const requestCounts = new Map<string, { count: number; windowStart: number }>();
-const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
-const RATE_LIMIT_MAX = 6; // max requests per window
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 6;
 
 async function checkRateLimit(key: string): Promise<boolean> {
     const now = Date.now();
@@ -44,15 +43,12 @@ async function checkRateLimit(key: string): Promise<boolean> {
         return true;
     }
 
-    if (entry.count >= RATE_LIMIT_MAX) {
-        return false;
-    }
+    if (entry.count >= RATE_LIMIT_MAX) return false;
 
     entry.count++;
     return true;
 }
 
-// Clean up stale entries every 2 minutes
 setInterval(() => {
     const now = Date.now();
     for (const [key, entry] of requestCounts) {
@@ -64,39 +60,25 @@ setInterval(() => {
 
 // ─── Record routes ───
 
-async function records(request: TransactionListRequest): Promise<TransactionListResponse> {
+async function records(request: TransactionListRequest) {
     request = TransactionListRequest.self(request);
     const account = await resolveAccount(request.auth || "");
     const data = await SubscriptionService.getRecordsByAccount(account.id);
     const list = data.map(item => new TransactionDTO(item));
-    return new TransactionListResponse({
-        success: true,
-        message: "success",
-        data: { list },
-    });
+    return { list };
 }
 
-/**
- * Create a top-up invoice.
- * User purchases raw tokens at a flat rate (1 USD per token).
- */
-async function createtopup(request: SubscriptionTopupRequest): Promise<SubscriptionTopupResponse> {
+async function createtopup(request: SubscriptionTopupRequest) {
     request = SubscriptionTopupRequest.self(request);
     const account = await resolveAccount(request.auth || "");
 
-    // Rate limit: max 6 requests per minute per account
     if (!(await checkRateLimit(`createtopup:${account.id}`))) {
-        return new SubscriptionTopupResponse({
-            success: false,
-            message: "Too many requests, please try again later",
-            data: { invoice_url: "", payment_id: "", token_amount: 0, price_dollars: 0 },
-        });
+        throw "Too many requests, please try again later";
     }
 
     const tokenAmount = request.token_amount || 0;
     if (tokenAmount <= 0) throw new Error("token_amount must be positive");
 
-    // 1 token = 1 USD
     const finalPrice = tokenAmount;
 
     const payCurrency = (request.pay_currency as PaymentCurrency) || "USDTERC20";
@@ -106,7 +88,6 @@ async function createtopup(request: SubscriptionTopupRequest): Promise<Subscript
         payCurrency,
     );
 
-    // Create a pending record
     await SubscriptionService.createRecord({
         account_id: account.id,
         txid: invoice_id,
@@ -116,36 +97,29 @@ async function createtopup(request: SubscriptionTopupRequest): Promise<Subscript
         type: "topup",
     });
 
-    return new SubscriptionTopupResponse({
-        success: true,
-        message: "success",
-        data: { invoice_url, payment_id, token_amount: tokenAmount, price_dollars: finalPrice },
-    });
+    return { invoice_url, payment_id, token_amount: tokenAmount, price_dollars: finalPrice };
 }
 
 // ─── Statement (unified balance history) ───
 
-async function statement(request: StatementRequest): Promise<StatementResponse> {
+async function statement(request: StatementRequest) {
     request = StatementRequest.self(request);
     const account = await resolveAccount(request.auth || "");
 
-    // 1. Confirmed topup transactions
     const txRepo = Repository.instance<any>("Transaction");
     const txs = await txRepo.find({ account_id: account.id, status: "confirmed", delete_time: null });
 
-    // 2. Redeemed gift cards (bonus & redeemed codes)
-    const cardRepo = Repository.instance<any>("GiftCard");
+    const cardRepo = Repository.instance<any>("gift_card");
     const cards = await cardRepo.find({ redeemed_by: account.id, status: "redeemed" });
 
-    // 3. Usage logs (AI call costs) — grouped by day + model
-    const usageRepo = Repository.instance<any>("UsageLog");
-    const usageLogs = await usageRepo.find({ accountId: account.id, delete_time: null });
+    const usageRepo = Repository.instance<any>("usage_log");
+    const usageLogs = await usageRepo.find({ account_id: account.id, delete_time: null });
 
-    // Group by "day|modelAlias"
+    // Group by "day|model_alias"
     const dailyModelUsage = new Map<string, { logs: any[]; maxTimestamp: number }>();
     for (const log of usageLogs) {
-        const day = new Date(log.create_time).toISOString().slice(0, 10); // "2026-05-12"
-        const model = log.modelAlias || "Unknown";
+        const day = new Date(log.create_time).toISOString().slice(0, 10);
+        const model = log.model_alias || "Unknown";
         const key = `${day}|${model}`;
         if (!dailyModelUsage.has(key)) {
             dailyModelUsage.set(key, { logs: [], maxTimestamp: 0 });
@@ -201,7 +175,6 @@ async function statement(request: StatementRequest): Promise<StatementResponse> 
         }
     }
 
-    // One entry per day per model
     for (const [key, entry] of dailyModelUsage) {
         const model = key.split("|")[1];
         items.push(new StatementItem({
@@ -214,14 +187,9 @@ async function statement(request: StatementRequest): Promise<StatementResponse> 
         }));
     }
 
-    // Sort by time descending (most recent first)
     items.sort((a, b) => b.create_time - a.create_time);
 
-    return new StatementResponse({
-        success: true,
-        message: "success",
-        data: { list: items },
-    });
+    return { list: items };
 }
 
 /**
@@ -229,7 +197,6 @@ async function statement(request: StatementRequest): Promise<StatementResponse> 
  * NowPayments POSTs here when payment status changes.
  */
 async function ipnwebhook(request: Record<string, unknown>): Promise<{ success: boolean; message: string }> {
-    // Verify NowPayments HMAC signature — required when IPN secret is configured
     const rawBody = (request as any).__raw_body as string || "";
     const headers = (request as any).__headers as Record<string, string> || {};
     const signature = headers["x-nowpayments-sig"] || headers["x-nowpayments-signature"] || "";
@@ -273,7 +240,6 @@ async function ipnwebhook(request: Record<string, unknown>): Promise<{ success: 
                 confirmations: 1,
             });
 
-            // Update account balance atomically
             await AccountService.updateBalance(record.account_id, record.amount);
 
             console.log(`[IPN] Account ${record.account_id} topped up ${record.amount} tokens`);
@@ -288,12 +254,7 @@ async function ipnwebhook(request: Record<string, unknown>): Promise<{ success: 
     }
 }
 
-// ─── Export controllers ───
-
-export const subscriptionRecordController = new TransactionRouterInstance(inject, {
-    records,
-    createtopup,
-    ipnwebhook,
-    statement,
-});
-
+export const subscriptionMount = {
+    routes: subscriptionRoutes,
+    handlers: { records, createtopup, ipnwebhook, statement },
+};

@@ -1,6 +1,3 @@
-import { eq, and, isNull, sql } from "drizzle-orm";
-import { db } from "../../lib/migrate";
-import { accountTable } from "../../../shared/modules/account/account.schema";
 import Repository from "../../lib/repository";
 import { AccountEntity } from "../../../shared/modules/account/account.entity";
 import { generateApiKey } from "../ai/ai.auth";
@@ -49,31 +46,26 @@ export class AccountService {
     }
 
     /** Sum usage costs for a set of logs using the same formula everywhere */
-    static computeUsageCost(logs: { inputTokens: number; outputTokens: number; inputPrice?: number; outputPrice?: number }[]): number {
+    static computeUsageCost(logs: { input_tokens: number; output_tokens: number; input_price?: number; output_price?: number }[]): number {
         let total = 0;
         for (const log of logs) {
-            total += (log.inputTokens * (log.inputPrice || 0) + log.outputTokens * (log.outputPrice || 0)) / 1_000_000;
+            total += (log.input_tokens * (log.input_price || 0) + log.output_tokens * (log.output_price || 0)) / 1_000_000;
         }
         return Math.round(total * 1_000_000) / 1_000_000;
     }
 
     /** Atomically update account balance by delta */
-    static async updateBalance(accountId: string, delta: number): Promise<void> {
+    static async updateBalance(account_id: string, delta: number): Promise<void> {
         if (delta === 0) return;
-        const now = Date.now();
-        await db
-            .update(accountTable)
-            .set({
-                balance: sql`${accountTable.balance} + ${delta}`,
-                update_time: now,
-            })
-            .where(and(eq(accountTable.id, accountId), isNull(accountTable.delete_time)))
-            .execute();
+        await accountRepository.atomicPatch({ id: account_id }, (row) => {
+            if (!row) return null;
+            return { balance: (row.balance || 0) + delta };
+        });
     }
 
     /** Get account balance from persisted field */
-    static async getBalance(accountId: string): Promise<number> {
-        const account = await this.findOne(accountId);
+    static async getBalance(account_id: string): Promise<number> {
+        const account = await this.findOne(account_id);
         return account?.balance ?? 0;
     }
 
@@ -94,17 +86,17 @@ export class AccountService {
     }
 
     /** Compute balance from transactions + gift cards - usage costs (original aggregation) */
-    static async computeBalance(accountId: string): Promise<number> {
+    static async computeBalance(account_id: string): Promise<number> {
         const txRepo = Repository.instance<any>("Transaction");
-        const transactions = await txRepo.find({ account_id: accountId, status: "confirmed", delete_time: null });
+        const transactions = await txRepo.find({ account_id: account_id, status: "confirmed", delete_time: null });
         const txTotal = transactions.reduce((sum: number, t: any) => sum + (t.amount || 0), 0);
 
-        const cardRepo = Repository.instance<any>("GiftCard");
-        const giftCards = await cardRepo.find({ redeemed_by: accountId, status: "redeemed" });
+        const cardRepo = Repository.instance<any>("gift_card");
+        const giftCards = await cardRepo.find({ redeemed_by: account_id, status: "redeemed" });
         const gcTotal = giftCards.reduce((sum: number, c: any) => sum + (c.token_amount || 0), 0);
 
-        const usageRepo = Repository.instance<any>("UsageLog");
-        const usageLogs = await usageRepo.find({ accountId, delete_time: null });
+        const usageRepo = Repository.instance<any>("usage_log");
+        const usageLogs = await usageRepo.find({ account_id: account_id, delete_time: null });
 
         return txTotal + gcTotal - this.computeUsageCost(usageLogs);
     }

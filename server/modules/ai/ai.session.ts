@@ -5,7 +5,7 @@ import { UsageLogEntity } from "../../../shared/modules/usage/usage.entity";
 
 const modelRepo = Repository.instance<ModelEntity>("Model");
 const providerRepo = Repository.instance<ProviderEntity>("Provider");
-const usageRepo = Repository.instance<UsageLogEntity>("UsageLog");
+const usageRepo = Repository.instance<UsageLogEntity>("usage_log");
 
 /** Ensure the 'hex' model exists in the database */
 export async function seedDefaultModel() {
@@ -18,13 +18,13 @@ export async function seedDefaultModel() {
 }
 
 export async function logUsage(usage: {
-    accountId: string,
-    modelAlias: string,
-    providerId?: string,
-    inputTokens: number,
-    outputTokens: number,
-    inputPrice: number,
-    outputPrice: number,
+    account_id: string,
+    model_alias: string,
+    provider_id?: string,
+    input_tokens: number,
+    output_tokens: number,
+    input_price: number,
+    output_price: number,
 }) {
     await usageRepo.insert(usage);
 }

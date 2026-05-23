@@ -3,7 +3,7 @@ import Repository from "../../lib/repository";
 import { GiftCardEntity } from "../../../shared/modules/gift_card/gift_card.entity";
 import { AccountService } from "../account/account.service";
 
-const cardRepo = Repository.instance<GiftCardEntity>("GiftCard");
+const cardRepo = Repository.instance<GiftCardEntity>("gift_card");
 
 export class GiftCardService {
 
@@ -35,19 +35,19 @@ export class GiftCardService {
 
     // ─── Redeem a gift card ───
 
-    static async redeem(card: GiftCardEntity, accountId: string): Promise<void> {
+    static async redeem(card: GiftCardEntity, account_id: string): Promise<void> {
         const now = Date.now();
 
         // Mark card as redeemed
         await cardRepo.update({ id: card.id }, {
             status: "redeemed",
-            redeemed_by: accountId,
+            redeemed_by: account_id,
             redeemed_at: now,
             update_time: now,
         });
 
         // Update account balance atomically
-        await AccountService.updateBalance(accountId, card.token_amount);
+        await AccountService.updateBalance(account_id, card.token_amount);
     }
 
     // ─── Hard delete expired unused cards ───

@@ -1,73 +1,68 @@
-import { BaseRouterInstance } from "../../shared/lib/default/decorator";
 import path from "path";
 
-export async function mounthttp(req: Request, controllers: BaseRouterInstance[]): Promise<Response | null> {
+export interface RouteMount {
+    routes: { base: string; prefix: string; [key: string]: any };
+    handlers: Record<string, Function>;
+}
+
+export async function mounthttp(req: Request, mounts: RouteMount[]): Promise<Response | null> {
     const url = new URL(req.url);
     const pathName = url.pathname;
     const method = req.method.toLowerCase();
-    for (const controller of controllers) {
-        const { base, prefix, router } = controller;
-        for (const item of router) {
-            const { path, handler } = item;
-            const fullPath = `${base}${prefix}${path}`;
 
-            if (pathName === fullPath) {
-                const auth = req.headers.get("token") || req.headers.get("x-api-key") || req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
-                let requestBody: Record<string, any> | null = {};
-                try {
-                    const contentType = req.headers.get("content-type") || "";
-                    const rawHeaders = Object.fromEntries(req.headers.entries());
-                    const rawBody = await req.text();
-                    if (contentType.includes("application/json")) {
+    for (const mount of mounts) {
+        const { routes, handlers } = mount;
+        for (const [key, val] of Object.entries(routes)) {
+            if (key === "base" || key === "prefix") continue;
+            const route = val as any;
+            const fullPath = `${routes.base}${routes.prefix}${route.path}`;
+
+            if (pathName !== fullPath) continue;
+
+            const handler = handlers[key];
+            if (!handler) continue;
+
+            const auth = req.headers.get("token") || req.headers.get("x-api-key") || req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
+            let requestBody: Record<string, any> | null = {};
+            try {
+                const contentType = req.headers.get("content-type") || "";
+                const rawHeaders = Object.fromEntries(req.headers.entries());
+                const rawBody = await req.text();
+                if (contentType.includes("application/json")) {
+                    requestBody = JSON.parse(rawBody);
+                } else if (contentType.includes("application/x-www-form-urlencoded")) {
+                    const params = new URLSearchParams(rawBody);
+                    requestBody = Object.fromEntries(params.entries());
+                } else {
+                    try {
                         requestBody = JSON.parse(rawBody);
-                    } else if (contentType.includes("application/x-www-form-urlencoded")) {
+                    } catch {
                         const params = new URLSearchParams(rawBody);
                         requestBody = Object.fromEntries(params.entries());
-                    } else {
-                        try {
-                            requestBody = JSON.parse(rawBody);
-                        } catch {
-                            const params = new URLSearchParams(rawBody);
-                            requestBody = Object.fromEntries(params.entries());
-                        }
                     }
-                    // 注入原始请求头和 body，供 webhook 签名验证使用
-                    (requestBody as any).__raw_body = rawBody;
-                    (requestBody as any).__headers = rawHeaders;
-                } catch (e) {
-                    requestBody = null;
                 }
-                let requertQuery: Record<string, string> | null = {};
-                try {
-                    requertQuery = Object.fromEntries(url.searchParams.entries());
-                } catch {
-                    requertQuery = {};
+                (requestBody as any).__raw_body = rawBody;
+                (requestBody as any).__headers = rawHeaders;
+            } catch (e) {
+                requestBody = null;
+            }
+            let requertQuery: Record<string, string> | null = {};
+            try {
+                requertQuery = Object.fromEntries(url.searchParams.entries());
+            } catch {
+                requertQuery = {};
+            }
+            try {
+                const result = handler && (await handler({ ...requertQuery, ...requestBody, auth }));
+
+                // 如果 handler 直接返回了 Response 对象 (如 stream)，透传
+                if (result instanceof Response || (result && result.constructor?.name === "Response")) {
+                    return result as any;
                 }
-                try {
-                    const result = handler && (await handler({ ...requertQuery, ...requestBody, auth }));
 
-                    // 如果 handler 直接返回了 Response 对象 (如 stream)，透传
-                    if (result instanceof Response || (result && result.constructor?.name === "Response")) {
-                        return result as any;
-                    }
-
-                    const response = new Response(JSON.stringify(result), {
-                        headers: {
-                            "Content-Type": "application/json",
-                            "Access-Control-Allow-Origin": "*",
-                            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                            "Access-Control-Allow-Headers": "Content-Type, token, Authorization",
-                        },
-                    });
-                    return response;
-                } catch (error: any) {
-                    console.error(`Error in handler for ${fullPath}:`, error);
-                    return new Response(JSON.stringify({
-                        success: false,
-                        message: error?.message || error?.toString() || "Internal server error",
-                        data: null
-                    }), {
-                        status: 400,
+                // raw 路由 (AI APIs, webhooks) — 直接透传结果，不包装
+                if (route.raw) {
+                    return new Response(JSON.stringify(result), {
                         headers: {
                             "Content-Type": "application/json",
                             "Access-Control-Allow-Origin": "*",
@@ -76,6 +71,34 @@ export async function mounthttp(req: Request, controllers: BaseRouterInstance[])
                         },
                     });
                 }
+
+                // Auto-wrap: handler returns data, we wrap in { success: true, data: ... }
+                return new Response(JSON.stringify({
+                    success: true,
+                    data: result,
+                }), {
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                        "Access-Control-Allow-Headers": "Content-Type, token, Authorization",
+                    },
+                });
+            } catch (error: any) {
+                console.error(`Error in handler for ${fullPath}:`, error);
+                return new Response(JSON.stringify({
+                    success: false,
+                    message: error?.message || error?.toString() || "Internal server error",
+                    data: null
+                }), {
+                    status: 400,
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                        "Access-Control-Allow-Headers": "Content-Type, token, Authorization",
+                    },
+                });
             }
         }
     }

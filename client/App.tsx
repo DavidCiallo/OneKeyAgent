@@ -15,8 +15,7 @@ import TermsPage from "./pages/terms/TermsPage";
 import NoContentPage from "./pages/nocontent/NoContentPage";
 import SubscriptionPage from "./pages/subscription/SubscriptionPage";
 import SettingsPage from "./pages/settings/SettingsPage";
-import { AuthRouter } from "./api/instance";
-import { AliveRequest } from "../shared/modules/auth/auth.interface";
+import { authApi } from "./api/instance";
 import { AuthProvider, useAuth } from "./methods/auth-context";
 
 const PrivateRoute = ({ redirectPath = "/auth" }) => {
@@ -29,7 +28,7 @@ const PrivateRoute = ({ redirectPath = "/auth" }) => {
             resetAuth();
             return;
         }
-        AuthRouter.alive(new AliveRequest({ auth: localStorage.getItem("access_token")! })).then(({ success, data }) => {
+        authApi.alive({}).then(({ success, data }) => {
             if (!success) {
                 clearAuthData();
                 resetAuth();

@@ -1,4 +1,3 @@
-import { BaseRouterInstance } from "../../lib/default/decorator";
 import {
     ModelListRequest,
     ModelListResponse,
@@ -12,31 +11,12 @@ import {
     ModelDeleteResponse,
 } from "./model.interface";
 
-export class ModelRouterInstance extends BaseRouterInstance {
-    base = "/api";
-    prefix = "/model";
-    router = [
-        { path: "/list", handler: Function },
-        { path: "/detail", handler: Function },
-        { path: "/create", handler: Function },
-        { path: "/update", handler: Function },
-        { path: "/delete", handler: Function },
-    ];
-
-    list!: (query: ModelListRequest) => Promise<ModelListResponse>;
-    detail!: (query: ModelDetailRequest) => Promise<ModelDetailResponse>;
-    create!: (body: ModelCreateRequest) => Promise<ModelCreateResponse>;
-    update!: (body: ModelUpdateRequest) => Promise<ModelUpdateResponse>;
-    delete!: (body: ModelDeleteRequest) => Promise<ModelDeleteResponse>;
-
-    constructor(inject: Function, functions?: {
-        list: (query: ModelListRequest) => Promise<ModelListResponse>,
-        detail: (query: ModelDetailRequest) => Promise<ModelDetailResponse>,
-        create: (body: ModelCreateRequest) => Promise<ModelCreateResponse>,
-        update: (body: ModelUpdateRequest) => Promise<ModelUpdateResponse>,
-        delete: (body: ModelDeleteRequest) => Promise<ModelDeleteResponse>
-    }) {
-        super();
-        inject(this, functions);
-    }
-}
+export const modelRoutes = {
+    base: "/api",
+    prefix: "/model",
+    list:   { path: "/list",   request: {} as ModelListRequest,   response: {} as ModelListResponse },
+    detail: { path: "/detail", request: {} as ModelDetailRequest, response: {} as ModelDetailResponse },
+    create: { path: "/create", request: {} as ModelCreateRequest, response: {} as ModelCreateResponse },
+    update: { path: "/update", request: {} as ModelUpdateRequest, response: {} as ModelUpdateResponse },
+    delete: { path: "/delete", request: {} as ModelDeleteRequest, response: {} as ModelDeleteResponse },
+} as const;

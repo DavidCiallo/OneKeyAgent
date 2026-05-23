@@ -2,15 +2,15 @@ import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input
 import { Locale } from "../../../methods/locale";
 
 type ProviderForm = {
-    modelAlias: string;
+    model_alias: string;
     priority: number;
     name: string;
-    baseURL: string;
+    base_url: string;
     model: string;
-    apiKey?: string;
-    authType: string;
-    apiType: string;
-    proxyURL?: string;
+    api_key?: string;
+    auth_type: string;
+    api_type: string;
+    proxy_url?: string;
     enabled: number;
 };
 
@@ -35,8 +35,8 @@ export function ProviderFormModal({ isOpen, onOpenChange, mode, form, onFormChan
                     <div className="flex flex-col gap-3">
                         <Input
                             label={locale.ModelAlias}
-                            value={form.modelAlias}
-                            onChange={e => onFormChange({ ...form, modelAlias: e.target.value })}
+                            value={form.model_alias}
+                            onChange={e => onFormChange({ ...form, model_alias: e.target.value })}
                             isRequired
                         />
                         <Select
@@ -58,8 +58,8 @@ export function ProviderFormModal({ isOpen, onOpenChange, mode, form, onFormChan
                         />
                         <Input
                             label={locale.BaseURL}
-                            value={form.baseURL}
-                            onChange={e => onFormChange({ ...form, baseURL: e.target.value })}
+                            value={form.base_url}
+                            onChange={e => onFormChange({ ...form, base_url: e.target.value })}
                             isRequired
                         />
                         <Input
@@ -70,29 +70,29 @@ export function ProviderFormModal({ isOpen, onOpenChange, mode, form, onFormChan
                         />
                         <Input
                             label={locale.ApiKey}
-                            value={form.apiKey || ""}
-                            onChange={e => onFormChange({ ...form, apiKey: e.target.value })}
+                            value={form.api_key || ""}
+                            onChange={e => onFormChange({ ...form, api_key: e.target.value })}
                         />
                         <Select
                             label={locale.AuthType}
-                            selectedKeys={[form.authType]}
-                            onChange={e => onFormChange({ ...form, authType: e.target.value })}
+                            selectedKeys={[form.auth_type]}
+                            onChange={e => onFormChange({ ...form, auth_type: e.target.value })}
                         >
                             <SelectItem key="bearer">Bearer</SelectItem>
                             <SelectItem key="custom">Custom</SelectItem>
                         </Select>
                         <Select
                             label={locale.ApiType}
-                            selectedKeys={[form.apiType]}
-                            onChange={e => onFormChange({ ...form, apiType: e.target.value })}
+                            selectedKeys={[form.api_type]}
+                            onChange={e => onFormChange({ ...form, api_type: e.target.value })}
                         >
                             <SelectItem key="openai">OpenAI</SelectItem>
                             <SelectItem key="anthropic">Anthropic</SelectItem>
                         </Select>
                         <Input
                             label={locale.ProxyURL}
-                            value={form.proxyURL || ""}
-                            onChange={e => onFormChange({ ...form, proxyURL: e.target.value })}
+                            value={form.proxy_url || ""}
+                            onChange={e => onFormChange({ ...form, proxy_url: e.target.value })}
                         />
                         <div className="flex flex-row items-center gap-2">
                             <span className="text-sm">{locale.Enabled}</span>

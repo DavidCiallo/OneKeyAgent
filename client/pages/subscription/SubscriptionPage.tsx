@@ -1,8 +1,6 @@
 import { Header } from "../../components/header/Header";
 import { useEffect, useState, useCallback } from "react";
-import { AccountRouter, TransactionRouter } from "../../api/instance";
-import { AccountProfileRequest } from "../../../shared/modules/account/account.interface";
-import { StatementRequest } from "../../../shared/modules/subscription_record/subscription_record.interface";
+import { accountApi, subscriptionApi } from "../../api/instance";
 import { Locale } from "../../methods/locale";
 import CurrentPlanCard from "./components/CurrentPlanCard";
 import PlanSelector from "./components/PlanSelector";
@@ -19,7 +17,6 @@ interface StatementRecord {
 
 export default function SubscriptionPage() {
     const menuLocale = Locale("Menu");
-    const getToken = () => localStorage.getItem("access_token") || "";
 
     const [account, setAccount] = useState<{
         name: string;
@@ -30,14 +27,14 @@ export default function SubscriptionPage() {
     const [refreshing, setRefreshing] = useState(false);
 
     const fetchProfile = useCallback(async () => {
-        const res = await AccountRouter.profile(new AccountProfileRequest({ auth: getToken() }));
+        const res = await accountApi.profile({} as any);
         if (res.success && res.data?.account) {
             setAccount({ ...res.data.account, balance: res.data.balance });
         }
     }, []);
 
     const fetchRecords = useCallback(async () => {
-        const res = await TransactionRouter.statement(new StatementRequest({ auth: getToken() }));
+        const res = await subscriptionApi.statement({} as any);
         if (res.success && res.data) {
             setRecords(res.data.list || []);
         }

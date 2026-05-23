@@ -11,7 +11,7 @@ export function validateApiKey(key: string): boolean {
 
 export async function getAccountIdByApiKey(key: string): Promise<string | null> {
     if (!key) return null;
-    const account = await accountRepo.findOne({ apiKey: key });
+    const account = await accountRepo.findOne({ api_key: key });
     return account?.id || null;
 }
 

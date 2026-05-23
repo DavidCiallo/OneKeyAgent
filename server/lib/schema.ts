@@ -1,9 +1,0 @@
-export * from "../../shared/modules/account/account.schema";
-export * from "../../shared/modules/model/model.schema";
-export * from "../../shared/modules/usage/usage.schema";
-export * from "../../shared/modules/role/role.schema";
-export * from "../../shared/modules/provider/provider.schema";
-export * from "../../shared/modules/task/task.schema";
-export * from "../../shared/modules/subscription_record/subscription_record.schema"; // transactionTable
-export * from "../../shared/modules/gift_card/gift_card.schema";
-export * from "../../shared/modules/settings/settings.schema";

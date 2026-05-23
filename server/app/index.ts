@@ -1,7 +1,6 @@
 import { config } from "dotenv";
 import { fileURLToPath } from "url";
 import path from "path";
-import { runMigrations } from "../lib/migrate";
 import { initialize } from "./initialize";
 import { AccountService } from "../modules/account/account.service";
 import { seedDefaultModel } from "../modules/ai/ai.session";
@@ -9,23 +8,21 @@ import { startMonitor } from "../modules/subscription/monitor";
 
 config();
 
-runMigrations();
-
 const staticPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../dist");
 
 import { mounthttp, mountstatic } from "../lib/mount";
-import { authController } from "../modules/auth/auth.controller";
-import { aiController } from "../modules/ai/ai.controller";
-import { modelController } from "../modules/model/model.controller";
-import { usageController } from "../modules/usage/usage.controller";
-import { accountController } from "../modules/account/account.controller";
-import { roleController } from "../modules/role/role.controller";
-import { providerController } from "../modules/provider/provider.controller";
-import { taskController } from "../modules/task/task.controller";
-import { telegramController } from "../modules/telegram/telegram.controller";
-import { subscriptionRecordController } from "../modules/subscription/subscription.controller";
-import { giftCardController } from "../modules/subscription/gift_card.controller";
-import { settingsController } from "../modules/settings/settings.controller";
+import { authMount } from "../modules/auth/auth.controller";
+import { aiMount } from "../modules/ai/ai.controller";
+import { modelMount } from "../modules/model/model.controller";
+import { usageMount } from "../modules/usage/usage.controller";
+import { accountMount } from "../modules/account/account.controller";
+import { roleMount } from "../modules/role/role.controller";
+import { providerMount } from "../modules/provider/provider.controller";
+import { taskMount } from "../modules/task/task.controller";
+import { telegramMount } from "../modules/telegram/telegram.controller";
+import { subscriptionMount } from "../modules/subscription/subscription.controller";
+import { giftCardMount } from "../modules/subscription/gift_card.controller";
+import { settingsMount } from "../modules/settings/settings.controller";
 const PORT = parseInt(process.env.SERVER_PORT || "3300");
 await initialize();
 await AccountService.initBalances();
@@ -38,20 +35,20 @@ Bun.serve({
     async fetch(req: Request) {
         const url = new URL(req.url);
         const pathName = url.pathname;
-    
+
         const apiResponse = await mounthttp(req, [
-            authController,
-            aiController,
-            modelController,
-            usageController,
-            accountController,
-            roleController,
-            providerController,
-            taskController,
-            telegramController,
-            subscriptionRecordController,
-            giftCardController,
-            settingsController,
+            authMount,
+            aiMount,
+            modelMount,
+            usageMount,
+            accountMount,
+            roleMount,
+            providerMount,
+            taskMount,
+            telegramMount,
+            subscriptionMount,
+            giftCardMount,
+            settingsMount,
         ]);
         if (apiResponse) return apiResponse;
         const staticResponse = await mountstatic(staticPath, pathName);

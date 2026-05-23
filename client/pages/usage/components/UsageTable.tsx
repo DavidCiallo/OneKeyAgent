@@ -38,11 +38,11 @@ export function UsageTable({ list, total, page, onPageChange }: Props) {
                     <TableBody emptyContent={locale.NoData}>
                         {list.map(item => (
                             <TableRow key={item.id}>
-                                <TableCell className="max-w-xs truncate text-center">{stripEmail(item.accountName || "") || item.accountId || "—"}</TableCell>
-                                <TableCell className="text-center">{item.modelAlias || "—"}</TableCell>
+                                <TableCell className="max-w-xs truncate text-center">{stripEmail(item.accountName || "") || item.account_id || "—"}</TableCell>
+                                <TableCell className="text-center">{item.model_alias || "—"}</TableCell>
                                 <TableCell className="text-center">{item.providerName || "—"}</TableCell>
-                                <TableCell className="text-center">{item.inputTokens}</TableCell>
-                                <TableCell className="text-center">{item.outputTokens}</TableCell>
+                                <TableCell className="text-center">{item.input_tokens}</TableCell>
+                                <TableCell className="text-center">{item.output_tokens}</TableCell>
                                 <TableCell className="text-center">${item.cost.toFixed(4)}</TableCell>
                                 <TableCell className="text-center">{item.create_time ? new Date(item.create_time).toLocaleString() : "—"}</TableCell>
                             </TableRow>

@@ -1,8 +1,7 @@
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Checkbox, CheckboxGroup, Input } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
 import { useEffect, useState } from "react";
-import { AiRouter } from "../../../api/instance";
-import { ModelsRequest } from "../../../../shared/modules/ai/ai.interface";
+import { aiApi } from "../../../api/instance";
 
 type Permission = { name: string; type: string };
 
@@ -57,7 +56,7 @@ export function AccountFormModal({ isOpen, onOpenChange, mode, form, onFormChang
         if (isOpen && mode === "edit") {
             (async () => {
                 try {
-                    const res = await AiRouter.models(new ModelsRequest({ auth: "" }));
+                    const res = await aiApi.models({} as any);
                     if (res.success && res.data) {
                         setAllModels(res.data.map((m: any) => m.id));
                     }

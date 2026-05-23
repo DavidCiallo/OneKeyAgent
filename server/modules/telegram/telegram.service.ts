@@ -29,7 +29,7 @@ export class TelegramService {
             if (text.startsWith("/auth")) {
                 return await this.handleAuthCommand(chatId, text);
             }
-            await this.sendMessage(chatId, 'Please use /auth [apiKey] first');
+            await this.sendMessage(chatId, 'Please use /auth [api_key] first');
             return;
         }
 
@@ -41,12 +41,12 @@ export class TelegramService {
 
     static async handleAuthCommand(chatId: string, text: string): Promise<void> {
         const parts = text.trim().split(/\s+/);
-        const apiKey = parts.slice(1).join(" ");
-        if (!apiKey) {
-            await this.sendMessage(chatId, 'Usage: /auth [apiKey]');
+        const api_key = parts.slice(1).join(" ");
+        if (!api_key) {
+            await this.sendMessage(chatId, 'Usage: /auth [api_key]');
             return;
         }
-        const account = await accountRepo.findOne({ apiKey });
+        const account = await accountRepo.findOne({ api_key: api_key });
         if (!account) {
             await this.sendMessage(chatId, "Authentication failed, invalid API Key");
             return;
