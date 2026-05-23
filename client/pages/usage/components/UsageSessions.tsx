@@ -20,7 +20,7 @@ function getActiveProviders(
     for (const g of groups) {
         for (const s of g.sessions) {
             for (const pu of s.providerUsage) {
-                totals.set(pu.providerName, (totals.get(pu.providerName) || 0) + pu.inputTokens + pu.outputTokens);
+                totals.set(pu.providerName, (totals.get(pu.providerName) || 0) + pu.input_tokens + pu.output_tokens);
             }
         }
     }
@@ -53,7 +53,7 @@ function buildChartData(
         };
         const providerMap = new Map<string, number>();
         for (const pu of s.providerUsage) {
-            providerMap.set(pu.providerName, (providerMap.get(pu.providerName) || 0) + pu.inputTokens + pu.outputTokens);
+            providerMap.set(pu.providerName, (providerMap.get(pu.providerName) || 0) + pu.input_tokens + pu.output_tokens);
         }
         for (const p of providers) {
             row[p] = providerMap.get(p) || 0;
@@ -165,9 +165,9 @@ export function UsageSessions({ groups, totals, recentSessions, gapMinutes }: Pr
                                 <TableCell className="max-w-32 truncate text-center hidden md:table-cell">
                                     {stripEmail(session.accountName || "")}
                                 </TableCell>
-                                <TableCell className="font-semibold text-center max-w-28 truncate">{session.modelAliases.join(", ")}</TableCell>
-                                <TableCell className="hidden md:table-cell text-center font-mono">{fmtM(session.inputTokens)}</TableCell>
-                                <TableCell className="hidden md:table-cell text-center font-mono">{fmtK(session.outputTokens)}</TableCell>
+                                <TableCell className="font-semibold text-center max-w-28 truncate">{session.model_aliases.join(", ")}</TableCell>
+                                <TableCell className="hidden md:table-cell text-center font-mono">{fmtM(session.input_tokens)}</TableCell>
+                                <TableCell className="hidden md:table-cell text-center font-mono">{fmtK(session.output_tokens)}</TableCell>
                                 <TableCell className="text-center font-mono">${session.cost?.toFixed(4) || "0"}</TableCell>
                             </TableRow>
                         ))}

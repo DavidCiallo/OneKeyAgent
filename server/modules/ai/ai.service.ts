@@ -14,19 +14,19 @@ import { toAnthropicBody, anthropicToOpenAI, antMessagesToOpenAI, openAIToAntMes
 import Repository from "../../lib/repository";
 
 /** Calculate cost in USDT for a request */
-function calculateCost(inputTokens: number, outputTokens: number, inputPrice: number, outputPrice: number): number {
-    // inputPrice/outputPrice are in dollars per 1M tokens
-    const cost = (inputTokens * inputPrice + outputTokens * outputPrice) / 1_000_000;
+function calculateCost(input_tokens: number, output_tokens: number, input_price: number, output_price: number): number {
+    // input_price/output_price are in dollars per 1M tokens
+    const cost = (input_tokens * input_price + output_tokens * output_price) / 1_000_000;
     return Math.round(cost * 1_000_000) / 1_000_000; // 6 decimal precision
 }
 
 const WEEKLY_LIMIT = 100; // $100 per week
 
 /** Get total weekly spending for an account */
-async function getWeeklySpending(accountId: string): Promise<number> {
+async function getWeeklySpending(account_id: string): Promise<number> {
     const since = Date.now() - 7 * 86400000;
     const repo = Repository.instance<any>("usage_log");
-    const logs = await repo.find({ account_id: accountId }, { since });
+    const logs = await repo.find({ account_id: account_id }, { since });
     let total = 0;
     for (const log of logs) {
         const cost = (log.input_tokens * (log.input_price || 0) + log.output_tokens * (log.output_price || 0)) / 1_000_000;
@@ -36,16 +36,16 @@ async function getWeeklySpending(accountId: string): Promise<number> {
 }
 
 /** Deduct balance from account, throw 429 if insufficient */
-async function deductBalance(accountId: string, cost: number): Promise<void> {
+async function deductBalance(account_id: string, cost: number): Promise<void> {
     if (cost <= 0) return;
 
     // Check weekly limit
-    const weeklySpent = await getWeeklySpending(accountId);
+    const weeklySpent = await getWeeklySpending(account_id);
     if (weeklySpent + cost > WEEKLY_LIMIT) {
         throw new Error("429 Weekly spending limit reached");
     }
 
-    const balance = await AccountService.getBalance(accountId);
+    const balance = await AccountService.getBalance(account_id);
     if (balance < cost) {
         throw new Error("429 Insufficient balance");
     }
@@ -53,12 +53,12 @@ async function deductBalance(accountId: string, cost: number): Promise<void> {
 }
 
 /** Get model prices for an alias */
-async function getModelPrices(alias: string): Promise<{ inputPrice: number; outputPrice: number }> {
+async function getModelPrices(alias: string): Promise<{ input_price: number; output_price: number }> {
     const models = await getAllModels();
     const match = models.find(m => m.alias === alias);
     return {
-        inputPrice: match?.input_price ?? 0,
-        outputPrice: match?.output_price ?? 0,
+        input_price: match?.input_price ?? 0,
+        output_price: match?.output_price ?? 0,
     };
 }
 
@@ -197,14 +197,14 @@ async function tryProviderStream(
 }
 
 /** Get allowed model aliases for a non-admin account, null means no restriction */
-async function getAllowedModelAliases(accountId: string): Promise<string[] | null> {
-    const account = await AccountService.findOne(accountId);
+async function getAllowedModelAliases(account_id: string): Promise<string[] | null> {
+    const account = await AccountService.findOne(account_id);
     if (!account || account.is_admin) return null; // admin — no restriction
 
     const models = await getAllModels();
     const publicAliases = models.filter(m => m.is_public).map(m => m.alias);
 
-    const roles = await AccountRoleService.findByAccount(accountId);
+    const roles = await AccountRoleService.findByAccount(account_id);
     const modelRoles = roles.filter(r => r.type === "model").map(r => r.name);
 
     // Union of explicitly assigned roles + public model aliases
@@ -212,18 +212,18 @@ async function getAllowedModelAliases(accountId: string): Promise<string[] | nul
 }
 
 /** Check if the requested model alias is allowed for this account */
-async function requireModelAccess(accountId: string, alias: string): Promise<void> {
-    const allowed = await getAllowedModelAliases(accountId);
+async function requireModelAccess(account_id: string, alias: string): Promise<void> {
+    const allowed = await getAllowedModelAliases(account_id);
     if (allowed === null) return; // admin or no account — unrestricted
     if (!allowed.includes(alias)) {
         throw new Error(`Model "${alias}" is not authorized for this account`);
     }
 }
 
-async function chatHex(body: Record<string, any>, accountId: string): Promise<any> {
+async function chatHex(body: Record<string, any>, account_id: string): Promise<any> {
     const requestedAlias = body.model;
 
-    await requireModelAccess(accountId, requestedAlias);
+    await requireModelAccess(account_id, requestedAlias);
 
     const providers = await ProviderService.getProvidersByAlias(requestedAlias);
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
@@ -244,25 +244,25 @@ async function chatHex(body: Record<string, any>, accountId: string): Promise<an
 
         ProviderService.recordSuccess(provider.id);
 
-        const { inputPrice: input_price, outputPrice: output_price } = await getModelPrices(requestedAlias);
+        const { input_price: input_price, output_price: output_price } = await getModelPrices(requestedAlias);
         const { usage } = data;
         // OpenAI format: prompt_tokens/completion_tokens; Anthropic format: input_tokens/output_tokens
         const rawInput = usage?.input_tokens ?? usage?.prompt_tokens ?? 0;
         const rawOutput = usage?.output_tokens ?? usage?.completion_tokens ?? 0;
         // Deduct balance
         const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
-        await deductBalance(accountId, cost);
+        await deductBalance(account_id, cost);
 
         await logUsage({
-            accountId,
-            modelAlias: requestedAlias,
-            providerId: provider.id,
-            inputTokens: rawInput,
-            outputTokens: rawOutput,
-            inputPrice: input_price,
-            outputPrice: output_price,
+            account_id,
+            model_alias: requestedAlias,
+            provider_id: provider.id,
+            input_tokens: rawInput,
+            output_tokens: rawOutput,
+            input_price: input_price,
+            output_price: output_price,
         });
-        await AccountService.updateBalance(accountId, -cost);
+        await AccountService.updateBalance(account_id, -cost);
         data.model = requestedAlias;
         return data;
     }
@@ -282,10 +282,10 @@ async function safePipe(reader: ReadableStreamDefaultReader<Uint8Array>, writer:
     }
 }
 
-async function chatHexStream(body: Record<string, any>, accountId: string): Promise<ReadableStream<Uint8Array>> {
+async function chatHexStream(body: Record<string, any>, account_id: string): Promise<ReadableStream<Uint8Array>> {
     const requestedAlias = body.model;
 
-    await requireModelAccess(accountId, requestedAlias);
+    await requireModelAccess(account_id, requestedAlias);
 
     const providers = await ProviderService.getProvidersByAlias(requestedAlias);
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
@@ -363,7 +363,7 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
                     }
                 }
 
-                const { inputPrice: input_price, outputPrice: output_price } = await getModelPrices(requestedAlias);
+                const { input_price: input_price, output_price: output_price } = await getModelPrices(requestedAlias);
 
                 let rawInput: number;
                 let rawOutput: number;
@@ -378,18 +378,18 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
 
                 // Deduct balance
                 const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
-                await deductBalance(accountId, cost);
+                await deductBalance(account_id, cost);
 
                 await logUsage({
-                    accountId,
-                    modelAlias: requestedAlias,
-                    providerId: provider.id,
-                    inputTokens: rawInput,
-                    outputTokens: rawOutput,
-                    inputPrice: input_price,
-                    outputPrice: output_price,
+                    account_id,
+                    model_alias: requestedAlias,
+                    provider_id: provider.id,
+                    input_tokens: rawInput,
+                    output_tokens: rawOutput,
+                    input_price: input_price,
+                    output_price: output_price,
                 });
-                await AccountService.updateBalance(accountId, -cost);
+                await AccountService.updateBalance(account_id, -cost);
             } catch (err) {
             }
         })();
@@ -433,10 +433,10 @@ function requestJson(urlStr: string, api_key: string | undefined, postBody: stri
     });
 }
 
-async function completeHex(body: Record<string, any>, accountId: string): Promise<any> {
+async function completeHex(body: Record<string, any>, account_id: string): Promise<any> {
     const requestedAlias = body.model;
 
-    await requireModelAccess(accountId, requestedAlias);
+    await requireModelAccess(account_id, requestedAlias);
 
     const providers = await ProviderService.getProvidersByAlias(requestedAlias);
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
@@ -449,25 +449,25 @@ async function completeHex(body: Record<string, any>, accountId: string): Promis
         }
 
         ProviderService.recordSuccess(provider.id);
-        const { inputPrice: input_price, outputPrice: output_price } = await getModelPrices(requestedAlias);
+        const { input_price: input_price, output_price: output_price } = await getModelPrices(requestedAlias);
         // OpenAI format: prompt_tokens/completion_tokens; Anthropic format: input_tokens/output_tokens
         const rawInput = data.usage?.input_tokens ?? data.usage?.prompt_tokens ?? 0;
         const rawOutput = data.usage?.output_tokens ?? data.usage?.completion_tokens ?? 0;
 
         // Deduct balance
         const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
-        await deductBalance(accountId, cost);
+        await deductBalance(account_id, cost);
 
         await logUsage({
-            accountId,
-            modelAlias: requestedAlias,
-            providerId: provider.id,
-            inputTokens: rawInput,
-            outputTokens: rawOutput,
-            inputPrice: input_price,
-            outputPrice: output_price,
+            account_id,
+            model_alias: requestedAlias,
+            provider_id: provider.id,
+            input_tokens: rawInput,
+            output_tokens: rawOutput,
+            input_price: input_price,
+            output_price: output_price,
         });
-        await AccountService.updateBalance(accountId, -cost);
+        await AccountService.updateBalance(account_id, -cost);
         return data;
     }
 
@@ -517,10 +517,10 @@ function requestStream(urlStr: string, api_key: string | undefined, postBody: st
     });
 }
 
-async function completeHexStream(body: Record<string, any>, accountId: string): Promise<ReadableStream<Uint8Array>> {
+async function completeHexStream(body: Record<string, any>, account_id: string): Promise<ReadableStream<Uint8Array>> {
     const requestedAlias = body.model;
 
-    await requireModelAccess(accountId, requestedAlias);
+    await requireModelAccess(account_id, requestedAlias);
 
     const providers = await ProviderService.getProvidersByAlias(requestedAlias);
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
@@ -570,7 +570,7 @@ async function completeHexStream(body: Record<string, any>, accountId: string): 
                     }
                 }
 
-                const { inputPrice: input_price, outputPrice: output_price } = await getModelPrices(requestedAlias);
+                const { input_price: input_price, output_price: output_price } = await getModelPrices(requestedAlias);
 
                 let rawInput: number;
                 let rawOutput: number;
@@ -584,18 +584,18 @@ async function completeHexStream(body: Record<string, any>, accountId: string): 
                 }
 
                 const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
-                await deductBalance(accountId, cost);
+                await deductBalance(account_id, cost);
 
                 await logUsage({
-                    accountId,
-                    modelAlias: requestedAlias,
-                    providerId: provider.id,
-                    inputTokens: rawInput,
-                    outputTokens: rawOutput,
-                    inputPrice: input_price,
-                    outputPrice: output_price,
+                    account_id,
+                    model_alias: requestedAlias,
+                    provider_id: provider.id,
+                    input_tokens: rawInput,
+                    output_tokens: rawOutput,
+                    input_price: input_price,
+                    output_price: output_price,
                 });
-                await AccountService.updateBalance(accountId, -cost);
+                await AccountService.updateBalance(account_id, -cost);
             } catch (err) {
             }
         })();
@@ -607,25 +607,25 @@ async function completeHexStream(body: Record<string, any>, accountId: string): 
 }
 
 export class AiService {
-    static async chatCompletions(data: Record<string, any>, accountId: string = ""): Promise<ChatCompletionsServiceResponse> {
-        return await chatHex(data, accountId) as any;
+    static async chatCompletions(data: Record<string, any>, account_id: string = ""): Promise<ChatCompletionsServiceResponse> {
+        return await chatHex(data, account_id) as any;
     }
 
-    static async chatCompletionsStream(data: Record<string, any>, accountId: string = ""): Promise<ReadableStream<Uint8Array>> {
-        return await chatHexStream(data, accountId);
+    static async chatCompletionsStream(data: Record<string, any>, account_id: string = ""): Promise<ReadableStream<Uint8Array>> {
+        return await chatHexStream(data, account_id);
     }
 
-    static async completions(data: Record<string, any>, accountId: string = ""): Promise<CompletionServiceResponse> {
-        return await completeHex(data, accountId);
+    static async completions(data: Record<string, any>, account_id: string = ""): Promise<CompletionServiceResponse> {
+        return await completeHex(data, account_id);
     }
 
-    static async completionsStream(data: Record<string, any>, accountId: string = ""): Promise<ReadableStream<Uint8Array>> {
-        return await completeHexStream(data, accountId);
+    static async completionsStream(data: Record<string, any>, account_id: string = ""): Promise<ReadableStream<Uint8Array>> {
+        return await completeHexStream(data, account_id);
     }
 
-    static async listModels(accountId: string = ""): Promise<ModelsServiceResponse> {
+    static async listModels(account_id: string = ""): Promise<ModelsServiceResponse> {
         const models = await getAllModels();
-        const allowed = accountId ? await getAllowedModelAliases(accountId) : null;
+        const allowed = account_id ? await getAllowedModelAliases(account_id) : null;
 
         const seen = new Set<string>();
         const data = [];
@@ -647,16 +647,16 @@ export class AiService {
     }
 
     /** Anthropic /v1/messages non-streaming: convert request → call chatHex → convert response back */
-    static async antMessages(data: Record<string, any>, accountId: string): Promise<Record<string, any>> {
+    static async antMessages(data: Record<string, any>, account_id: string): Promise<Record<string, any>> {
         const openaiBody = antMessagesToOpenAI(data);
-        const result = await chatHex(openaiBody, accountId);
+        const result = await chatHex(openaiBody, account_id);
         return openAIToAntMessages(result, data.model);
     }
 
     /** Anthropic /v1/messages streaming: convert request → call chatHexStream → convert SSE stream */
-    static async antMessagesStream(data: Record<string, any>, accountId: string): Promise<ReadableStream<Uint8Array>> {
+    static async antMessagesStream(data: Record<string, any>, account_id: string): Promise<ReadableStream<Uint8Array>> {
         const openaiBody = antMessagesToOpenAI(data);
-        const upstream = await chatHexStream(openaiBody, accountId);
+        const upstream = await chatHexStream(openaiBody, account_id);
         return openAIToAntStream(upstream);
     }
 }

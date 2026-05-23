@@ -11,11 +11,11 @@ import { AccountService } from "../account/account.service";
 export const aiController = new AiRouterInstance(inject, {
     async chatcompletions(request): Promise<any> {
         const api_key = request.auth || "";
-        const accountId = await getAccountIdByApiKey(api_key);
-        if (!accountId) throw new Error("Invalid API Key");
+        const account_id = await getAccountIdByApiKey(api_key);
+        if (!account_id) throw new Error("Invalid API Key");
 
         if (request.stream) {
-            const stream = await AiService.chatCompletionsStream(request, accountId);
+            const stream = await AiService.chatCompletionsStream(request, account_id);
             return new Response(stream as any, {
                 headers: {
                     "Content-Type": "text/event-stream",
@@ -28,17 +28,17 @@ export const aiController = new AiRouterInstance(inject, {
             });
         }
 
-        const result = await AiService.chatCompletions(request, accountId);
+        const result = await AiService.chatCompletions(request, account_id);
         return result;
     },
 
     async completions(request): Promise<any> {
         const api_key = request.auth || "";
-        const accountId = await getAccountIdByApiKey(api_key);
-        if (!accountId) throw new Error("Invalid API Key");
+        const account_id = await getAccountIdByApiKey(api_key);
+        if (!account_id) throw new Error("Invalid API Key");
 
         if (request.stream) {
-            const stream = await AiService.completionsStream(request, accountId);
+            const stream = await AiService.completionsStream(request, account_id);
             return new Response(stream as any, {
                 headers: {
                     "Content-Type": "text/event-stream",
@@ -51,40 +51,40 @@ export const aiController = new AiRouterInstance(inject, {
             });
         }
 
-        const result = await AiService.completions(request, accountId);
+        const result = await AiService.completions(request, account_id);
         return result;
     },
 
     async models(request): Promise<ModelsResponse> {
         const auth = request.auth || "";
-        let accountId = "";
+        let account_id = "";
 
         if (auth) {
             // Try API key auth first
             if (validateApiKey(auth)) {
-                accountId = (await getAccountIdByApiKey(auth)) || "";
+                account_id = (await getAccountIdByApiKey(auth)) || "";
             } else {
                 // Try JWT token auth (used by frontend ProfilePage)
                 const email = getIdentifyByVerify(auth);
                 if (email) {
                     const account = await AccountService.findByEmail(email);
-                    if (account) accountId = account.id;
+                    if (account) account_id = account.id;
                 }
             }
         }
 
-        const data = await AiService.listModels(accountId);
+        const data = await AiService.listModels(account_id);
         return new ModelsResponse(data);
     },
 
     async v1messages(request): Promise<any> {
         const api_key = request.auth || "";
-        const accountId = await getAccountIdByApiKey(api_key);
-        if (!accountId) throw new Error("Invalid API Key");
+        const account_id = await getAccountIdByApiKey(api_key);
+        if (!account_id) throw new Error("Invalid API Key");
 
         if (request.stream) {
             try {
-                const stream = await AiService.antMessagesStream(request, accountId);
+                const stream = await AiService.antMessagesStream(request, account_id);
                 return new Response(stream as any, {
                     headers: {
                         "Content-Type": "text/event-stream",
@@ -122,7 +122,7 @@ export const aiController = new AiRouterInstance(inject, {
             }
         }
 
-        const result = await AiService.antMessages(request, accountId);
+        const result = await AiService.antMessages(request, account_id);
         return result;
     },
 });

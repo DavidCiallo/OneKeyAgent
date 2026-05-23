@@ -42,18 +42,18 @@ async function list(request: UsageListRequest): Promise<UsageListResponse> {
     const since = Date.now() - 30 * 86400000;
     const { list: data, total } = await UsageService.find(page, search, since);
 
-    // Resolve accountId to account name (email)
-    const accountIds = [...new Set(data.map(item => item.account_id))];
+    // Resolve account_id to account name (email)
+    const account_ids = [...new Set(data.map(item => item.account_id))];
     const accounts = await Promise.all(
-        accountIds.map(id => AccountService.findOne(id).then(a => ({ id, name: a ? `${a.name} (${a.email})` : id })))
+        account_ids.map(id => AccountService.findOne(id).then(a => ({ id, name: a ? `${a.name} (${a.email})` : id })))
     );
     const accountMap = new Map(accounts.map(a => [a.id, a.name]));
 
-    // Resolve providerId to provider name (include soft-deleted ones for history display)
-    const providerIds = [...new Set(data.map(item => item.provider_id).filter(Boolean))] as string[];
+    // Resolve provider_id to provider name (include soft-deleted ones for history display)
+    const provider_ids = [...new Set(data.map(item => item.provider_id).filter(Boolean))] as string[];
     const providerService = await import("../provider/provider.service").then(m => m.ProviderService);
     const providers = await Promise.all(
-        providerIds.map(id => providerService.findOneIgnoreDelete(id).then(p => ({ id, name: p?.name || id })))
+        provider_ids.map(id => providerService.findOneIgnoreDelete(id).then(p => ({ id, name: p?.name || id })))
     );
     const providerMap = new Map(providers.map(p => [p.id, p.name]));
 
@@ -76,10 +76,10 @@ async function list(request: UsageListRequest): Promise<UsageListResponse> {
 
 async function stats(request: UsageStatsRequest): Promise<UsageStatsResponse> {
     request = UsageStatsRequest.self(request);
-    const { auth, modelAlias } = request;
+    const { auth, model_alias } = request;
     if (!auth) throw "Authorization failed";
     const account = await resolveAccount(auth);
-    const data = await UsageService.stats(modelAlias, account.is_admin ? undefined : account.id);
+    const data = await UsageService.stats(model_alias, account.is_admin ? undefined : account.id);
     return new UsageStatsResponse({
         success: true,
         message: "success",
@@ -106,10 +106,10 @@ async function sessions(request: UsageSessionsRequest): Promise<UsageSessionsRes
     );
     const accountMap = new Map(accounts.map(a => [a.id, a.name]));
 
-    const allRawSessions: (UserSession & { accountId: string })[] = [];
+    const allRawSessions: (UserSession & { account_id: string })[] = [];
     for (const g of rawGroups) {
         for (const s of g.sessions) {
-            allRawSessions.push({ ...s, accountId: g.account_id });
+            allRawSessions.push({ ...s, account_id: g.account_id });
         }
     }
     allRawSessions.sort((a, b) => b.startTime - a.startTime);
@@ -127,7 +127,7 @@ async function sessions(request: UsageSessionsRequest): Promise<UsageSessionsRes
         );
         providerMap = new Map(providers.map(p => [p.id, p.name]));
     } else {
-        // Non-admin: providerName is actually modelAlias, use as-is
+        // Non-admin: providerName is actually model_alias, use as-is
         providerMap = new Map(allProviderIds.map(id => [id, id]));
     }
 

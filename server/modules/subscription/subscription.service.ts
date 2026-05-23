@@ -7,8 +7,8 @@ export class SubscriptionService {
 
     // ─── Record management ───
 
-    static async getRecordsByAccount(accountId: string): Promise<TransactionEntity[]> {
-        return await recordRepo.find({ account_id: accountId, delete_time: null });
+    static async getRecordsByAccount(account_id: string): Promise<TransactionEntity[]> {
+        return await recordRepo.find({ account_id: account_id, delete_time: null });
     }
 
     static async createRecord(data: Partial<TransactionEntity>): Promise<TransactionEntity> {

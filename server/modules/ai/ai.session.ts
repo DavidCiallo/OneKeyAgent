@@ -18,13 +18,13 @@ export async function seedDefaultModel() {
 }
 
 export async function logUsage(usage: {
-    accountId: string,
-    modelAlias: string,
-    providerId?: string,
-    inputTokens: number,
-    outputTokens: number,
-    inputPrice: number,
-    outputPrice: number,
+    account_id: string,
+    model_alias: string,
+    provider_id?: string,
+    input_tokens: number,
+    output_tokens: number,
+    input_price: number,
+    output_price: number,
 }) {
     await usageRepo.insert(usage);
 }

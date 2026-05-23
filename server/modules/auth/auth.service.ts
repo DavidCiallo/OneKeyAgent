@@ -24,19 +24,19 @@ export async function loginUser(email: string, password: string): Promise<{ toke
 }
 
 /** Claim daily sign-in bonus for an account. Returns the bonus amount. */
-export async function claimDailyBonus(accountId: string): Promise<number> {
+export async function claimDailyBonus(account_id: string): Promise<number> {
     const now = Date.now();
-    const account = await accountRepository.findOne({ id: accountId } as any);
+    const account = await accountRepository.findOne({ id: account_id } as any);
     if (!account) return 0;
 
     const lastDaily = account.last_daily_time;
     const isNewDay = !lastDaily || new Date(lastDaily).toDateString() !== new Date(now).toDateString();
     if (!isNewDay) return 0;
 
-    await accountRepository.update({ id: accountId }, { last_daily_time: now } as any);
+    await accountRepository.update({ id: account_id }, { last_daily_time: now } as any);
     const cardRepo = Repository.instance<any>("gift_card");
 
-    const allRedeemed = await cardRepo.find({ redeemed_by: accountId, status: "redeemed" });
+    const allRedeemed = await cardRepo.find({ redeemed_by: account_id, status: "redeemed" });
     const manualTotal = allRedeemed
         .filter((c: any) => c.code && !c.code.startsWith("daily_") && !c.code.startsWith("register_"))
         .reduce((sum: number, c: any) => sum + (c.token_amount || 0), 0);
@@ -55,16 +55,16 @@ export async function claimDailyBonus(accountId: string): Promise<number> {
     }
 
     await cardRepo.insert({
-        code: `daily_${accountId}_${now}`,
+        code: `daily_${account_id}_${now}`,
         token_amount: amount,
         status: "redeemed",
-        redeemed_by: accountId,
+        redeemed_by: account_id,
         redeemed_at: now,
         create_time: now,
     } as any);
 
     // Update account balance atomically
-    await AccountService.updateBalance(accountId, amount);
+    await AccountService.updateBalance(account_id, amount);
 
     return amount;
 }
