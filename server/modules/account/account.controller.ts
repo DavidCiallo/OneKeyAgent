@@ -70,12 +70,12 @@ async function create(request: AccountCreateRequest): Promise<AccountCreateRespo
     }
     await requireAdmin(request.auth);
 
-    const apiKey = generateApiKey();
+    const api_key = generateApiKey();
     const account = await AccountService.create({
         name: request.account.name,
         email: request.account.email,
         password: hashGenerate(request.account.password),
-        apiKey,
+        api_key,
         is_admin: request.account.is_admin || 0,
     });
     if (!account) throw "create failed";
@@ -130,8 +130,8 @@ async function profile(request: AccountProfileRequest): Promise<AccountProfileRe
 
     // Calculate weekly usage cost
     const since = Date.now() - 7 * 86400000;
-    const usageRepo = Repository.instance<any>("UsageLog");
-    const logs = await usageRepo.find({ accountId: account.id }, { since });
+    const usageRepo = Repository.instance<any>("usage_log");
+    const logs = await usageRepo.find({ account_id: account.id }, { since });
 
     return new AccountProfileResponse({
         success: true,
@@ -151,11 +151,11 @@ async function regenerate(request: AccountRegenerateRequest): Promise<AccountReg
     const account = await getAccountByEmail(email);
     if (!account) throw new Error("Account not found");
     const newApiKey = generateApiKey();
-    await AccountService.update(account.id, { apiKey: newApiKey });
+    await AccountService.update(account.id, { api_key: newApiKey });
     return new AccountRegenerateResponse({
         success: true,
         message: "success",
-        data: { apiKey: newApiKey },
+        data: { api_key: newApiKey },
     });
 }
 
@@ -168,11 +168,11 @@ async function exportData(request: AccountExportRequest): Promise<AccountExportR
     const modelRepo = Repository.instance<any>("Model");
     const providerRepo = Repository.instance<any>("Provider");
     const roleRepo = Repository.instance<any>("Role");
-    const accountRoleRepo = Repository.instance<any>("AccountRole");
+    const accountRoleRepo = Repository.instance<any>("account_role");
     const recordRepo = Repository.instance<any>("Transaction");
     const taskRepo = Repository.instance<any>("Task");
-    const usageRepo = Repository.instance<any>("UsageLog");
-    const giftCardRepo = Repository.instance<any>("GiftCard");
+    const usageRepo = Repository.instance<any>("usage_log");
+    const giftCardRepo = Repository.instance<any>("gift_card");
 
     // Small tables: load all at once
     const [accounts, models, providers, roles, accountRoles, tasks, giftCards] = await Promise.all([
@@ -219,7 +219,7 @@ async function exportData(request: AccountExportRequest): Promise<AccountExportR
 async function exportUsage(request: AccountExportRequest): Promise<AccountExportResponse> {
     await requireAdmin(request.auth);
 
-    const usageRepo = Repository.instance<any>("UsageLog");
+    const usageRepo = Repository.instance<any>("usage_log");
 
     const usageLogs: any[] = [];
     for await (const batch of usageRepo.findAllIgnoreDeleteBatch(2000)) {
@@ -268,11 +268,11 @@ async function importData(request: AccountImportRequest): Promise<AccountImportR
     const modelRepo = Repository.instance<any>("Model");
     const providerRepo = Repository.instance<any>("Provider");
     const roleRepo = Repository.instance<any>("Role");
-    const accountRoleRepo = Repository.instance<any>("AccountRole");
+    const accountRoleRepo = Repository.instance<any>("account_role");
     const recordRepo = Repository.instance<any>("Transaction");
     const taskRepo = Repository.instance<any>("Task");
-    const usageRepo = Repository.instance<any>("UsageLog");
-    const giftCardRepo = Repository.instance<any>("GiftCard");
+    const usageRepo = Repository.instance<any>("usage_log");
+    const giftCardRepo = Repository.instance<any>("gift_card");
 
     type TableDef = { repo: Repository<any>; items: any[] | undefined; name: string };
     const tables: TableDef[] = [

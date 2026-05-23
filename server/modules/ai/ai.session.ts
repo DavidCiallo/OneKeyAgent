@@ -5,7 +5,7 @@ import { UsageLogEntity } from "../../../shared/modules/usage/usage.entity";
 
 const modelRepo = Repository.instance<ModelEntity>("Model");
 const providerRepo = Repository.instance<ProviderEntity>("Provider");
-const usageRepo = Repository.instance<UsageLogEntity>("UsageLog");
+const usageRepo = Repository.instance<UsageLogEntity>("usage_log");
 
 /** Ensure the 'hex' model exists in the database */
 export async function seedDefaultModel() {

@@ -88,7 +88,7 @@ export default function ProfilePage() {
                 <div className="max-w-2xl mx-auto space-y-6">
                     <AccountInfoCard account={account} weeklyUsage={weeklyUsage} balance={balance} />
                     <ApiKeyCard
-                        apiKey={account.apiKey}
+                        api_key={account.api_key}
                         regenerating={regenerating}
                         onConfirmOpen={onConfirmOpen}
                         endpoint={endpoint}

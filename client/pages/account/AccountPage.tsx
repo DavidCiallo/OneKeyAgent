@@ -97,7 +97,7 @@ export default function AccountPage() {
                     name: form.name,
                     email: form.email,
                     password: form.password,
-                    apiKey: "",
+                    api_key: "",
                     is_admin: 0,
                 }),
                 auth: getToken(),

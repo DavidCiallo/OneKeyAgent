@@ -17,7 +17,7 @@ async function list(request: ProviderListRequest): Promise<ProviderListResponse>
     await requireAdmin(request?.auth);
 
     const search: Partial<Record<string, any>> = {};
-    if (request.filter?.modelAlias) search.modelAlias = request.filter.modelAlias;
+    if (request.filter?.model_alias) search.model_alias = request.filter.model_alias;
     if (request.filter?.enabled !== undefined) search.enabled = request.filter.enabled;
 
     const { list: data, total } = await ProviderService.find(request.page, search as any);

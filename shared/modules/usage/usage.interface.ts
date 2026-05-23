@@ -21,12 +21,12 @@ export interface UsageStatsResult {
 
 export class UsageStatsRequest implements BaseRequest {
     public auth?: string;
-    public modelAlias?: string;
+    public model_alias?: string;
 
     constructor(origin: Partial<UsageStatsRequest>) {
         if (false) throw new Error("Unexpected error");
         origin.auth && (this.auth = origin.auth);
-        origin.modelAlias && (this.modelAlias = origin.modelAlias);
+        origin.model_alias && (this.model_alias = origin.model_alias);
     }
     static self(unsafe: UsageStatsRequest) {
         return new UsageStatsRequest(unsafe);
@@ -51,38 +51,38 @@ export class UsageStatsResponse implements BaseResponse<UsageStatsPeriod> {
 
 export class UsageDTO {
     public id: string;
-    public accountId: string;
+    public account_id: string;
     public accountName?: string;
-    public modelAlias: string;
-    public providerId?: string;
+    public model_alias: string;
+    public provider_id?: string;
     public providerName?: string;
-    public inputTokens: number;
-    public outputTokens: number;
+    public input_tokens: number;
+    public output_tokens: number;
     public cost: number;
     public create_time: number;
 
     constructor(origin: UsageLogEntity & { accountName?: string; providerName?: string; cost?: number }) {
         this.id = origin.id;
-        this.accountId = origin.accountId;
+        this.account_id = origin.account_id;
         this.accountName = origin.accountName;
-        this.modelAlias = origin.modelAlias;
-        this.providerId = origin.providerId;
+        this.model_alias = origin.model_alias;
+        this.provider_id = origin.provider_id;
         this.providerName = origin.providerName;
-        this.inputTokens = origin.inputTokens;
-        this.outputTokens = origin.outputTokens;
+        this.input_tokens = origin.input_tokens;
+        this.output_tokens = origin.output_tokens;
         this.cost = origin.cost ?? 0;
         this.create_time = origin.create_time;
     }
 }
 
 export class UsageQueryBody {
-    public accountId?: string;
-    public modelAlias?: string;
+    public account_id?: string;
+    public model_alias?: string;
 
     constructor(origin: Partial<UsageLogEntity>) {
         if (false) throw new Error("Unexpected error");
-        origin.accountId && (this.accountId = origin.accountId);
-        origin.modelAlias && (this.modelAlias = origin.modelAlias);
+        origin.account_id && (this.account_id = origin.account_id);
+        origin.model_alias && (this.model_alias = origin.model_alias);
     }
 
     static self(unsafe: Partial<UsageLogEntity>) {
@@ -161,14 +161,14 @@ export class UsageSessionsRequest implements BaseRequest {
     public auth?: string;
     public gapMinutes?: number;
     public since?: number;
-    public accountIds?: string[];
+    public account_ids?: string[];
 
     constructor(origin: Partial<UsageSessionsRequest>) {
         if (false) throw new Error("Unexpected error");
         origin.auth && (this.auth = origin.auth);
         origin.gapMinutes && (this.gapMinutes = origin.gapMinutes);
         origin.since && (this.since = origin.since);
-        origin.accountIds && (this.accountIds = origin.accountIds);
+        origin.account_ids && (this.account_ids = origin.account_ids);
     }
     static self(unsafe: UsageSessionsRequest) {
         return new UsageSessionsRequest(unsafe);

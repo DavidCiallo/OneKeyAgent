@@ -10,8 +10,8 @@ import { AccountService } from "../account/account.service";
 
 export const aiController = new AiRouterInstance(inject, {
     async chatcompletions(request): Promise<any> {
-        const apiKey = request.auth || "";
-        const accountId = await getAccountIdByApiKey(apiKey);
+        const api_key = request.auth || "";
+        const accountId = await getAccountIdByApiKey(api_key);
         if (!accountId) throw new Error("Invalid API Key");
 
         if (request.stream) {
@@ -33,8 +33,8 @@ export const aiController = new AiRouterInstance(inject, {
     },
 
     async completions(request): Promise<any> {
-        const apiKey = request.auth || "";
-        const accountId = await getAccountIdByApiKey(apiKey);
+        const api_key = request.auth || "";
+        const accountId = await getAccountIdByApiKey(api_key);
         if (!accountId) throw new Error("Invalid API Key");
 
         if (request.stream) {
@@ -78,8 +78,8 @@ export const aiController = new AiRouterInstance(inject, {
     },
 
     async v1messages(request): Promise<any> {
-        const apiKey = request.auth || "";
-        const accountId = await getAccountIdByApiKey(apiKey);
+        const api_key = request.auth || "";
+        const accountId = await getAccountIdByApiKey(api_key);
         if (!accountId) throw new Error("Invalid API Key");
 
         if (request.stream) {

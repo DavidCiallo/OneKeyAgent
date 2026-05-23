@@ -85,7 +85,7 @@ export default function UsagePage() {
             auth: getToken(),
             gapMinutes: gap,
             since,
-            accountIds: ids.size > 0 ? Array.from(ids) : undefined,
+            account_ids: ids.size > 0 ? Array.from(ids) : undefined,
         });
         const res = await UsageRouter.sessions(req);
         if (res.success && res.data) {

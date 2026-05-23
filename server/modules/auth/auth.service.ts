@@ -34,7 +34,7 @@ export async function claimDailyBonus(accountId: string): Promise<number> {
     if (!isNewDay) return 0;
 
     await accountRepository.update({ id: accountId }, { last_daily_time: now } as any);
-    const cardRepo = Repository.instance<any>("GiftCard");
+    const cardRepo = Repository.instance<any>("gift_card");
 
     const allRedeemed = await cardRepo.find({ redeemed_by: accountId, status: "redeemed" });
     const manualTotal = allRedeemed
@@ -110,7 +110,7 @@ export async function preRegisterUser(name: string, email: string, password: str
  * Step 2: Complete registration — decrypt token, create account.
  * Returns the created account on success, null if token is invalid/expired.
  */
-export async function completeRegistration(token: string): Promise<{ account?: AccountEntity; apiKey?: string } | null> {
+export async function completeRegistration(token: string): Promise<{ account?: AccountEntity; api_key?: string } | null> {
     const decrypted = aesDecrypt(token);
     if (!decrypted) return null;
     const parts = decrypted.split("|-|");
@@ -121,8 +121,8 @@ export async function completeRegistration(token: string): Promise<{ account?: A
     const exist = await accountRepository.findIgnoreDelete({ email });
     if (exist) return null;
     const password = hashGenerate(plainPassword);
-    const apiKey = generateApiKey();
-    const account = await accountRepository.insert({ name, email, password, apiKey, is_admin: 0 });
+    const api_key = generateApiKey();
+    const account = await accountRepository.insert({ name, email, password, api_key, is_admin: 0 });
     if (!account) return null;
     // Assign default permissions
     await AccountRoleService.assignPermissions(account.id, [
@@ -132,7 +132,7 @@ export async function completeRegistration(token: string): Promise<{ account?: A
     ]);
     // Registration bonus: insert a redeemed gift card worth 2 tokens
     const now = Date.now();
-    const cardRepo = Repository.instance<any>("GiftCard");
+    const cardRepo = Repository.instance<any>("gift_card");
     await cardRepo.insert({
         code: `register_${account.id}_${now}`,
         token_amount: 1,
@@ -145,7 +145,7 @@ export async function completeRegistration(token: string): Promise<{ account?: A
     // Update account balance atomically
     await AccountService.updateBalance(account.id, 1);
 
-    return { account, apiKey };
+    return { account, api_key };
 }
 
 export async function getAccountByEmail(email: string): Promise<AccountEntity | null> {

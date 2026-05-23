@@ -35,7 +35,7 @@ export class ProviderService {
 
     static async find(page: number, filter: Partial<ProviderEntity>): Promise<{ list: ProviderEntity[], total: number }> {
         const list = (await providerRepository.find(filter))
-            .sort((a, b) => a.modelAlias.localeCompare(b.modelAlias))
+            .sort((a, b) => a.model_alias.localeCompare(b.model_alias))
             .slice((page - 1) * 10, page * 10);
         const total = await providerRepository.count(filter);
         return { list, total };
@@ -65,7 +65,7 @@ export class ProviderService {
 
     /** Get all enabled providers for a given model alias, ordered by priority and call stats */
     static async getProvidersByAlias(alias: string): Promise<ProviderEntity[]> {
-        const all = await providerRepository.find({ modelAlias: alias, enabled: 1 });
+        const all = await providerRepository.find({ model_alias: alias, enabled: 1 });
         return all.sort((a, b) => {
             const aSuccess = successCount.get(a.id) || 0;
             const bSuccess = successCount.get(b.id) || 0;

@@ -100,7 +100,7 @@ export class StatementRequest implements BaseRequest {
     }
 }
 
-export class StatementResponse implements BaseResponse<{ list: StatementItem[] }> {
+export class StatementResponse implements BaseResponse<StatementItem[]> {
     public success: boolean;
     public message: string;
     public data: { list: StatementItem[] };

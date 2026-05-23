@@ -25,11 +25,11 @@ const WEEKLY_LIMIT = 100; // $100 per week
 /** Get total weekly spending for an account */
 async function getWeeklySpending(accountId: string): Promise<number> {
     const since = Date.now() - 7 * 86400000;
-    const repo = Repository.instance<any>("UsageLog");
-    const logs = await repo.find({ accountId }, { since });
+    const repo = Repository.instance<any>("usage_log");
+    const logs = await repo.find({ account_id: accountId }, { since });
     let total = 0;
     for (const log of logs) {
-        const cost = (log.inputTokens * (log.inputPrice || 0) + log.outputTokens * (log.outputPrice || 0)) / 1_000_000;
+        const cost = (log.input_tokens * (log.input_price || 0) + log.output_tokens * (log.output_price || 0)) / 1_000_000;
         total += Math.round(cost * 1_000_000) / 1_000_000;
     }
     return Math.round(total * 1_000_000) / 1_000_000;
@@ -63,16 +63,16 @@ async function getModelPrices(alias: string): Promise<{ inputPrice: number; outp
 }
 
 /** Build Authorization header value based on auth type */
-function buildAuthHeader(apiKey: string | undefined, authType?: string): string {
-    if (!apiKey) return "";
-    if (authType === "custom") return apiKey;
-    return `Bearer ${apiKey}`;
+function buildAuthHeader(api_key: string | undefined, authType?: string): string {
+    if (!api_key) return "";
+    if (authType === "custom") return api_key;
+    return `Bearer ${api_key}`;
 }
 
 /** Build request headers and URL path based on api type */
 function buildRequestConfig(
     baseURL: string,
-    apiKey: string | undefined,
+    api_key: string | undefined,
     authType: string | undefined,
     apiType: string | undefined,
     body: Record<string, any>,
@@ -91,10 +91,10 @@ function buildRequestConfig(
     };
 
     if (isAnthropic) {
-        headers["x-api-key"] = apiKey || "";
+        headers["x-api-key"] = api_key || "";
         headers["anthropic-version"] = "2023-06-01";
     } else {
-        headers["Authorization"] = buildAuthHeader(apiKey, authType);
+        headers["Authorization"] = buildAuthHeader(api_key, authType);
     }
 
     return { url, headers, requestBody: postBody };
@@ -104,13 +104,13 @@ function buildRequestConfig(
 async function tryProvider(
     baseURL: string,
     model: string,
-    apiKey: string | undefined,
+    api_key: string | undefined,
     proxyURL: string | undefined,
     body: Record<string, any>,
     authType?: string,
     apiType?: string,
 ): Promise<any> {
-    const { url, headers, requestBody: postBody } = buildRequestConfig(baseURL, apiKey, authType, apiType, body);
+    const { url, headers, requestBody: postBody } = buildRequestConfig(baseURL, api_key, authType, apiType, body);
     const agent = proxyURL ? new HttpsProxyAgent(proxyURL) : undefined;
 
     return new Promise((resolve) => {
@@ -150,13 +150,13 @@ async function tryProvider(
 async function tryProviderStream(
     baseURL: string,
     model: string,
-    apiKey: string | undefined,
+    api_key: string | undefined,
     proxyURL: string | undefined,
     body: Record<string, any>,
     authType?: string,
     apiType?: string,
 ): Promise<ReadableStream<Uint8Array> | null> {
-    const { url, headers, requestBody: postBody } = buildRequestConfig(baseURL, apiKey, authType, apiType, body);
+    const { url, headers, requestBody: postBody } = buildRequestConfig(baseURL, api_key, authType, apiType, body);
     const agent = proxyURL ? new HttpsProxyAgent(proxyURL) : undefined;
 
     return new Promise((resolve) => {
@@ -236,7 +236,7 @@ async function chatHex(body: Record<string, any>, accountId: string): Promise<an
             model: provider.model,
         };
 
-        const data = await tryProvider(provider.baseURL, provider.model, provider.apiKey, provider.proxyURL, requestBody, provider.authType, provider.apiType);
+        const data = await tryProvider(provider.base_url, provider.model, provider.api_key, provider.proxy_url, requestBody, provider.auth_type, provider.api_type);
         if (!data) {
             ProviderService.recordFail(provider.id);
             continue;
@@ -299,13 +299,13 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
         };
 
         const bodyStream = await tryProviderStream(
-            provider.baseURL,
+            provider.base_url,
             provider.model,
-            provider.apiKey,
-            provider.proxyURL,
+            provider.api_key,
+            provider.proxy_url,
             requestBody,
-            provider.authType,
-            provider.apiType
+            provider.auth_type,
+            provider.api_type
         );
         if (!bodyStream) {
             ProviderService.recordFail(provider.id);
@@ -400,7 +400,7 @@ async function chatHexStream(body: Record<string, any>, accountId: string): Prom
     throw new Error("All providers failed for streaming");
 }
 
-function requestJson(urlStr: string, apiKey: string | undefined, postBody: string, proxyURL: string | undefined, authType?: string): Promise<any> {
+function requestJson(urlStr: string, api_key: string | undefined, postBody: string, proxyURL: string | undefined, authType?: string): Promise<any> {
     const url = new URL(urlStr);
     const agent = proxyURL ? new HttpsProxyAgent(proxyURL) : undefined;
     return new Promise((resolve) => {
@@ -412,7 +412,7 @@ function requestJson(urlStr: string, apiKey: string | undefined, postBody: strin
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "Authorization": buildAuthHeader(apiKey, authType),
+                "Authorization": buildAuthHeader(api_key, authType),
                 "Content-Length": Buffer.byteLength(postBody).toString(),
             },
             agent,
@@ -442,7 +442,7 @@ async function completeHex(body: Record<string, any>, accountId: string): Promis
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
 
     for (const provider of providers) {
-        const data = await requestJson(`${provider.baseURL}/completions`, provider.apiKey, JSON.stringify({ ...body, stream: false, model: provider.model }), provider.proxyURL, provider.authType);
+        const data = await requestJson(`${provider.base_url}/completions`, provider.api_key, JSON.stringify({ ...body, stream: false, model: provider.model }), provider.proxy_url, provider.auth_type);
         if (!data) {
             ProviderService.recordFail(provider.id);
             continue;
@@ -474,7 +474,7 @@ async function completeHex(body: Record<string, any>, accountId: string): Promis
     throw new Error("All providers failed");
 }
 
-function requestStream(urlStr: string, apiKey: string | undefined, postBody: string, proxyURL: string | undefined, authType?: string, apiType?: string): Promise<ReadableStream<Uint8Array> | null> {
+function requestStream(urlStr: string, api_key: string | undefined, postBody: string, proxyURL: string | undefined, authType?: string, apiType?: string): Promise<ReadableStream<Uint8Array> | null> {
     const url = new URL(urlStr);
     const agent = proxyURL ? new HttpsProxyAgent(proxyURL) : undefined;
     return new Promise((resolve) => {
@@ -486,7 +486,7 @@ function requestStream(urlStr: string, apiKey: string | undefined, postBody: str
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "Authorization": buildAuthHeader(apiKey, authType),
+                "Authorization": buildAuthHeader(api_key, authType),
                 "Content-Length": Buffer.byteLength(postBody).toString(),
             },
             agent,
@@ -526,7 +526,7 @@ async function completeHexStream(body: Record<string, any>, accountId: string): 
     if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
 
     for (const provider of providers) {
-        const bodyStream = await requestStream(`${provider.baseURL}/completions`, provider.apiKey, JSON.stringify({ ...body, stream: true, model: provider.model }), provider.proxyURL, provider.authType, provider.apiType);
+        const bodyStream = await requestStream(`${provider.base_url}/completions`, provider.api_key, JSON.stringify({ ...body, stream: true, model: provider.model }), provider.proxy_url, provider.auth_type, provider.api_type);
         if (!bodyStream) {
             ProviderService.recordFail(provider.id);
             continue;

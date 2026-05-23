@@ -20,7 +20,7 @@ export class TaskDTO {
     }
 }
 
-// Poll: 客户端拉取自己的待办任务（用 apiKey 认证）
+// Poll: 客户端拉取自己的待办任务（用 api_key 认证）
 export class TaskPollRequest implements BaseRequest {
     public auth?: string;
 

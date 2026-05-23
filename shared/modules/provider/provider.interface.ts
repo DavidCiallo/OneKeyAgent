@@ -3,15 +3,15 @@ import { ProviderEntity } from "./provider.entity";
 
 export class ProviderDTO {
     public id: string;
-    public modelAlias: string;
+    public model_alias: string;
     public priority: number;
     public name: string;
-    public baseURL: string;
+    public base_url: string;
     public model: string;
-    public apiKey?: string;
-    public authType?: string;
-    public apiType?: string;
-    public proxyURL?: string;
+    public api_key?: string;
+    public auth_type?: string;
+    public api_type?: string;
+    public proxy_url?: string;
     public enabled: number;
     public create_time: number;
     public update_time: number | null;
@@ -19,15 +19,15 @@ export class ProviderDTO {
 
     constructor(origin: ProviderEntity) {
         this.id = origin.id;
-        this.modelAlias = origin.modelAlias;
+        this.model_alias = origin.model_alias;
         this.priority = origin.priority;
         this.name = origin.name;
-        this.baseURL = origin.baseURL;
+        this.base_url = origin.base_url;
         this.model = origin.model;
-        this.apiKey = origin.apiKey;
-        this.authType = origin.authType;
-        this.apiType = origin.apiType;
-        this.proxyURL = origin.proxyURL;
+        this.api_key = origin.api_key;
+        this.auth_type = origin.auth_type;
+        this.api_type = origin.api_type;
+        this.proxy_url = origin.proxy_url;
         this.enabled = origin.enabled;
         this.create_time = origin.create_time;
         this.update_time = origin.update_time;
@@ -36,30 +36,30 @@ export class ProviderDTO {
 }
 
 export class ProviderCreateBody {
-    public modelAlias: string;
+    public model_alias: string;
     public priority: number;
     public name: string;
-    public baseURL: string;
+    public base_url: string;
     public model: string;
-    public apiKey?: string;
-    public authType?: string;
-    public apiType?: string;
-    public proxyURL?: string;
+    public api_key?: string;
+    public auth_type?: string;
+    public api_type?: string;
+    public proxy_url?: string;
     public enabled?: number;
 
-    constructor(origin: Pick<ProviderEntity, "modelAlias" | "baseURL" | "model" | "priority" | "name"> & Partial<Pick<ProviderEntity, "apiKey" | "authType" | "apiType" | "proxyURL" | "enabled">>) {
-        if (!origin.modelAlias || !origin.baseURL || !origin.model || origin.priority === undefined) {
+    constructor(origin: Pick<ProviderEntity, "model_alias" | "base_url" | "model" | "priority" | "name"> & Partial<Pick<ProviderEntity, "api_key" | "auth_type" | "api_type" | "proxy_url" | "enabled">>) {
+        if (!origin.model_alias || !origin.base_url || !origin.model || origin.priority === undefined) {
             throw new Error("modelAlias, baseURL, model and priority are required");
         }
-        this.modelAlias = origin.modelAlias;
+        this.model_alias = origin.model_alias;
         this.priority = origin.priority;
         this.name = origin.name;
-        this.baseURL = origin.baseURL;
+        this.base_url = origin.base_url;
         this.model = origin.model;
-        this.apiKey = origin.apiKey;
-        this.authType = origin.authType;
-        this.apiType = origin.apiType;
-        this.proxyURL = origin.proxyURL;
+        this.api_key = origin.api_key;
+        this.auth_type = origin.auth_type;
+        this.api_type = origin.api_type;
+        this.proxy_url = origin.proxy_url;
         this.enabled = origin.enabled ?? 1;
     }
 
@@ -69,30 +69,30 @@ export class ProviderCreateBody {
 }
 
 export class ProviderUpdateBody {
-    public modelAlias?: string;
+    public model_alias?: string;
     public priority?: number;
     public name?: string;
-    public baseURL?: string;
+    public base_url?: string;
     public model?: string;
-    public apiKey?: string;
-    public authType?: string;
-    public apiType?: string;
-    public proxyURL?: string;
+    public api_key?: string;
+    public auth_type?: string;
+    public api_type?: string;
+    public proxy_url?: string;
     public enabled?: number;
 
     constructor(origin: Partial<ProviderEntity> = {}) {
-        if (!origin.modelAlias && origin.priority === undefined && !origin.baseURL && !origin.model && !origin.apiKey && origin.apiKey === undefined && !origin.authType && !origin.apiType && !origin.proxyURL && origin.enabled === undefined) {
+        if (!origin.model_alias && origin.priority === undefined && !origin.base_url && !origin.model && !origin.api_key && origin.api_key === undefined && !origin.auth_type && !origin.api_type && !origin.proxy_url && origin.enabled === undefined) {
             throw new Error("At least one field is required");
         }
-        origin.modelAlias && (this.modelAlias = origin.modelAlias);
+        origin.model_alias && (this.model_alias = origin.model_alias);
         origin.priority !== undefined && (this.priority = origin.priority);
         origin.name && (this.name = origin.name);
-        origin.baseURL && (this.baseURL = origin.baseURL);
+        origin.base_url && (this.base_url = origin.base_url);
         origin.model && (this.model = origin.model);
-        origin.apiKey !== undefined && (this.apiKey = origin.apiKey);
-        origin.authType && (this.authType = origin.authType);
-        origin.apiType && (this.apiType = origin.apiType);
-        origin.proxyURL !== undefined && (this.proxyURL = origin.proxyURL);
+        origin.api_key !== undefined && (this.api_key = origin.api_key);
+        origin.auth_type && (this.auth_type = origin.auth_type);
+        origin.api_type && (this.api_type = origin.api_type);
+        origin.proxy_url !== undefined && (this.proxy_url = origin.proxy_url);
         origin.enabled !== undefined && (this.enabled = origin.enabled);
     }
 
@@ -102,12 +102,12 @@ export class ProviderUpdateBody {
 }
 
 export class ProviderQueryBody {
-    public modelAlias?: string;
+    public model_alias?: string;
     public enabled?: number;
 
     constructor(origin: Partial<ProviderEntity>) {
         if (false) throw new Error("Unexpected error");
-        origin.modelAlias && (this.modelAlias = origin.modelAlias);
+        origin.model_alias && (this.model_alias = origin.model_alias);
         origin.enabled !== undefined && (this.enabled = origin.enabled);
     }
 

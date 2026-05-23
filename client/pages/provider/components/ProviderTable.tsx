@@ -33,26 +33,26 @@ export function ProviderTable({ list, onEdit, onCopy, onDelete, onMoveUp, onMove
                 {list.map((item, i) => {
                     return (
                         <TableRow key={item.id}>
-                            <TableCell>{item.modelAlias}</TableCell>
+                            <TableCell>{item.model_alias}</TableCell>
                             <TableCell>{item.priority}</TableCell>
                             <TableCell className="max-w-xs truncate">{item.name}</TableCell>
-                            <TableCell className="max-w-xs truncate">{item.baseURL}</TableCell>
+                            <TableCell className="max-w-xs truncate">{item.base_url}</TableCell>
                             <TableCell>{item.model}</TableCell>
                             <TableCell>
                                 <Chip size="sm" variant="flat">
-                                    {item.authType || "bearer"}
+                                    {item.auth_type || "bearer"}
                                 </Chip>
                             </TableCell>
                             <TableCell>
                                 <Chip size="sm" variant="flat">
-                                    {item.apiType || "openai"}
+                                    {item.api_type || "openai"}
                                 </Chip>
                             </TableCell>
                             <TableCell className="max-w-xs truncate">
-                                {item.apiKey ? item.apiKey.slice(0, 8) + '...' + item.apiKey.slice(-8) : "—"}
+                                {item.api_key ? item.api_key.slice(0, 8) + '...' + item.api_key.slice(-8) : "—"}
                             </TableCell>
                             <TableCell className="max-w-xs truncate">
-                                {item.proxyURL ? item.proxyURL.slice(0, 12) + '...' + item.proxyURL.slice(-8) : "—"}
+                                {item.proxy_url ? item.proxy_url.slice(0, 12) + '...' + item.proxy_url.slice(-8) : "—"}
                             </TableCell>
                             <TableCell>
                                 <Chip color={item.enabled ? "success" : "default"} size="sm" variant="flat">

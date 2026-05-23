@@ -33,24 +33,24 @@ async function list(request: UsageListRequest): Promise<UsageListResponse> {
 
     const search: Partial<UsageLogEntity> = {};
     if (account.is_admin) {
-        if (filter?.accountId) search.accountId = filter.accountId;
+        if (filter?.account_id) search.account_id = filter.account_id;
     } else {
-        search.accountId = account.id;
+        search.account_id = account.id;
     }
-    if (filter?.modelAlias) search.modelAlias = filter.modelAlias;
+    if (filter?.model_alias) search.model_alias = filter.model_alias;
 
     const since = Date.now() - 30 * 86400000;
     const { list: data, total } = await UsageService.find(page, search, since);
 
     // Resolve accountId to account name (email)
-    const accountIds = [...new Set(data.map(item => item.accountId))];
+    const accountIds = [...new Set(data.map(item => item.account_id))];
     const accounts = await Promise.all(
         accountIds.map(id => AccountService.findOne(id).then(a => ({ id, name: a ? `${a.name} (${a.email})` : id })))
     );
     const accountMap = new Map(accounts.map(a => [a.id, a.name]));
 
     // Resolve providerId to provider name (include soft-deleted ones for history display)
-    const providerIds = [...new Set(data.map(item => item.providerId).filter(Boolean))] as string[];
+    const providerIds = [...new Set(data.map(item => item.provider_id).filter(Boolean))] as string[];
     const providerService = await import("../provider/provider.service").then(m => m.ProviderService);
     const providers = await Promise.all(
         providerIds.map(id => providerService.findOneIgnoreDelete(id).then(p => ({ id, name: p?.name || id })))
@@ -58,11 +58,11 @@ async function list(request: UsageListRequest): Promise<UsageListResponse> {
     const providerMap = new Map(providers.map(p => [p.id, p.name]));
 
     const list = data.map(item => {
-        const cost = (item.inputTokens * (item.inputPrice || 0) + item.outputTokens * (item.outputPrice || 0)) / 1_000_000;
+        const cost = (item.input_tokens * (item.input_price || 0) + item.output_tokens * (item.output_price || 0)) / 1_000_000;
         return new UsageDTO({
             ...item,
-            accountName: accountMap.get(item.accountId) || item.accountId,
-            providerName: item.providerId ? providerMap.get(item.providerId) || item.providerId : undefined,
+            accountName: accountMap.get(item.account_id) || item.account_id,
+            providerName: item.provider_id ? providerMap.get(item.provider_id) || item.provider_id : undefined,
             cost: Math.round(cost * 1_000_000) / 1_000_000,
         });
     });
@@ -92,7 +92,7 @@ async function sessions(request: UsageSessionsRequest): Promise<UsageSessionsRes
     const { auth } = request;
     if (!auth) throw "Authorization failed";
     const account = await resolveAccount(auth);
-    const effectiveAccountIds = account.is_admin ? request.accountIds : [account.id];
+    const effectiveAccountIds = account.is_admin ? request.account_ids : [account.id];
 
     const { groups, totals } = await UsageService.getUserSessions(request.gapMinutes, request.since, effectiveAccountIds, account.is_admin ? true : false);
 
@@ -100,7 +100,7 @@ async function sessions(request: UsageSessionsRequest): Promise<UsageSessionsRes
     const { groups: rawGroups } = await UsageService.getUserSessions(1, request.since, effectiveAccountIds, account.is_admin ? true : false);
 
     // Resolve account names
-    const allGroupIds = [...new Set([...groups, ...rawGroups].map(g => g.accountId))];
+    const allGroupIds = [...new Set([...groups, ...rawGroups].map(g => g.account_id))];
     const accounts = await Promise.all(
         allGroupIds.map(id => AccountService.findOne(id).then(a => ({ id, name: a ? `${a.name} (${a.email})` : id })))
     );
@@ -109,13 +109,13 @@ async function sessions(request: UsageSessionsRequest): Promise<UsageSessionsRes
     const allRawSessions: (UserSession & { accountId: string })[] = [];
     for (const g of rawGroups) {
         for (const s of g.sessions) {
-            allRawSessions.push({ ...s, accountId: g.accountId });
+            allRawSessions.push({ ...s, accountId: g.account_id });
         }
     }
     allRawSessions.sort((a, b) => b.startTime - a.startTime);
     const recentSessions = allRawSessions.slice(0, 10).map(s => ({
         ...s,
-        accountName: accountMap.get(s.accountId) || s.accountId,
+        accountName: accountMap.get(s.account_id) || s.account_id,
     }));
 
     const allProviderIds = [...new Set(groups.flatMap(g => g.sessions.flatMap(s => s.providerUsage.map(p => p.providerName))))];
@@ -133,7 +133,7 @@ async function sessions(request: UsageSessionsRequest): Promise<UsageSessionsRes
 
     const data: UserSessionGroup[] = groups.map(g => ({
         ...g,
-        accountName: accountMap.get(g.accountId) || g.accountId,
+        accountName: accountMap.get(g.account_id) || g.account_id,
         sessions: g.sessions.map(s => ({
             ...s,
             providerUsage: s.providerUsage.map(pu => ({
