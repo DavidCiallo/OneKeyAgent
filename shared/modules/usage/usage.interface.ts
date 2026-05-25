@@ -181,18 +181,3 @@ export interface UsageSessionTotals {
     totalRequests: number;
 }
 
-export class UsageSessionsResponse implements BaseResponse<UserSessionGroup> {
-    public success: boolean;
-    public message: string;
-    public data: UserSessionGroup[];
-    public totals: UsageSessionTotals;
-    public recentSessions?: UserSession[];
-
-    constructor(origin: UsageSessionsResponse) {
-        this.success = origin.success;
-        this.message = origin.message;
-        this.data = origin.data;
-        this.totals = origin.totals;
-        this.recentSessions = origin.recentSessions;
-    }
-}
