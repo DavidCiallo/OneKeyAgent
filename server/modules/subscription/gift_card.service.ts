@@ -50,7 +50,7 @@ export class GiftCardService {
         await AccountService.updateBalance(account_id, card.token_amount);
     }
 
-    // ─── Hard delete expired unused cards ───
+    // ─── Hard-delete expired unused cards ───
 
     static async cleanupExpired(before: number): Promise<number> {
         const cards = await cardRepo.find({ status: "unused", delete_time: null });

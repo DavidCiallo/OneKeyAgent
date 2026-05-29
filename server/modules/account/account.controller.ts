@@ -101,12 +101,13 @@ async function profile(request: AccountProfileRequest) {
     if (!account) throw new Error("Account not found");
 
     const since = Date.now() - 7 * 86400000;
-    const usageRepo = Repository.instance<any>("usage_log");
-    const logs = await usageRepo.find({ account_id: account.id }, { since });
+    const bucketRepo = Repository.instance<any>("usage_bucket");
+    const buckets = await bucketRepo.find({ account_id: account.id }, { since });
+    const weeklyUsage = buckets.reduce((sum: number, b: any) => sum + (b.cost || 0), 0);
 
     return {
         account: new AccountDTO(account),
-        weeklyUsage: AccountService.computeUsageCost(logs),
+        weeklyUsage: Math.round(weeklyUsage * 1_000_000) / 1_000_000,
         balance: account.balance,
     };
 }
@@ -135,6 +136,7 @@ async function exportData(request: AccountExportRequest) {
     const recordRepo = Repository.instance<any>("Transaction");
     const taskRepo = Repository.instance<any>("Task");
     const usageRepo = Repository.instance<any>("usage_log");
+    const bucketRepo = Repository.instance<any>("usage_bucket");
     const giftCardRepo = Repository.instance<any>("gift_card");
 
     const [accounts, models, providers, roles, accountRoles, tasks, giftCards] = await Promise.all([
@@ -147,14 +149,11 @@ async function exportData(request: AccountExportRequest) {
         giftCardRepo.findAllIgnoreDelete(),
     ]);
 
-    const transactions: any[] = [];
-    for await (const batch of recordRepo.findAllIgnoreDeleteBatch(2000)) {
-        transactions.push(...batch);
-    }
-    const usageLogs: any[] = [];
-    for await (const batch of usageRepo.findAllIgnoreDeleteBatch(2000)) {
-        usageLogs.push(...batch);
-    }
+    const [transactions, usageLogs, usageBuckets] = await Promise.all([
+        (async () => { const r: any[] = []; for await (const b of recordRepo.findAllIgnoreDeleteBatch(2000)) r.push(...b); return r; })(),
+        (async () => { const r: any[] = []; for await (const b of usageRepo.findAllIgnoreDeleteBatch(2000)) r.push(...b); return r; })(),
+        (async () => { const r: any[] = []; for await (const b of bucketRepo.findAllIgnoreDeleteBatch(2000)) r.push(...b); return r; })(),
+    ]);
 
     return {
         version: 1,
@@ -168,38 +167,9 @@ async function exportData(request: AccountExportRequest) {
             transactions,
             tasks: tasks || [],
             usage_logs: usageLogs,
+            usage_buckets: usageBuckets,
             gift_cards: giftCards || [],
         },
-    };
-}
-
-async function exportUsage(request: AccountExportRequest) {
-    await requireAdmin(request.auth);
-
-    const usageRepo = Repository.instance<any>("usage_log");
-
-    const usageLogs: any[] = [];
-    for await (const batch of usageRepo.findAllIgnoreDeleteBatch(2000)) {
-        usageLogs.push(...batch);
-    }
-
-    return {
-        version: 1,
-        exported_at: Date.now(),
-        data: { usage_logs: usageLogs },
-    };
-}
-
-async function exportTasks(request: AccountExportRequest) {
-    await requireAdmin(request.auth);
-
-    const taskRepo = Repository.instance<any>("Task");
-    const tasks = await taskRepo.findAllIgnoreDelete();
-
-    return {
-        version: 1,
-        exported_at: Date.now(),
-        data: { tasks: tasks || [] },
     };
 }
 
@@ -217,6 +187,7 @@ async function importData(request: AccountImportRequest) {
     const recordRepo = Repository.instance<any>("Transaction");
     const taskRepo = Repository.instance<any>("Task");
     const usageRepo = Repository.instance<any>("usage_log");
+    const bucketRepo = Repository.instance<any>("usage_bucket");
     const giftCardRepo = Repository.instance<any>("gift_card");
 
     type TableDef = { repo: Repository<any>; items: any[] | undefined; name: string };
@@ -228,6 +199,7 @@ async function importData(request: AccountImportRequest) {
         { repo: providerRepo, items: data.providers, name: "providers" },
         { repo: taskRepo, items: data.tasks, name: "tasks" },
         { repo: usageRepo, items: data.usage_logs, name: "usage_logs" },
+        { repo: bucketRepo, items: data.usage_buckets, name: "usage_buckets" },
         { repo: recordRepo, items: data.transactions, name: "transactions" },
         { repo: giftCardRepo, items: data.gift_cards, name: "gift_cards" },
     ];
@@ -244,8 +216,18 @@ async function importData(request: AccountImportRequest) {
 
     for (const { repo, items, name } of tables) {
         if (!items || items.length === 0) continue;
-        await repo.hardDelete({});
+        await repo.truncate();
         await importTable(repo, items, name);
+    }
+
+    // Rebuild usage_buckets from usage_logs if importing an old backup without bucket data
+    const usageLogs = data.usage_logs;
+    const usageBuckets = data.usage_buckets;
+    if (usageLogs && usageLogs.length > 0 && (!usageBuckets || usageBuckets.length === 0)) {
+        await bucketRepo.truncate();
+        const rebuilt = rebuildBuckets(usageLogs);
+        await bucketRepo.batchInsert(rebuilt);
+        imported["usage_buckets"] = rebuilt.length;
     }
 
     if (data.accounts && data.accounts.length > 0) {
@@ -255,7 +237,68 @@ async function importData(request: AccountImportRequest) {
     return { imported };
 }
 
+function rebuildBuckets(logs: any[]): any[] {
+    const GRANULARITY_MS: Record<string, number> = {
+        "1m": 60000, "5m": 300000, "15m": 900000, "30m": 1800000, "60m": 3600000,
+    };
+    const TTL_MS: Record<string, number> = {
+        "1m": 86400000, "5m": 86400000, "15m": 604800000, "30m": 604800000, "60m": 7776000000,
+    };
+
+    // Build 1min buckets from raw logs
+    const acc1m = new Map<string, any>();
+    for (const log of logs) {
+        const cost = Math.round(((log.input_tokens || 0) * (log.input_price || 0) + (log.output_tokens || 0) * (log.output_price || 0)) / 1_000_000 * 1_000_000) / 1_000_000;
+        const bt = Math.floor(log.create_time / 60000) * 60000;
+        const key = `${bt}|${log.account_id}|${log.model_alias}|${log.provider_id || "unknown"}`;
+        let entry = acc1m.get(key);
+        if (!entry) {
+            entry = { account_id: log.account_id, model_alias: log.model_alias, provider_id: log.provider_id || "unknown", bucket_time: bt, granularity: "1m", input_tokens: 0, output_tokens: 0, cost: 0, request_count: 0 };
+            acc1m.set(key, entry);
+        }
+        entry.input_tokens += log.input_tokens || 0;
+        entry.output_tokens += log.output_tokens || 0;
+        entry.cost += cost;
+        entry.request_count += 1;
+    }
+
+    const records: any[] = [];
+    const allEntries = [...acc1m.values()];
+
+    // Write 1m records
+    for (const e of allEntries) {
+        records.push({ ...e, clean_timestamp: e.bucket_time + TTL_MS["1m"] });
+    }
+
+    // Promote to coarser granularities: 1m→5m→15m→30m→60m
+    for (let i = 1; i < ["1m", "5m", "15m", "30m", "60m"].length; i++) {
+        const granularity = ["1m", "5m", "15m", "30m", "60m"][i];
+        const prevGran = ["1m", "5m", "15m", "30m", "60m"][i - 1];
+        const interval = GRANULARITY_MS[granularity];
+        const acc = new Map<string, any>();
+        const sourceEntries = records.filter(r => r.granularity === prevGran);
+        for (const e of sourceEntries) {
+            const bt = Math.floor(e.bucket_time / interval) * interval;
+            const key = `${bt}|${e.account_id}|${e.model_alias}|${e.provider_id}`;
+            let entry = acc.get(key);
+            if (!entry) {
+                entry = { account_id: e.account_id, model_alias: e.model_alias, provider_id: e.provider_id, bucket_time: bt, granularity, input_tokens: 0, output_tokens: 0, cost: 0, request_count: 0 };
+                acc.set(key, entry);
+            }
+            entry.input_tokens += e.input_tokens;
+            entry.output_tokens += e.output_tokens;
+            entry.cost += e.cost;
+            entry.request_count += e.request_count;
+        }
+        for (const e of acc.values()) {
+            records.push({ ...e, clean_timestamp: e.bucket_time + TTL_MS[granularity] });
+        }
+    }
+
+    return records;
+}
+
 export const accountMount = {
     routes: accountRoutes,
-    handlers: { list, detail, create, update, delete: del, profile, regenerate, export: exportData, export_usage: exportUsage, export_tasks: exportTasks, import: importData },
+    handlers: { list, detail, create, update, delete: del, profile, regenerate, export: exportData, import: importData },
 };

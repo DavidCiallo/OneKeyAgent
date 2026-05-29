@@ -304,6 +304,7 @@ export interface ExportData {
         transactions?: any[];
         tasks?: any[];
         usage_logs?: any[];
+        usage_buckets?: any[];
         gift_cards?: any[];
     };
 }

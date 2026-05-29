@@ -18,27 +18,11 @@ function collectionFile(name: string): string {
     return path.join(DATA_DIR, `${name}.jsonl`);
 }
 
-function hardDeleteFile(name: string): string {
-    return path.join(DATA_DIR, `${name}.deleted`);
-}
-
-function readDeleted(name: string): Set<string> {
-    const file = hardDeleteFile(name);
-    if (!fs.existsSync(file)) return new Set();
-    const ids = fs.readFileSync(file, "utf-8").trim().split("\n").filter(Boolean);
-    return new Set(ids);
-}
-
-function appendDeleted(name: string, id: string) {
-    fs.appendFileSync(hardDeleteFile(name), id + "\n");
-}
-
 /** Read lines from end to start (newest first) — used for paginated find() with DESC order */
-async function* readLinesReverse(name: string, skipDeleted: boolean): AsyncGenerator<Row, void, void> {
+async function* readLinesReverse(name: string): AsyncGenerator<Row, void, void> {
     const file = collectionFile(name);
     if (!fs.existsSync(file)) return;
 
-    const deleted = skipDeleted ? readDeleted(name) : new Set<string>();
     const stat = fs.statSync(file);
     if (stat.size === 0) return;
 
@@ -61,15 +45,12 @@ async function* readLinesReverse(name: string, skipDeleted: boolean): AsyncGener
                 const trimmed = lines[i].trim();
                 if (!trimmed) continue;
                 const row = JSON.parse(trimmed);
-                if (skipDeleted && row.id && deleted.has(row.id)) continue;
                 yield row;
             }
         }
         if (remainder.trim()) {
             const row = JSON.parse(remainder.trim());
-            if (!(skipDeleted && row.id && deleted.has(row.id))) {
-                yield row;
-            }
+            yield row;
         }
     } finally {
         fs.closeSync(fd);
@@ -77,11 +58,9 @@ async function* readLinesReverse(name: string, skipDeleted: boolean): AsyncGener
 }
 
 /** Read lines forward — used for findOne(), count(), findAllIgnoreDelete() */
-async function* readLines(name: string, skipDeleted: boolean): AsyncGenerator<Row, void, void> {
+async function* readLines(name: string): AsyncGenerator<Row, void, void> {
     const file = collectionFile(name);
     if (!fs.existsSync(file)) return;
-
-    const deleted = skipDeleted ? readDeleted(name) : new Set<string>();
 
     const stream = Bun.file(file).stream();
     const reader = stream.getReader();
@@ -99,15 +78,12 @@ async function* readLines(name: string, skipDeleted: boolean): AsyncGenerator<Ro
                 const trimmed = line.trim();
                 if (!trimmed) continue;
                 const row = JSON.parse(trimmed);
-                if (skipDeleted && row.id && deleted.has(row.id)) continue;
                 yield row;
             }
         }
         if (buffer.trim()) {
             const row = JSON.parse(buffer.trim());
-            if (!(skipDeleted && row.id && deleted.has(row.id))) {
-                yield row;
-            }
+            yield row;
         }
     } finally {
         reader.cancel().catch(() => {});
@@ -177,7 +153,7 @@ class Repository<
         const offset = config?.offset || 0;
 
         // Use reverse read to get newest-first (matches previous Drizzle DESC order)
-        for await (const row of readLinesReverse(this.collection, true)) {
+        for await (const row of readLinesReverse(this.collection)) {
             if (row.delete_time) continue;
             if (since && row.create_time < since) continue;
 
@@ -195,7 +171,7 @@ class Repository<
     }
 
     async findOne(where: Partial<T>): Promise<T | null> {
-        for await (const row of readLines(this.collection, true)) {
+        for await (const row of readLines(this.collection)) {
             if (row.delete_time) continue;
             if (matches(row, where as Record<string, any>)) return row as T;
         }
@@ -203,7 +179,7 @@ class Repository<
     }
 
     async findIgnoreDelete(where: Partial<T>): Promise<T | null> {
-        for await (const row of readLines(this.collection, false)) {
+        for await (const row of readLines(this.collection)) {
             if (matches(row, where as Record<string, any>)) return row as T;
         }
         return null;
@@ -212,7 +188,7 @@ class Repository<
     /** Get ALL records (including soft-deleted) — used for data export */
     async findAllIgnoreDelete(): Promise<T[]> {
         const results: T[] = [];
-        for await (const row of readLines(this.collection, false)) {
+        for await (const row of readLines(this.collection)) {
             results.push(row as T);
         }
         return results;
@@ -222,7 +198,7 @@ class Repository<
         if (ids.length === 0) return [];
         const idSet = new Set(ids);
         const results: T[] = [];
-        for await (const row of readLines(this.collection, true)) {
+        for await (const row of readLines(this.collection)) {
             if (row.delete_time) continue;
             if (row.id && idSet.has(row.id)) {
                 results.push(row as T);
@@ -234,7 +210,7 @@ class Repository<
     /** Stream all records in batches (including soft-deleted) — avoids loading entire table into memory */
     async *findAllIgnoreDeleteBatch(batchSize = 1000): AsyncGenerator<T[], void, void> {
         let batch: T[] = [];
-        for await (const row of readLines(this.collection, false)) {
+        for await (const row of readLines(this.collection)) {
             batch.push(row as T);
             if (batch.length >= batchSize) {
                 yield batch;
@@ -267,7 +243,6 @@ class Repository<
             const file = this.filePath();
             if (!fs.existsSync(file)) return false;
 
-            const deleted = readDeleted(this.collection);
             const content = fs.readFileSync(file, "utf-8");
             const lines = content.split("\n");
             const out: string[] = [];
@@ -276,7 +251,6 @@ class Repository<
                 const trimmed = line.trim();
                 if (!trimmed) continue;
                 const row = JSON.parse(trimmed);
-                if (row.id && deleted.has(row.id)) continue;
                 if (!includeDeleted && row.delete_time) {
                     out.push(line);
                     continue;
@@ -305,12 +279,18 @@ class Repository<
     }
 
     async delete(where: Partial<T>): Promise<boolean> {
-        // Soft delete via update — the existing behavior
         const now = Date.now();
         return this.update(where, { delete_time: now } as any);
     }
 
-    /** Permanently delete records (used for replace during import) */
+    /** Clear all data — used before import */
+    async truncate(): Promise<void> {
+        return this.withLock(async () => {
+            fs.writeFileSync(this.filePath(), "");
+        });
+    }
+
+    /** Permanently delete matching records */
     async hardDelete(where: Partial<T>): Promise<boolean> {
         return this.withLock(async () => {
             let deleted = false;
@@ -335,7 +315,6 @@ class Repository<
                 }
 
                 if (match) {
-                    appendDeleted(this.collection, row.id);
                     deleted = true;
                 } else {
                     out.push(line);
@@ -360,7 +339,6 @@ class Repository<
             const file = this.filePath();
             if (!fs.existsSync(file)) return false;
 
-            const deleted = readDeleted(this.collection);
             const content = fs.readFileSync(file, "utf-8");
             const lines = content.split("\n");
             const now = Date.now();
@@ -370,7 +348,6 @@ class Repository<
                 const trimmed = lines[i].trim();
                 if (!trimmed) continue;
                 const row = JSON.parse(trimmed);
-                if (row.id && deleted.has(row.id)) continue;
                 if (!includeDeleted && row.delete_time) continue;
 
                 let match = true;
@@ -416,7 +393,7 @@ class Repository<
 
     async count(where?: Partial<T>, since?: number): Promise<number> {
         let count = 0;
-        for await (const row of readLines(this.collection, true)) {
+        for await (const row of readLines(this.collection)) {
             if (row.delete_time) continue;
             if (since && row.create_time < since) continue;
             if (where && !matches(row, where as Record<string, any>)) continue;
