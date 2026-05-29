@@ -1,5 +1,5 @@
 /**
- * AI 协议转换工具：OpenAI ↔ Anthropic 格式互转
+ * AI protocol conversion utilities: OpenAI ↔ Anthropic format interchange
  */
 
 /** Convert OpenAI-format chat body to Anthropic format (for upstream Anthropic provider) */

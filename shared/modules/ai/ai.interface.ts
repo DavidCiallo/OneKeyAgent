@@ -112,34 +112,6 @@ export interface ModelsServiceResponse {
     }>;
 }
 
-export class ChatCompletionsResponse implements BaseResponse<Message> {
-    success: boolean;
-    id: string;
-    object: string = "chat.completion";
-    created: number;
-    model: string;
-    choices: Array<{
-        index: number;
-        message: Message;
-        finish_reason: string;
-    }>;
-    usage: {
-        prompt_tokens: number;
-        completion_tokens: number;
-        total_tokens: number;
-    };
-    message?: string;
-
-    constructor(data: ChatCompletionsServiceResponse) {
-        this.success = true;
-        this.id = data.id;
-        this.created = Date.now();
-        this.model = data.model;
-        this.choices = data.choices;
-        this.usage = data.usage;
-    }
-}
-
 export class CompletionResponse implements BaseResponse<string> {
     success: boolean;
     id: string;
@@ -186,7 +158,7 @@ export class ModelsResponse implements BaseResponse<any> {
 }
 
 export interface AiService {
-    chatCompletions: (request: ChatCompletionsRequest) => Promise<ChatCompletionsResponse>;
+    chatCompletions: (request: ChatCompletionsRequest) => Promise<CompletionResponse>;
     completions: (request: CompletionRequest) => Promise<CompletionResponse>;
     listModels: (request: ModelsRequest) => Promise<ModelsResponse>;
 }
