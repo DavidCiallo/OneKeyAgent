@@ -55,12 +55,12 @@ export async function mounthttp(req: Request, mounts: RouteMount[]): Promise<Res
             try {
                 const result = handler && (await handler({ ...requertQuery, ...requestBody, auth }));
 
-                // 如果 handler 直接返回了 Response 对象 (如 stream)，透传
+                // If the handler directly returned a Response object (e.g. stream), pass through
                 if (result instanceof Response || (result && result.constructor?.name === "Response")) {
                     return result as any;
                 }
 
-                // raw 路由 (AI APIs, webhooks) — 直接透传结果，不包装
+                // Raw routes (AI APIs, webhooks) — pass through without wrapping
                 if (route.raw) {
                     return new Response(JSON.stringify(result), {
                         headers: {
@@ -123,10 +123,19 @@ export async function mountstatic(staticPath: string, pathName: string) {
         return new Response("Forbidden", { status: 403 });
     }
 
+    if (pathName.includes("..")) {
+        return new Response("Forbidden", { status: 403 });
+    }
+
     let filePath = path.join(staticPath, pathName);
     if (pathName === "/") {
         filePath = path.join(staticPath, "index.html");
     }
+
+    if (!filePath.startsWith(staticPath)) {
+        return new Response("Forbidden", { status: 403 });
+    }
+
     if (!validStaticFiles.has(filePath)) {
         // @ts-ignore
         const file = Bun.file(filePath);

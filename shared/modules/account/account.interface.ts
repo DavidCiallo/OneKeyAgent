@@ -2,11 +2,11 @@ import { BaseRequest, BaseResponse } from "../../lib/default/decorator";
 import { AccountEntity } from "./account.entity";
 
 
-// DTO 的字段均只来自于实体，不允许添加额外字段
-// 额外业务字段（例如查询的page）不允许直接在实体中添加，而应该在请求中添加
+// DTO fields must come only from the entity — no extra fields allowed
+// Additional business fields (e.g. page for queries) should be added in requests, not the entity
 
 // Base DTO
-// 只在服务端使用，用于构建安全的返回对象
+// Server-side only — constructs a safe response object
 export class AccountDTO {
     public id: string;
     public name: string;
@@ -28,10 +28,10 @@ export class AccountDTO {
 }
 
 // Client DTO
-// throw 仅在构造函数中使用
+// throw is only used within constructors
 
-// 客户端使用，使用new用于构造合法请求，非法请求在本地构建时throw
-// 服务端使用，使用self进行重复构造，非法请求会被拒绝throw并且返回错误
+// Client side: use `new` to construct valid requests; invalid local requests will throw
+// Server side: use `self` for reconstruction; invalid requests are rejected with an error response
 
 export class AccountQueryBody {
     public id?: string;
