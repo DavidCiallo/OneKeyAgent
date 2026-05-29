@@ -13,15 +13,14 @@ import { buildAuthHeader, buildRequestConfig, calculateCost, getThinkingConfig }
 
 const WEEKLY_LIMIT = 100; // $100 per week
 
-/** Get total weekly spending for an account */
+/** Get total weekly spending for an account (uses pre-aggregated usage_bucket) */
 async function getWeeklySpending(account_id: string): Promise<number> {
     const since = Date.now() - 7 * 86400000;
-    const repo = Repository.instance<any>("usage_log");
-    const logs = await repo.find({ account_id: account_id }, { since });
+    const repo = Repository.instance<any>("usage_bucket");
+    const buckets = await repo.find({ account_id: account_id }, { since });
     let total = 0;
-    for (const log of logs) {
-        const cost = (log.input_tokens * (log.input_price || 0) + log.output_tokens * (log.output_price || 0)) / 1_000_000;
-        total += Math.round(cost * 1_000_000) / 1_000_000;
+    for (const bucket of buckets) {
+        total += bucket.cost || 0;
     }
     return Math.round(total * 1_000_000) / 1_000_000;
 }
@@ -224,7 +223,6 @@ async function requireModelAccess(account_id: string, alias: string): Promise<vo
     }
 }
 
-
 async function safePipe(reader: ReadableStreamDefaultReader<Uint8Array>, writer: WritableStreamDefaultWriter<Uint8Array>) {
     try {
         while (true) {
@@ -271,138 +269,6 @@ async function requestJson(urlStr: string, api_key: string | undefined, postBody
     });
 }
 
-async function requestStream(urlStr: string, api_key: string | undefined, postBody: string, proxy_url: string | undefined, auth_type?: string, apiType?: string): Promise<ReadableStream<Uint8Array> | null> {
-    const url = new URL(urlStr);
-    const agent = proxy_url ? new HttpsProxyAgent(proxy_url) : undefined;
-    return new Promise((resolve) => {
-        const lib = url.protocol === "https:" ? https : http;
-        const opts: http.RequestOptions = {
-            hostname: url.hostname,
-            port: url.port || (url.protocol === "https:" ? 443 : 80),
-            path: url.pathname + url.search,
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": buildAuthHeader(api_key, auth_type),
-                "Content-Length": Buffer.byteLength(postBody).toString(),
-            },
-            agent,
-            timeout: 300_000,
-        };
-        const req = lib.request(opts, (res) => {
-            if (res.statusCode !== 200) {
-                res.resume();
-                return resolve(null);
-            }
-            const ts = new TransformStream<Uint8Array, Uint8Array>();
-            const writer = ts.writable.getWriter();
-            res.on("data", (chunk: Buffer) => writer.write(chunk));
-            res.on("end", () => writer.close());
-            res.on("error", () => writer.close());
-
-            // Normalize Anthropic SSE to OpenAI SSE so downstream always gets OpenAI format
-            if (apiType === "anthropic") {
-                resolve(antStreamToOpenAI(ts.readable));
-            } else {
-                resolve(ts.readable);
-            }
-        });
-        req.on("error", () => resolve(null));
-        req.on("timeout", () => { req.destroy(); resolve(null); });
-        req.write(postBody);
-        req.end();
-    });
-}
-
-async function completeHexStream(body: Record<string, any>, account_id: string): Promise<ReadableStream<Uint8Array>> {
-    const requestedAlias = body.model;
-
-    await requireModelAccess(account_id, requestedAlias);
-
-    const providers = await ProviderService.getProvidersByAlias(requestedAlias);
-    if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
-
-    for (const provider of providers) {
-        const bodyStream = await requestStream(`${provider.base_url}/completions`, provider.api_key, JSON.stringify({ ...body, stream: true, model: provider.model }), provider.proxy_url, provider.auth_type, provider.api_type);
-        if (!bodyStream) {
-            ProviderService.recordFail(provider.id);
-            continue;
-        }
-
-        ProviderService.recordSuccess(provider.id);
-
-        const [upstreamForward, parseStream] = (bodyStream.tee() as [ReadableStream<Uint8Array>, ReadableStream<Uint8Array>]);
-
-        const ts = new TransformStream<Uint8Array, Uint8Array>();
-        const forwardStream = ts.readable;
-        safePipe(upstreamForward.getReader(), ts.writable.getWriter());
-
-        // Background parse usage
-        (async () => {
-            try {
-                const reader = parseStream.getReader();
-                const decoder = new TextDecoder();
-                let usageData: any = null;
-                let estimatedOutputChars = 0;
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-
-                    const text = decoder.decode(value, { stream: true });
-                    const lines = text.split('\n');
-                    for (const line of lines) {
-                        if (line.startsWith('data: ') && !line.startsWith('data: [DONE]')) {
-                            try {
-                                const data = JSON.parse(line.slice(6));
-                                if (data.usage) {
-                                    usageData = data.usage;
-                                }
-                                const content = data.choices?.[0]?.delta?.content || data.choices?.[0]?.text || '';
-                                if (content) {
-                                    estimatedOutputChars += content.length;
-                                }
-                            } catch { }
-                        }
-                    }
-                }
-
-                const { input_price: input_price, output_price: output_price } = await getModelPrices(requestedAlias);
-
-                let rawInput: number;
-                let rawOutput: number;
-
-                if (usageData) {
-                    rawInput = usageData.input_tokens ?? usageData.prompt_tokens ?? 0;
-                    rawOutput = usageData.output_tokens ?? usageData.completion_tokens ?? 0;
-                } else {
-                    rawInput = 0;
-                    rawOutput = Math.max(1, Math.round(estimatedOutputChars / 4));
-                }
-
-                const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
-                await deductBalance(account_id, cost);
-
-                await logUsage({
-                    account_id,
-                    model_alias: requestedAlias,
-                    provider_id: provider.id,
-                    input_tokens: rawInput,
-                    output_tokens: rawOutput,
-                    input_price: input_price,
-                    output_price: output_price,
-                });
-                await AccountService.updateBalance(account_id, -cost);
-            } catch (err) {
-            }
-        })();
-
-        return forwardStream;
-    }
-
-    throw new Error("All providers failed for streaming");
-}
-
 export class AiService {
     static async chatCompletions(data: Record<string, any>, account_id: string): Promise<CompletionServiceResponse> {
         const requestedAlias = data.model;
@@ -439,7 +305,7 @@ export class AiService {
             // Deduct balance
             const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
             await deductBalance(account_id, cost);
-
+            console.log(`Usage logged: ${rawInput} input tokens, ${rawOutput} output tokens, cost: ${cost}`);
             await logUsage({
                 account_id,
                 model_alias: requestedAlias,
@@ -466,25 +332,23 @@ export class AiService {
 
         const firstUserMsg = data.messages.find((m: any) => m.role === "user")?.content ?? "";
         const sessionKey = `${account_id}::${Buffer.from(JSON.stringify(firstUserMsg)).toString("base64")}`;
-        console.log(new Date(), "Session key:", sessionKey.slice(0, 10) + "......" + sessionKey.slice(-10));
-        // Inject previously saved reasoning_content (to prevent missing reasoning)
-        if (sessionReasoningMap.has(sessionKey)) {
-            console.log("Found saved reasoning_content");
-            const saved = sessionReasoningMap.get(sessionKey)!;
-            let idx = 0;
-            for (const msg of data.messages) {
-                if (msg.role === "assistant" && msg.tool_calls) {
-                    msg.reasoning_content = idx < saved.length ? saved[idx] : "";
-                    idx++;
-                }
-            }
-        }
+
 
         for (const provider of providers) {
             const requestBody: Record<string, any> = { ...data, stream: true, model: provider.model };
             const thinkConfig = getThinkingConfig(requestedAlias);
-            if (thinkConfig) {
-                Object.assign(requestBody, thinkConfig);
+            Object.assign(requestBody, thinkConfig);
+            if (thinkConfig.thinking.type === "enabled") {
+                if (sessionReasoningMap.has(sessionKey)) {
+                    const saved = sessionReasoningMap.get(sessionKey)!;
+                    let idx = 0;
+                    for (const msg of data.messages) {
+                        if (msg.role === "assistant" && msg.tool_calls) {
+                            msg.reasoning_content = idx < saved.length ? saved[idx] : "";
+                            idx++;
+                        }
+                    }
+                }
             }
             const { base_url, api_key, proxy_url, auth_type, api_type } = provider;
             const result = await tryProviderStream(base_url, api_key, proxy_url, requestBody, auth_type, api_type);
@@ -497,11 +361,52 @@ export class AiService {
             saved.push(result.reasoningContent);
             sessionReasoningMap.set(sessionKey, saved);
 
-            // Tee stream: forward + usage parsing (unchanged)
             const [upstreamForward, parseStream] = result.stream.tee() as [ReadableStream<Uint8Array>, ReadableStream<Uint8Array>];
+
+            (async () => {
+                try {
+                    const reader = parseStream.getReader();
+                    const decoder = new TextDecoder();
+                    let usageData: any = null;
+                    let estimatedOutputChars = 0;
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        const text = decoder.decode(value, { stream: true });
+                        const lines = text.split('\n');
+                        for (const line of lines) {
+                            if (line.startsWith('data: ') && !line.startsWith('data: [DONE]')) {
+                                try {
+                                    const d = JSON.parse(line.slice(6));
+                                    if (d.usage) usageData = d.usage;
+                                    const content = d.choices?.[0]?.delta?.content || d.choices?.[0]?.text || '';
+                                    if (content) estimatedOutputChars += content.length;
+                                } catch { }
+                            }
+                        }
+                    }
+
+                    const { input_price, output_price } = await getModelPrices(requestedAlias);
+                    const rawInput = usageData?.input_tokens ?? usageData?.prompt_tokens ?? 0;
+                    const rawOutput = usageData?.output_tokens ?? usageData?.completion_tokens ?? Math.max(1, Math.round(estimatedOutputChars / 4));
+                    const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
+                    await deductBalance(account_id, cost);
+                    await logUsage({
+                        account_id,
+                        model_alias: requestedAlias,
+                        provider_id: provider.id,
+                        input_tokens: rawInput,
+                        output_tokens: rawOutput,
+                        input_price,
+                        output_price,
+                    });
+                    await AccountService.updateBalance(account_id, -cost);
+                } catch { }
+            })();
+
             const ts = new TransformStream<Uint8Array, Uint8Array>();
             safePipe(upstreamForward.getReader(), ts.writable.getWriter());
-            // … background usage parsing (omitted)
 
             return ts.readable;
         }

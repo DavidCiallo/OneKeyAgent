@@ -1,21 +1,10 @@
 import Repository from "../../lib/repository";
 import { ModelEntity } from "../../../shared/modules/model/model.entity";
-import { ProviderEntity } from "../../../shared/modules/provider/provider.entity";
 import { UsageLogEntity } from "../../../shared/modules/usage/usage.entity";
+import { BucketManager } from "../usage/usage_bucket";
 
 const modelRepo = Repository.instance<ModelEntity>("Model");
-const providerRepo = Repository.instance<ProviderEntity>("Provider");
 const usageRepo = Repository.instance<UsageLogEntity>("usage_log");
-
-/** Ensure the 'hex' model exists in the database */
-export async function seedDefaultModel() {
-    // const models = await modelRepo.find();
-    // const hasHex = models.some(m => m.alias === "hex");
-    // if (!hasHex) {
-    //     await modelRepo.insert({ alias: "hex" });
-    //     console.log("[Seed] Created default model 'hex'");
-    // }
-}
 
 export async function logUsage(usage: {
     account_id: string,
@@ -26,7 +15,19 @@ export async function logUsage(usage: {
     input_price: number,
     output_price: number,
 }) {
+    // Write raw log (unchanged — preserves full detail for audit / list view)
     await usageRepo.insert(usage);
+
+    // Accumulate into in-memory bucket manager (O(1), no I/O here)
+    const cost = Math.round((usage.input_tokens * (usage.input_price || 0) + usage.output_tokens * (usage.output_price || 0)) / 1_000_000 * 1_000_000) / 1_000_000;
+    BucketManager.instance.accumulate({
+        account_id: usage.account_id,
+        model_alias: usage.model_alias,
+        provider_id: usage.provider_id || "unknown",
+        input_tokens: usage.input_tokens,
+        output_tokens: usage.output_tokens,
+        cost,
+    });
 }
 
 export async function getAllModels(): Promise<ModelEntity[]> {

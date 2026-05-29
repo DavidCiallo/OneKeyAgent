@@ -181,18 +181,18 @@ export interface UsageSessionTotals {
     totalRequests: number;
 }
 
-export class UsageSessionsResponse implements BaseResponse<UserSessionGroup> {
+export class UsageSessionsResponse implements BaseResponse<UserSessionGroup | UsageSessionTotals | UserSession> {
     public success: boolean;
     public message: string;
-    public data: UserSessionGroup[];
-    public totals: UsageSessionTotals;
-    public recentSessions?: UserSession[];
+    public data: {
+        list: UserSessionGroup[];
+        totals: UsageSessionTotals;
+        recentSessions?: UserSession[];
+    };
 
     constructor(origin: UsageSessionsResponse) {
         this.success = origin.success;
         this.message = origin.message;
         this.data = origin.data;
-        this.totals = origin.totals;
-        this.recentSessions = origin.recentSessions;
     }
 }

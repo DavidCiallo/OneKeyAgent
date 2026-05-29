@@ -46,13 +46,14 @@ export function calculateCost(input_tokens: number, output_tokens: number, input
 }
 
 /** Determine thinking/reasoning config from model alias suffix */
-export function getThinkingConfig(alias: string): { thinking: { type: string }; reasoning_effort?: string } | null {
+export function getThinkingConfig(alias: string): { thinking: { type: string }; reasoning_effort?: string } {
     const match = alias.match(/^(.*)-think-(low|medium|high|max)$/);
     if (match) {
         return {
             thinking: { type: "enabled" },
             reasoning_effort: match[2] as "low" | "medium" | "high" | "max",
         };
+    }else{
+        return { thinking: { type: "disabled" } };
     }
-    return null; // not a think model — don't inject thinking params
 }

@@ -84,9 +84,9 @@ export default function UsagePage() {
             account_ids: ids.size > 0 ? Array.from(ids) : undefined,
         } as any);
         if (res.success && res.data) {
-            setGroups(res.data);
-            setTotals(res.totals);
-            setRecentSessions(res.recentSessions || []);
+            setGroups(res.data.list);
+            setTotals(res.data.totals);
+            setRecentSessions(res.data.recentSessions || []);
         }
         setLoading(false);
     }, []);
