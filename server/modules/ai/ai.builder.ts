@@ -35,18 +35,24 @@ export function buildRequestConfig(
         headers["Authorization"] = buildAuthHeader(api_key, auth_type);
     }
 
-    // Debug logs only — no longer mutating message content
-    // console.log("--- Outgoing messages (first 50 chars of content) ---");
-    // for (const msg of body.messages) {
-    //     console.log({
-    //         role: msg.role,
-    //         content: typeof msg.content === "string" ? msg.content.slice(0, 50) : msg.content,
-    //         tool_call_id: msg.tool_call_id ?? "",
-    //         has_tool_calls: !!msg.tool_calls,
-    //         has_reasoning: !!msg.reasoning_content,
-    //     });
-    // }
-    // console.log("--- End of messages ---");
-
     return { url, headers, requestBody: postBody };
+}
+
+/** Calculate cost in USDT for a request */
+export function calculateCost(input_tokens: number, output_tokens: number, input_price: number, output_price: number): number {
+    // input_price/output_price are in dollars per 1M tokens
+    const cost = (input_tokens * input_price + output_tokens * output_price) / 1_000_000;
+    return Math.round(cost * 1_000_000) / 1_000_000; // 6 decimal precision
+}
+
+/** Determine thinking/reasoning config from model alias suffix */
+export function getThinkingConfig(alias: string): { thinking: { type: string }; reasoning_effort?: string } | null {
+    const match = alias.match(/^(.*)-think-(low|medium|high|max)$/);
+    if (match) {
+        return {
+            thinking: { type: "enabled" },
+            reasoning_effort: match[2] as "low" | "medium" | "high" | "max",
+        };
+    }
+    return null; // not a think model — don't inject thinking params
 }

@@ -9,14 +9,7 @@ import { AccountRoleService } from "../role/role.service";
 import { anthropicToOpenAI, antMessagesToOpenAI, openAIToAntMessages, openAIToAntStream, antStreamToOpenAI } from "./ai.trans";
 import Repository from "../../lib/repository";
 import fs from "fs";
-import { buildAuthHeader, buildRequestConfig } from "./ai.builder";
-
-/** Calculate cost in USDT for a request */
-function calculateCost(input_tokens: number, output_tokens: number, input_price: number, output_price: number): number {
-    // input_price/output_price are in dollars per 1M tokens
-    const cost = (input_tokens * input_price + output_tokens * output_price) / 1_000_000;
-    return Math.round(cost * 1_000_000) / 1_000_000; // 6 decimal precision
-}
+import { buildAuthHeader, buildRequestConfig, calculateCost, getThinkingConfig } from "./ai.builder";
 
 const WEEKLY_LIMIT = 100; // $100 per week
 
@@ -423,9 +416,12 @@ export class AiService {
             const requestBody: Record<string, any> = {
                 ...data,
                 stream: false,
-                thinking: { type: "disabled" },
                 model: provider.model,
             };
+            const thinkConfig = getThinkingConfig(requestedAlias);
+            if (thinkConfig) {
+                Object.assign(requestBody, thinkConfig);
+            }
 
             const rdata = await tryProvider(provider.base_url, provider.model, provider.api_key, provider.proxy_url, requestBody, provider.auth_type, provider.api_type);
             if (!rdata) {
@@ -485,7 +481,11 @@ export class AiService {
         }
 
         for (const provider of providers) {
-            const requestBody = { ...data, stream: true, thinking: { type: "enabled" }, reasoning_effort: "max", model: provider.model };
+            const requestBody: Record<string, any> = { ...data, stream: true, model: provider.model };
+            const thinkConfig = getThinkingConfig(requestedAlias);
+            if (thinkConfig) {
+                Object.assign(requestBody, thinkConfig);
+            }
             const { base_url, api_key, proxy_url, auth_type, api_type } = provider;
             const result = await tryProviderStream(base_url, api_key, proxy_url, requestBody, auth_type, api_type);
 
