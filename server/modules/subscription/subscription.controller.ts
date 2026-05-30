@@ -113,8 +113,9 @@ async function statement(request: StatementRequest) {
     const cards = await cardRepo.find({ redeemed_by: account.id, status: "redeemed" });
 
     const bucketRepo = Repository.instance<any>("usage_bucket");
-    // Use 60m granularity buckets for cost aggregation
-    const usageBuckets = await bucketRepo.find({ account_id: account.id, granularity: "60m", delete_time: null });
+    // Use 60m granularity buckets for cost aggregation (last 90 days)
+    const since = Date.now() - 90 * 86400000;
+    const usageBuckets = await bucketRepo.find({ account_id: account.id, granularity: "60m", delete_time: null }, { since });
 
     // Group by "day|model_alias"
     const dailyModelUsage = new Map<string, { logs: any[]; maxTimestamp: number }>();
