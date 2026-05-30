@@ -45,15 +45,6 @@ export class AccountService {
         await accountRepository.delete({ id });
     }
 
-    /** Sum usage costs for a set of logs using the same formula everywhere */
-    static computeUsageCost(logs: { input_tokens: number; output_tokens: number; input_price?: number; output_price?: number }[]): number {
-        let total = 0;
-        for (const log of logs) {
-            total += (log.input_tokens * (log.input_price || 0) + log.output_tokens * (log.output_price || 0)) / 1_000_000;
-        }
-        return Math.round(total * 1_000_000) / 1_000_000;
-    }
-
     /** Atomically update account balance by delta */
     static async updateBalance(account_id: string, delta: number): Promise<void> {
         if (delta === 0) return;
@@ -67,37 +58,5 @@ export class AccountService {
     static async getBalance(account_id: string): Promise<number> {
         const account = await this.findOne(account_id);
         return account?.balance ?? 0;
-    }
-
-    /** One-time init: compute and persist balance for accounts that haven't been initialized yet (balance === 0 and has history) */
-    static async initBalances(): Promise<void> {
-        const accounts = await accountRepository.find({ balance: 0 });
-        let count = 0;
-        for (const acct of accounts) {
-            const balance = await this.computeBalance(acct.id);
-            if (balance !== 0) {
-                await accountRepository.update({ id: acct.id }, { balance } as any);
-                count++;
-            }
-        }
-        if (count > 0) {
-            console.log(`[AccountService] Initialized balances for ${count} accounts`);
-        }
-    }
-
-    /** Compute balance from transactions + gift cards - usage costs (original aggregation) */
-    static async computeBalance(account_id: string): Promise<number> {
-        const txRepo = Repository.instance<any>("Transaction");
-        const transactions = await txRepo.find({ account_id: account_id, status: "confirmed", delete_time: null });
-        const txTotal = transactions.reduce((sum: number, t: any) => sum + (t.amount || 0), 0);
-
-        const cardRepo = Repository.instance<any>("gift_card");
-        const giftCards = await cardRepo.find({ redeemed_by: account_id, status: "redeemed" });
-        const gcTotal = giftCards.reduce((sum: number, c: any) => sum + (c.token_amount || 0), 0);
-
-        const usageRepo = Repository.instance<any>("usage_log");
-        const usageLogs = await usageRepo.find({ account_id: account_id, delete_time: null });
-
-        return txTotal + gcTotal - this.computeUsageCost(usageLogs);
     }
 }

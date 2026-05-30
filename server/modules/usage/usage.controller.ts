@@ -1,4 +1,3 @@
-import { UsageLogEntity } from "../../../shared/modules/usage/usage.entity";
 import {
     UsageListRequest,
     UsageDTO,
@@ -27,7 +26,7 @@ async function list(request: UsageListRequest) {
 
     const account = await resolveAccount(auth);
 
-    const search: Partial<UsageLogEntity> = {};
+    const search: { account_id?: string; model_alias?: string } = {};
     if (account.is_admin) {
         if (filter?.account_id) search.account_id = filter.account_id;
     } else {
@@ -52,12 +51,11 @@ async function list(request: UsageListRequest) {
     const providerMap = new Map(providers.map(p => [p.id, p.name]));
 
     const list = data.map(item => {
-        const cost = (item.input_tokens * (item.input_price || 0) + item.output_tokens * (item.output_price || 0)) / 1_000_000;
         return new UsageDTO({
             ...item,
             accountName: accountMap.get(item.account_id) || item.account_id,
             providerName: item.provider_id ? providerMap.get(item.provider_id) || item.provider_id : undefined,
-            cost: Math.round(cost * 1_000_000) / 1_000_000,
+            cost: Math.round((item.cost || 0) * 1_000_000) / 1_000_000,
         });
     });
 

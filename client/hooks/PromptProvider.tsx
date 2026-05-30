@@ -1,4 +1,4 @@
-// PromptProvider.tsx (更新版本)
+// PromptProvider.tsx (updated version)
 
 import { useState, createContext, useContext, ReactNode, Ref, useRef, FormEvent } from "react";
 import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Textarea } from "@heroui/react";
@@ -27,14 +27,14 @@ interface PromptState extends PromptConfig {
     resolver: (value: string | null) => void;
 }
 
-// 3. PromptProvider 组件
+// 3. PromptProvider component
 export const TextEditorPromptProvider = ({ children }: { children: ReactNode }) => {
     const [promptState, setPromptState] = useState<PromptState | null>(null);
     const [currentText, setCurrentText] = useState("");
 
     const formRef = useRef<HTMLButtonElement>(null);
 
-    // showPrompt 现在接收一个配置对象
+    // showPrompt now receives a config object
     const showPrompt = (config: PromptConfig): Promise<string | null> => {
         return new Promise((resolve) => {
             setPromptState({
@@ -71,7 +71,7 @@ export const TextEditorPromptProvider = ({ children }: { children: ReactNode }) 
     return (
         <PromptContext.Provider value={contextValue}>
             {children}
-            {/* 渲染模态框：使用 promptState 中的配置项 */}
+            {/* Render modal: using config from promptState */}
             {promptState && (
                 <Modal className="w-full" isOpen={promptState.isOpen}>
                     <ModalContent className="min-w-[50vw]">
@@ -131,7 +131,7 @@ export const TextEditorPromptProvider = ({ children }: { children: ReactNode }) 
 export const useTextEditorPrompt = () => {
     const context = useContext(PromptContext);
     if (context === undefined) {
-        throw new Error("useTextEditorPrompt 必须在 TextEditorPromptProvider 内部使用");
+        throw new Error("useTextEditorPrompt must be used within TextEditorPromptProvider");
     }
     return context;
 };

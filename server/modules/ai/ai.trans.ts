@@ -1,5 +1,5 @@
 /**
- * AI 协议转换工具：OpenAI ↔ Anthropic 格式互转
+ * AI protocol conversion utilities: OpenAI ↔ Anthropic format interchange
  */
 
 /** Convert OpenAI-format chat body to Anthropic format (for upstream Anthropic provider) */
@@ -303,7 +303,6 @@ export function openAIToAntStream(upstream: ReadableStream<Uint8Array>): Readabl
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) {
-                    console.log("[openAIToAntStream] upstream stream done");
                     break;
                 }
 
@@ -448,7 +447,6 @@ export function openAIToAntStream(upstream: ReadableStream<Uint8Array>): Readabl
  * Handles text content blocks and tool_use blocks.
  */
 export function antStreamToOpenAI(upstream: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
-    console.log("Converting Anthropic SSE stream to OpenAI SSE stream");
     const ts = new TransformStream<Uint8Array, Uint8Array>();
     const writer = ts.writable.getWriter();
     const decoder = new TextDecoder();

@@ -32,7 +32,7 @@ if (args.length > 1) {
     if (fs.existsSync(jsonPath)) {
         fields = JSON.parse(fs.readFileSync(jsonPath, 'utf-8')).fields;
     } else {
-        console.error(`Error: 未提供字段且未找到蓝图 ${jsonPath}`);
+        console.error(`Error: No fields provided and no blueprint found at ${jsonPath}`);
         process.exit(1);
     }
 }

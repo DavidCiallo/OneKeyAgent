@@ -20,7 +20,7 @@ export class TaskDTO {
     }
 }
 
-// Poll: 客户端拉取自己的待办任务（用 api_key 认证）
+// Poll: Client fetches its pending tasks (authenticated via api_key)
 export class TaskPollRequest implements BaseRequest {
     public auth?: string;
 
@@ -47,7 +47,7 @@ export class TaskPollResponse implements BaseResponse<TaskDTO> {
     }
 }
 
-// Receive: TG 推送消息过来，服务端接收并解析创建任务
+// Receive: TG pushes a message, server receives and parses it to create a task
 export class TaskReceiveBody {
     public tg_chat_id: string;
     public text: string;
@@ -93,7 +93,7 @@ export class TaskReceiveResponse implements BaseResponse<TaskDTO> {
     }
 }
 
-// Complete: 客户端完成任务后更新状态，可选回传结果文本
+// Complete: Client updates task status after completion, optionally returns result text
 export class TaskCompleteBody {
     public status: "completed" | "failed";
     public result?: string;
@@ -141,7 +141,7 @@ export class TaskCompleteResponse implements BaseResponse<TaskDTO> {
     }
 }
 
-// SendMessage: 客户端根据 task_id 发送消息到 TG
+// SendMessage: Client sends a message to TG by task_id
 export class TaskSendMessageRequest implements BaseRequest {
     public auth?: string;
     public id: string;

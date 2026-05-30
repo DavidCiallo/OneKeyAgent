@@ -1,5 +1,5 @@
 import { BaseRequest, BaseResponse } from "../../lib/default/decorator";
-import { UsageLogEntity } from "./usage.entity";
+import { UsageBucketEntity } from "./usage_bucket.entity";
 
 export interface UsageAmountData {
     ts: number;
@@ -61,7 +61,7 @@ export class UsageDTO {
     public cost: number;
     public create_time: number;
 
-    constructor(origin: UsageLogEntity & { accountName?: string; providerName?: string; cost?: number }) {
+    constructor(origin: UsageBucketEntity & { accountName?: string; providerName?: string; cost?: number }) {
         this.id = origin.id;
         this.account_id = origin.account_id;
         this.accountName = origin.accountName;
@@ -79,13 +79,13 @@ export class UsageQueryBody {
     public account_id?: string;
     public model_alias?: string;
 
-    constructor(origin: Partial<UsageLogEntity>) {
+    constructor(origin: Partial<UsageBucketEntity>) {
         if (false) throw new Error("Unexpected error");
         origin.account_id && (this.account_id = origin.account_id);
         origin.model_alias && (this.model_alias = origin.model_alias);
     }
 
-    static self(unsafe: Partial<UsageLogEntity>) {
+    static self(unsafe: Partial<UsageBucketEntity>) {
         return new UsageQueryBody(unsafe);
     }
 }

@@ -21,8 +21,8 @@ function sendChunk(
 }
 
 /**
- * 将完整的非流式响应内容（可能含 tool_calls），模拟成 SSE 流式传输的 ReadableStream
- * 格式兼容 OpenAI 的 streaming API（含 tool_calls 分块）
+ * Convert a complete non-streaming response (possibly with tool_calls) into an SSE streaming ReadableStream.
+ * Compatible with OpenAI's streaming API format, including tool_calls chunking.
  */
 export function createPseudoStream(
     content: string,
@@ -44,7 +44,7 @@ export function createPseudoStream(
                 { index: 0, delta: { role: "assistant", content: toolCalls ? null : "" }, finish_reason: null },
             ]);
 
-            // tool_calls 一次性全发
+            // Emit all tool_calls at once
             if (toolCalls && toolCalls.length > 0) {
                 for (const tc of toolCalls) {
                     sendChunk(controller, encoder, id, model, created, [
@@ -61,7 +61,7 @@ export function createPseudoStream(
                 }
             }
 
-            // content 一次性全发（仅在没有 tool_calls 时输出 content）
+            // Emit all content at once (only when there are no tool_calls)
             if (!toolCalls || toolCalls.length === 0) {
                 sendChunk(controller, encoder, id, model, created, [
                     { index: 0, delta: { content }, finish_reason: null },
@@ -80,7 +80,7 @@ export function createPseudoStream(
 }
 
 /**
- * 为 completions endpoint 生成伪流式
+ * Create a pseudo-stream for the completions endpoint
  */
 export function createPseudoCompletionStream(
     text: string,
