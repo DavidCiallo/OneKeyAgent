@@ -226,7 +226,7 @@ async function importData(request: AccountImportRequest) {
     }
 
     return { imported };
-
+}
 export const accountMount = {
     routes: accountRoutes,
     handlers: { list, detail, create, update, delete: del, profile, regenerate, export: exportData, import: importData },

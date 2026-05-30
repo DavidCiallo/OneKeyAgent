@@ -174,7 +174,6 @@ export class VerifyEmailRequest implements BaseRequest {
     public token: string;
 
     constructor(origin: Partial<VerifyEmailRequest>) {
-        console.log(origin);
         if (!origin.token) throw new Error("Token is required");
         this.token = origin.token;
     }

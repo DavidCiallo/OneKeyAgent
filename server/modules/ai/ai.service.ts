@@ -80,7 +80,6 @@ async function tryProvider(
             res.on("data", (chunk: Buffer) => data += chunk);
             res.on("end", () => {
                 if (res.statusCode !== 200) {
-                    console.log("[AI] Error response:", res.statusCode, data)
                     return resolve(null);
                 }
                 try {
@@ -91,13 +90,11 @@ async function tryProvider(
                         resolve(parsed);
                     }
                 } catch (e) {
-                    console.log("[AI] Error parsing response", e)
                     resolve(null);
                 }
             });
         });
         req.on("error", (e) => {
-            console.log("[AI] Error request", e)
             resolve(null);
         });
         req.on("timeout", () => { req.destroy(); resolve(null); });
