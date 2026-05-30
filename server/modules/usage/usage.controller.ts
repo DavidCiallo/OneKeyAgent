@@ -3,6 +3,7 @@ import {
     UsageDTO,
     UsageStatsRequest,
     UsageSessionsRequest,
+    UsageStatsBatchRequest,
     UserSessionGroup,
     UserSession,
 } from "../../../shared/modules/usage/usage.interface";
@@ -71,6 +72,19 @@ async function stats(request: UsageStatsRequest) {
     return data;
 }
 
+async function statsBatch(request: UsageStatsBatchRequest) {
+    request = UsageStatsBatchRequest.self(request);
+    const { auth, model_aliases } = request;
+    if (!auth) throw "Authorization failed";
+    const account = await resolveAccount(auth);
+    const results = await UsageService.statsBatch(model_aliases, account.is_admin ? undefined : account.id);
+    const data: Record<string, any> = {};
+    for (const [alias, result] of results) {
+        data[alias] = result;
+    }
+    return data;
+}
+
 async function sessions(request: UsageSessionsRequest) {
     request = UsageSessionsRequest.self(request);
     const { auth } = request;
@@ -129,5 +143,5 @@ async function sessions(request: UsageSessionsRequest) {
 
 export const usageMount = {
     routes: usageRoutes,
-    handlers: { list, stats, sessions },
+    handlers: { list, stats, statsBatch, sessions },
 };
