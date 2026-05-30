@@ -23,11 +23,10 @@ function localDayStart(ts: number): number {
 /** Return how many 10-min display slots a bucket granularity spans */
 function bucketSlots(granularity: string): number {
     switch (granularity) {
-        case "minute": case "1m": case "5m": return 1;
-        case "15m":  return 2;
-        case "30m":  return 3;
+        case "minute": case "1m": return 1;
         case "hour": case "60m": return 6;
-        default:     return 1;
+        case "1d": return 144; // 144 * 10min = 24h
+        default: return 1;
     }
 }
 
@@ -75,7 +74,8 @@ function buildBucketPeriod(buckets: any[], periodStart: number, periodEnd: numbe
 
 export class UsageService {
     static async find(page: number, filter: { account_id?: string; model_alias?: string }, since?: number): Promise<{ list: UsageBucketEntity[], total: number }> {
-        const bucketFilter: any = { ...filter, granularity: "1m" };
+        // 30-day window → use 60m granularity (1m data only kept 7 days)
+        const bucketFilter: any = { ...filter, granularity: "60m" };
         const list = await bucketRepo.find(bucketFilter, { offset: (page - 1) * 40, limit: 40, since });
         const total = since ? await bucketRepo.count(bucketFilter, since) : await bucketRepo.count(bucketFilter);
         return { list, total };
@@ -92,11 +92,11 @@ export class UsageService {
         if (model_alias) baseFilter.model_alias = model_alias;
         if (account_id) baseFilter.account_id = account_id;
 
-        // Use fine granularity for short ranges, coarse for long ranges
+        // Use 1m for fine-grained short ranges, 1d for weekly overview
         const [todayBuckets, last24hBuckets, weekBuckets] = await Promise.all([
-            UsageService.loadBucketsByTime(baseFilter, todayStart, "5m"),
-            UsageService.loadBucketsByTime(baseFilter, last24hStart, "5m"),
-            UsageService.loadBucketsByTime(baseFilter, weekStart, "60m"),
+            UsageService.loadBucketsByTime(baseFilter, todayStart, "1m"),
+            UsageService.loadBucketsByTime(baseFilter, last24hStart, "1m"),
+            UsageService.loadBucketsByTime(baseFilter, weekStart, "1d"),
         ]);
 
         return {
@@ -119,11 +119,9 @@ export class UsageService {
     /** Pick the coarsest granularity that still provides adequate precision for the query */
     private static selectGranularity(gapMinutes: number, since: number): string {
         const rangeDays = (Date.now() - since) / DAY;
-        if (rangeDays <= 1 && gapMinutes <= 1) return "1m";
-        if (rangeDays <= 1 && gapMinutes <= 5) return "5m";
-        if (rangeDays <= 7 && gapMinutes <= 15) return "15m";
-        if (rangeDays <= 7 && gapMinutes <= 30) return "30m";
-        return "60m";
+        if (rangeDays <= 1) return "1m";          // up to 1 day → 1m precision
+        if (rangeDays <= 90) return "60m";         // up to 90 days → hourly precision
+        return "1d";                                // beyond 90 days → daily
     }
 
     static windowStart(ts: number, gapMs: number): number {
@@ -151,7 +149,7 @@ export class UsageService {
             // >= 1h: show as hh:00-hh:00
             return `${MM}/${DD} ${hh}:00-${ehh}:00`;
         }
-        // < 1h (15min, 30min): show as hh:mm-hh:mm
+        // < 1h (1m, 15min, 30min): show as hh:mm-hh:mm
         return `${MM}/${DD} ${hh}:${mm}-${ehh}:${emm}`;
     }
 
