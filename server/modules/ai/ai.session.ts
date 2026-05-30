@@ -1,10 +1,8 @@
 import Repository from "../../lib/repository";
 import { ModelEntity } from "../../../shared/modules/model/model.entity";
-import { UsageLogEntity } from "../../../shared/modules/usage/usage.entity";
 import { BucketManager } from "../usage/usage_bucket";
 
 const modelRepo = Repository.instance<ModelEntity>("Model");
-const usageRepo = Repository.instance<UsageLogEntity>("usage_log");
 
 export async function logUsage(usage: {
     account_id: string,
@@ -15,10 +13,6 @@ export async function logUsage(usage: {
     input_price: number,
     output_price: number,
 }) {
-    // Write raw log (unchanged — preserves full detail for audit / list view)
-    await usageRepo.insert(usage);
-
-    // Accumulate into in-memory bucket manager (O(1), no I/O here)
     const cost = Math.round((usage.input_tokens * (usage.input_price || 0) + usage.output_tokens * (usage.output_price || 0)) / 1_000_000 * 1_000_000) / 1_000_000;
     BucketManager.instance.accumulate({
         account_id: usage.account_id,

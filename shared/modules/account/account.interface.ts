@@ -303,7 +303,6 @@ export interface ExportData {
         account_roles?: any[];
         transactions?: any[];
         tasks?: any[];
-        usage_logs?: any[];
         usage_buckets?: any[];
         gift_cards?: any[];
     };

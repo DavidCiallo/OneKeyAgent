@@ -2,11 +2,9 @@ import Repository from "../../lib/repository";
 import { AccountEntity } from "../../../shared/modules/account/account.entity";
 import { ModelEntity } from "../../../shared/modules/model/model.entity";
 import { ProviderEntity } from "../../../shared/modules/provider/provider.entity";
-import { UsageLogEntity } from "../../../shared/modules/usage/usage.entity";
-import { UsageBucketEntity, BucketGranularity } from "../../../shared/modules/usage/usage_bucket.entity";
+import { UsageBucketEntity } from "../../../shared/modules/usage/usage_bucket.entity";
 import { UsageStatsPeriod, UsageStatsResult, UsageAmountData, UserSession, UserSessionGroup, ProviderUsage, ModelUsage } from "../../../shared/modules/usage/usage.interface";
 
-const usageRepo = Repository.instance<UsageLogEntity>("usage_log");
 const bucketRepo = Repository.instance<UsageBucketEntity>("usage_bucket");
 const modelRepo = Repository.instance<ModelEntity>("Model");
 const providerRepo = Repository.instance<ProviderEntity>("Provider");
@@ -20,18 +18,6 @@ const MONTH = 30 * DAY;
 function localDayStart(ts: number): number {
     const d = new Date(ts);
     return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-}
-
-function getRawInputTokens(log: UsageLogEntity): number {
-    return log.input_tokens || 0;
-}
-
-function getRawOutputTokens(log: UsageLogEntity): number {
-    return log.output_tokens || 0;
-}
-
-function getRawTotalTokens(log: UsageLogEntity): number {
-    return getRawInputTokens(log) + getRawOutputTokens(log);
 }
 
 /** Return how many 10-min display slots a bucket granularity spans */
@@ -88,9 +74,10 @@ function buildBucketPeriod(buckets: any[], periodStart: number, periodEnd: numbe
 }
 
 export class UsageService {
-    static async find(page: number, filter: Partial<UsageLogEntity>, since?: number): Promise<{ list: UsageLogEntity[], total: number }> {
-        const list = await usageRepo.find(filter, { offset: (page - 1) * 40, limit: 40, since });
-        const total = since ? await usageRepo.count(filter, since) : await usageRepo.count(filter);
+    static async find(page: number, filter: { account_id?: string; model_alias?: string }, since?: number): Promise<{ list: UsageBucketEntity[], total: number }> {
+        const bucketFilter: any = { ...filter, granularity: "1m" };
+        const list = await bucketRepo.find(bucketFilter, { offset: (page - 1) * 40, limit: 40, since });
+        const total = since ? await bucketRepo.count(bucketFilter, since) : await bucketRepo.count(bucketFilter);
         return { list, total };
     }
 

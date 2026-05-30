@@ -2,7 +2,6 @@ import { config } from "dotenv";
 import { fileURLToPath } from "url";
 import path from "path";
 import { initialize } from "./initialize";
-import { AccountService } from "../modules/account/account.service";
 import { startMonitor } from "../modules/subscription/monitor";
 import { BucketManager } from "../modules/usage/usage_bucket";
 
@@ -25,7 +24,6 @@ import { giftCardMount } from "../modules/subscription/gift_card.controller";
 import { settingsMount } from "../modules/settings/settings.controller";
 const PORT = parseInt(process.env.SERVER_PORT || "3300");
 await initialize();
-await AccountService.initBalances();
 startMonitor();
 BucketManager.instance.start();
 // @ts-ignore

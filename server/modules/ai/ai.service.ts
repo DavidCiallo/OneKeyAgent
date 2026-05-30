@@ -39,7 +39,6 @@ async function deductBalance(account_id: string, cost: number): Promise<void> {
     if (balance < cost) {
         throw new Error("429 Insufficient balance");
     }
-    // Balance is computed from UsageLog — no manual deduction needed
 }
 
 /** Get model prices for an alias */
@@ -92,13 +91,13 @@ async function tryProvider(
                         resolve(parsed);
                     }
                 } catch (e) {
-                    console.log("[AI] Error parsing response 143", e)
+                    console.log("[AI] Error parsing response", e)
                     resolve(null);
                 }
             });
         });
         req.on("error", (e) => {
-            console.log("[AI] Error request 149:", e)
+            console.log("[AI] Error request", e)
             resolve(null);
         });
         req.on("timeout", () => { req.destroy(); resolve(null); });
@@ -136,11 +135,6 @@ async function tryProviderStream(
                 let errorData = "";
                 res.on("data", (c: Buffer) => errorData += c);
                 res.on("end", () => {
-                    fs.writeFileSync("./error.json", JSON.stringify({
-                        statusCode: res.statusCode,
-                        headers: res.headers,
-                        body: errorData
-                    }, null, 2));
                     resolve({ stream: null, reasoningContent: "" });
                 });
                 return;
@@ -183,14 +177,14 @@ async function tryProviderStream(
             });
 
             res.on("error", (e: any) => {
-                console.log("[AI] Error response: 194", e);
+                console.log("[AI] Error response:", e);
                 writer.close();
                 resolve({ stream: null, reasoningContent: "" });
             });
         });
 
         req.on("error", (e) => {
-            console.error("[AI] Error request 206", e);
+            console.error("[AI] Error request", e);
             resolve({ stream: null, reasoningContent: "" });
         });
         req.on("timeout", () => { req.destroy(); resolve({ stream: null, reasoningContent: "" }); });
@@ -234,7 +228,7 @@ async function safePipe(reader: ReadableStreamDefaultReader<Uint8Array>, writer:
     } catch (err) {
     }
 }
-const sessionReasoningMap = new Map<string, string[]>();
+const sessionReasoningMap = new Map<string, Map<string, string>>();
 
 async function requestJson(urlStr: string, api_key: string | undefined, postBody: string, proxy_url: string | undefined, auth_type?: string): Promise<any> {
     const url = new URL(urlStr);
@@ -284,10 +278,7 @@ export class AiService {
                 stream: false,
                 model: provider.model,
             };
-            const thinkConfig = getThinkingConfig(requestedAlias);
-            if (thinkConfig) {
-                Object.assign(requestBody, thinkConfig);
-            }
+            Object.assign(requestBody, getThinkingConfig(requestedAlias));
 
             const rdata = await tryProvider(provider.base_url, provider.model, provider.api_key, provider.proxy_url, requestBody, provider.auth_type, provider.api_type);
             if (!rdata) {
@@ -305,7 +296,6 @@ export class AiService {
             // Deduct balance
             const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
             await deductBalance(account_id, cost);
-            console.log(`Usage logged: ${rawInput} input tokens, ${rawOutput} output tokens, cost: ${cost}`);
             await logUsage({
                 account_id,
                 model_alias: requestedAlias,
@@ -338,28 +328,52 @@ export class AiService {
             const requestBody: Record<string, any> = { ...data, stream: true, model: provider.model };
             const thinkConfig = getThinkingConfig(requestedAlias);
             Object.assign(requestBody, thinkConfig);
+
+            // Inject reasoning_content into all assistant messages (thinking mode requires this field)
             if (thinkConfig.thinking.type === "enabled") {
-                if (sessionReasoningMap.has(sessionKey)) {
-                    const saved = sessionReasoningMap.get(sessionKey)!;
-                    let idx = 0;
-                    for (const msg of data.messages) {
-                        if (msg.role === "assistant" && msg.tool_calls) {
-                            msg.reasoning_content = idx < saved.length ? saved[idx] : "";
-                            idx++;
+                const saved = sessionReasoningMap.get(sessionKey);
+                for (const msg of requestBody.messages) {
+                    if (msg.role === "assistant") {
+                        let rc = "";
+                        if (msg.tool_calls && Array.isArray(msg.tool_calls) && saved) {
+                            for (const tc of msg.tool_calls) {
+                                if (tc.id && saved.has(tc.id)) {
+                                    rc = saved.get(tc.id)!;
+                                    break;
+                                }
+                            }
                         }
+                        msg.reasoning_content = rc;
                     }
                 }
             }
+
             const { base_url, api_key, proxy_url, auth_type, api_type } = provider;
             const result = await tryProviderStream(base_url, api_key, proxy_url, requestBody, auth_type, api_type);
 
             if (!result?.stream) { ProviderService.recordFail(provider.id); continue; }
             ProviderService.recordSuccess(provider.id);
 
-            // Save the reasoning content produced this round (push even if empty to keep index alignment)
-            const saved = sessionReasoningMap.get(sessionKey) || [];
-            saved.push(result.reasoningContent);
-            sessionReasoningMap.set(sessionKey, saved);
+            // Save reasoning content keyed by tool_call id
+            if (thinkConfig.thinking.type === "enabled" && result.reasoningContent) {
+                let saved = sessionReasoningMap.get(sessionKey);
+                if (!saved) {
+                    saved = new Map();
+                    sessionReasoningMap.set(sessionKey, saved);
+                }
+                const msgs = data.messages;
+                for (let i = msgs.length - 1; i >= 0; i--) {
+                    const m = msgs[i];
+                    if (m.role === "assistant" && m.tool_calls && Array.isArray(m.tool_calls)) {
+                        for (const tc of m.tool_calls) {
+                            if (tc.id) {
+                                saved.set(tc.id, result.reasoningContent);
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
 
             const [upstreamForward, parseStream] = result.stream.tee() as [ReadableStream<Uint8Array>, ReadableStream<Uint8Array>];
 
