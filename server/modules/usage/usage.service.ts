@@ -129,14 +129,14 @@ export class UsageService {
         };
 
         // Store in cache
-        statsCache.set(cacheKey, { result, expiry: now + STATS_CACHE_TTL });
-        if (statsCache.size > 500) {
-            // Evict expired entries if cache gets too large
-            const now2 = Date.now();
-            for (const [k, v] of statsCache) {
-                if (v.expiry <= now2) statsCache.delete(k);
-            }
-        }
+        // statsCache.set(cacheKey, { result, expiry: now + STATS_CACHE_TTL });
+        // if (statsCache.size > 500) {
+        //     // Evict expired entries if cache gets too large
+        //     const now2 = Date.now();
+        //     for (const [k, v] of statsCache) {
+        //         if (v.expiry <= now2) statsCache.delete(k);
+        //     }
+        // }
 
         return result;
     }

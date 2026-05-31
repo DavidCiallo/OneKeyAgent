@@ -41,20 +41,25 @@ export default function ModelPage() {
             setList(res.data.list);
             setTotal(res.data.total);
 
-            // Fetch usage stats for each model
+            // Fetch usage stats for all models in one request
             const map: Record<string, { todayPeriod: UsageStatsPeriod; last24hPeriod: UsageStatsPeriod; weekPeriod: UsageStatsPeriod }> = {};
-            await Promise.all(res.data.list.map(async (item) => {
-                try {
-                    const statsRes = await usageApi.stats({ model_alias: item.alias });
-                    if (statsRes.success && statsRes.data) {
-                        map[item.id] = {
-                            todayPeriod: statsRes.data.today,
-                            last24hPeriod: statsRes.data.last24h,
-                            weekPeriod: statsRes.data.last7Days,
-                        };
+            const aliases = res.data.list.map(item => item.alias).filter(Boolean) as string[];
+            if (aliases.length > 0) {
+                const aliasToId = new Map(res.data.list.map(item => [item.alias, item.id]));
+                const statsRes = await usageApi.statsBatch({ model_aliases: aliases });
+                if (statsRes.success && statsRes.data) {
+                    for (const [alias, result] of Object.entries(statsRes.data)) {
+                        const id = aliasToId.get(alias);
+                        if (id) {
+                            map[id] = {
+                                todayPeriod: result.today,
+                                last24hPeriod: result.last24h,
+                                weekPeriod: result.last7Days,
+                            };
+                        }
                     }
-                } catch {}
-            }));
+                }
+            }
             setUsageMap(map);
         }
     }, []);
