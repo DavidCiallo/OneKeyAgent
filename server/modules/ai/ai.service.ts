@@ -8,8 +8,8 @@ import { AccountService } from "../account/account.service";
 import { AccountRoleService } from "../role/role.service";
 import { anthropicToOpenAI, antMessagesToOpenAI, openAIToAntMessages, openAIToAntStream, antStreamToOpenAI } from "./ai.trans";
 import Repository from "../../lib/repository";
-import fs from "fs";
-import { buildAuthHeader, buildRequestConfig, calculateCost, getThinkingConfig } from "./ai.builder";
+import { buildRequestConfig, calculateCost, getThinkingConfig } from "./ai.builder";
+import { SessionReasoningEntity } from "../../../shared/modules/session/session_reasoning.entity";
 
 const WEEKLY_LIMIT = 100; // $100 per week
 
@@ -225,40 +225,7 @@ async function safePipe(reader: ReadableStreamDefaultReader<Uint8Array>, writer:
     } catch (err) {
     }
 }
-const sessionReasoningMap = new Map<string, Map<string, string>>();
-
-async function requestJson(urlStr: string, api_key: string | undefined, postBody: string, proxy_url: string | undefined, auth_type?: string): Promise<any> {
-    const url = new URL(urlStr);
-    const agent = proxy_url ? new HttpsProxyAgent(proxy_url) : undefined;
-    return new Promise((resolve) => {
-        const lib = url.protocol === "https:" ? https : http;
-        const opts: http.RequestOptions = {
-            hostname: url.hostname,
-            port: url.port || (url.protocol === "https:" ? 443 : 80),
-            path: url.pathname + url.search,
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": buildAuthHeader(api_key, auth_type),
-                "Content-Length": Buffer.byteLength(postBody).toString(),
-            },
-            agent,
-            timeout: 300_000,
-        };
-        const req = lib.request(opts, (res) => {
-            let data = "";
-            res.on("data", (chunk: Buffer) => data += chunk);
-            res.on("end", () => {
-                if (res.statusCode !== 200) return resolve(null);
-                try { resolve(JSON.parse(data)); } catch { resolve(null); }
-            });
-        });
-        req.on("error", () => resolve(null));
-        req.on("timeout", () => { req.destroy(); resolve(null); });
-        req.write(postBody);
-        req.end();
-    });
-}
+const reasoningRepo = Repository.instance<SessionReasoningEntity>("session_reasoning");
 
 export class AiService {
     static async chatCompletions(data: Record<string, any>, account_id: string): Promise<CompletionServiceResponse> {
@@ -318,7 +285,7 @@ export class AiService {
         if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
 
         const firstUserMsg = data.messages.find((m: any) => m.role === "user")?.content ?? "";
-        const sessionKey = `${account_id}::${Buffer.from(JSON.stringify(firstUserMsg)).toString("base64")}`;
+        const sessionKey = `${account_id}::${Buffer.from(JSON.stringify(firstUserMsg)).toString("base64url").slice(0, 16)}`;
 
 
         for (const provider of providers) {
@@ -328,11 +295,15 @@ export class AiService {
 
             // Inject reasoning_content into all assistant messages (thinking mode requires this field)
             if (thinkConfig.thinking.type === "enabled") {
-                const saved = sessionReasoningMap.get(sessionKey);
+                const savedRecords = await reasoningRepo.find({ session_key: sessionKey });
+                const saved = new Map<string, string>();
+                for (const r of savedRecords) {
+                    saved.set(r.tool_call_id, r.reasoning_content);
+                }
                 for (const msg of requestBody.messages) {
                     if (msg.role === "assistant") {
                         let rc = "";
-                        if (msg.tool_calls && Array.isArray(msg.tool_calls) && saved) {
+                        if (msg.tool_calls && Array.isArray(msg.tool_calls)) {
                             for (const tc of msg.tool_calls) {
                                 if (tc.id && saved.has(tc.id)) {
                                     rc = saved.get(tc.id)!;
@@ -353,22 +324,26 @@ export class AiService {
 
             // Save reasoning content keyed by tool_call id
             if (thinkConfig.thinking.type === "enabled" && result.reasoningContent) {
-                let saved = sessionReasoningMap.get(sessionKey);
-                if (!saved) {
-                    saved = new Map();
-                    sessionReasoningMap.set(sessionKey, saved);
-                }
                 const msgs = data.messages;
+                let tcId: string | null = null;
                 for (let i = msgs.length - 1; i >= 0; i--) {
                     const m = msgs[i];
                     if (m.role === "assistant" && m.tool_calls && Array.isArray(m.tool_calls)) {
                         for (const tc of m.tool_calls) {
                             if (tc.id) {
-                                saved.set(tc.id, result.reasoningContent);
+                                tcId = tc.id;
+                                break;
                             }
                         }
                         break;
                     }
+                }
+                if (tcId) {
+                    await reasoningRepo.insert({
+                        session_key: sessionKey,
+                        tool_call_id: tcId,
+                        reasoning_content: result.reasoningContent,
+                    });
                 }
             }
 
