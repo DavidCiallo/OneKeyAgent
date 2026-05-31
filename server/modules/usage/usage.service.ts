@@ -1,15 +1,12 @@
 import Repository from "../../lib/repository";
 import { AccountEntity } from "../../../shared/modules/account/account.entity";
 import { ModelEntity } from "../../../shared/modules/model/model.entity";
-import { ProviderEntity } from "../../../shared/modules/provider/provider.entity";
 import { UsageBucketEntity } from "../../../shared/modules/usage/usage_bucket.entity";
 import { UsageStatsPeriod, UsageStatsResult, UsageAmountData, UserSession, UserSessionGroup, ProviderUsage, ModelUsage } from "../../../shared/modules/usage/usage.interface";
 
 const bucketRepo = Repository.instance<UsageBucketEntity>("usage_bucket");
 const modelRepo = Repository.instance<ModelEntity>("Model");
-const providerRepo = Repository.instance<ProviderEntity>("Provider");
 const accountRepository = Repository.instance<AccountEntity>("Account");
-
 const TEN_MIN = 10 * 60 * 1000;
 const DAY = 86400000;
 const MONTH = 30 * DAY;
@@ -346,25 +343,23 @@ export class UsageService {
             g.sessions = g.sessions.filter((_, si) => keep.has(`${gi}:${si}`));
         });
 
-        // Filter out sessions whose provider or model has been deleted
-        const [activeProviders, activeModels] = await Promise.all([
-            providerRepo.find({}),
-            modelRepo.find({}),
-        ]);
-        const activeProviderIds = new Set(activeProviders.map(p => p.id));
+        // Filter out sessions whose model has been deleted
+        const activeModels = await modelRepo.find({});
         const activeModelAliases = new Set(activeModels.map(m => m.alias));
 
-        const filtered = groups.filter(g => g.sessions.length > 0).map(g => ({
-            ...g,
-            sessions: g.sessions
-                .map(s => ({
-                    ...s,
-                    providerUsage: account_ids && account_ids.length > 0 && !isAdmin
-                        ? s.modelUsage.map(mu => ({ providerName: mu.model_alias, input_tokens: mu.input_tokens, output_tokens: mu.output_tokens }))
-                        : s.providerUsage.filter(pu => activeProviderIds.has(pu.providerName)),
-                }))
-                .filter(s => s.providerUsage.length > 0 && s.model_aliases.some(m => activeModelAliases.has(m))),
-        })).filter(g => g.sessions.length > 0);
+        const filtered = groups
+            .map(g => ({
+                ...g,
+                sessions: g.sessions
+                    .map(s => ({
+                        ...s,
+                        providerUsage: account_ids && account_ids.length > 0 && !isAdmin
+                            ? s.modelUsage.map(mu => ({ providerName: mu.model_alias, input_tokens: mu.input_tokens, output_tokens: mu.output_tokens }))
+                            : s.providerUsage,
+                    }))
+                    .filter(s => s.model_aliases.some(m => activeModelAliases.has(m))),
+            }))
+            .filter(g => g.sessions.length > 0);
 
         totalCost = Math.round(totalCost * 1_000_000) / 1_000_000;
 
