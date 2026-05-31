@@ -3,7 +3,7 @@ import { fileURLToPath } from "url";
 import path from "path";
 import { initialize } from "./initialize";
 import { startMonitor } from "../modules/subscription/monitor";
-import { BucketManager } from "../modules/usage/usage_bucket";
+
 
 config();
 
@@ -25,7 +25,7 @@ import { settingsMount } from "../modules/settings/settings.controller";
 const PORT = parseInt(process.env.SERVER_PORT || "3300");
 await initialize();
 startMonitor();
-BucketManager.instance.start();
+
 // @ts-ignore
 Bun.serve({
     port: PORT,
