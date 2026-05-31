@@ -33,7 +33,7 @@ export default function TopupPack({ onSuccess }: TopupPackProps) {
             const res = await subscriptionApi.createtopup({
                 token_amount: amount,
                 pay_currency: payCurrency,
-            } as any);
+            });
             if (res.success && res.data) {
                 window.open(res.data.invoice_url, "_blank");
                 onSuccess();

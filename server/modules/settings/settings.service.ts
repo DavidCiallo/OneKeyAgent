@@ -55,11 +55,11 @@ export class SettingsService {
     /** Update a single setting in DB and memory */
     static async set(key: string, value: string): Promise<void> {
         cache.set(key, value);
-        const existing = await settingsRepo.findOne({ key } as any);
+        const existing = await settingsRepo.findOne({ key });
         if (existing) {
-            await settingsRepo.update({ key } as any, { value } as any);
+            await settingsRepo.update({ key }, { value });
         } else {
-            await settingsRepo.insert({ key, value } as any);
+            await settingsRepo.insert({ key, value });
         }
     }
 

@@ -37,7 +37,7 @@ export default function AccountPage() {
         if (filterName) filter.name = filterName;
         if (filterEmail) filter.email = filterEmail;
 
-        const res = await accountApi.list({ page: p, filter } as any);
+        const res = await accountApi.list({ page: p, filter });
         if (res.success && res.data) {
             setList(res?.data?.list.sort((a, _) => a.is_admin ? -1 : 1));
             setTotal(res.data.total);
@@ -63,7 +63,7 @@ export default function AccountPage() {
         let permissions: string[] = [];
         if (!item.is_admin) {
             try {
-                const rolesRes = await roleApi.account_roles({ account_id: item.id } as any);
+                const rolesRes = await roleApi.account_roles({ account_id: item.id });
                 if (rolesRes.success && rolesRes.data) {
                     permissions = rolesRes.data.roles.map(r => permToKey({ name: r.name, type: r.type }));
                 }
@@ -82,7 +82,7 @@ export default function AccountPage() {
         await roleApi.assign({
             account_id,
             roles: { permissions },
-        } as any);
+        });
     };
 
     const handleFormConfirm = async () => {
@@ -95,7 +95,7 @@ export default function AccountPage() {
                     api_key: "",
                     is_admin: 0,
                 },
-            } as any);
+            });
             if (res.success && res.data?.account) {
                 if (!form.is_admin && form.permissions.length > 0) {
                     await assignPermissions(res.data.account.id, form.permissions);
@@ -114,7 +114,7 @@ export default function AccountPage() {
             const res = await accountApi.update({
                 id: editId,
                 account: updateData,
-            } as any);
+            });
             if (res.success) {
                 await assignPermissions(editId, form.permissions);
                 onFormClose();
@@ -124,7 +124,7 @@ export default function AccountPage() {
     };
 
     const handleDelete = async (id: string) => {
-        const res = await accountApi.delete({ id } as any);
+        const res = await accountApi.delete({ id });
         if (res.success) {
             fetchList(page);
         }

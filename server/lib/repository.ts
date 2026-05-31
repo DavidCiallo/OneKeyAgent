@@ -242,12 +242,12 @@ class Repository<
     async insert(entity: Partial<T>): Promise<T> {
         return this.withLock(async () => {
             const now = Date.now();
-            const id = (entity as any)?.id || nanoid(6);
+            const id = entity.id || nanoid(6);
             const row = {
                 ...entity,
                 id,
-                create_time: (entity as any)?.create_time || now,
-                update_time: (entity as any)?.update_time || now,
+                create_time: entity.create_time || now,
+                update_time: entity.update_time || now,
                 delete_time: null,
             };
             fs.appendFileSync(this.filePath(), JSON.stringify(row) + "\n");
@@ -299,7 +299,7 @@ class Repository<
 
     async delete(where: Partial<T>): Promise<boolean> {
         const now = Date.now();
-        return this.update(where, { delete_time: now } as any);
+        return this.update(where, { delete_time: now } as Partial<T>);
     }
 
     /** Clear all data — used before import */
@@ -396,15 +396,13 @@ class Repository<
         return this.withLock(async () => {
             if (entities.length === 0) return 0;
             const now = Date.now();
-            const rows = entities.map((e) => {
-                return {
-                    ...e,
-                    id: (e as any)?.id || nanoid(6),
-                    create_time: (e as any)?.create_time || now,
-                    update_time: (e as any)?.update_time || now,
-                    delete_time: null,
-                };
-            });
+            const rows = entities.map((e) => ({
+                ...e,
+                id: e.id || nanoid(6),
+                create_time: e.create_time || now,
+                update_time: e.update_time || now,
+                delete_time: null,
+            }));
             fs.appendFileSync(this.filePath(), rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
             return rows.length;
         });

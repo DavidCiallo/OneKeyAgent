@@ -226,12 +226,12 @@ export class BucketManager {
                 model_alias: modelAlias,
                 provider_id: providerId,
                 bucket_time: bucketTime,
-                granularity: "1m",
+                granularity: "1m" as BucketGranularity,
                 input_tokens: entry.input_tokens,
                 output_tokens: entry.output_tokens,
                 cost,
                 request_count: entry.request_count,
-            } as any);
+            });
 
             // 2. Accumulate into in-memory 60m grouping (dedup by hour-aligned key)
             const b60m = alignTime(bucketTime, 3_600_000);
@@ -261,7 +261,7 @@ export class BucketManager {
             const cost60 = Math.round(acc60.cost * 1_000_000) / 1_000_000;
 
             const existing = await this.bucketRepo.findOne({
-                granularity: "60m",
+                granularity: "60m" as BucketGranularity,
                 bucket_time: b60m,
                 account_id: accountId,
                 model_alias: modelAlias,
@@ -280,7 +280,7 @@ export class BucketManager {
                     model_alias: modelAlias,
                     provider_id: providerId,
                     bucket_time: b60m,
-                    granularity: "60m",
+                    granularity: "60m" as BucketGranularity,
                     input_tokens: acc60.input_tokens,
                     output_tokens: acc60.output_tokens,
                     cost: cost60,
@@ -347,7 +347,7 @@ export class BucketManager {
                 model_alias: entry.model_alias,
                 provider_id: entry.provider_id,
                 bucket_time: yesterdayStart,
-                granularity: "1d",
+                granularity: "1d" as BucketGranularity,
                 input_tokens: entry.input_tokens,
                 output_tokens: entry.output_tokens,
                 cost,
