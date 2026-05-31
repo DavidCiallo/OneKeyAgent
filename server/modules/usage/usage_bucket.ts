@@ -38,9 +38,6 @@ const GRANULARITY_CONFIGS: Record<BucketGranularity, GranularityConfig> = {
     "1d": { granularity: "1d", intervalMs: 86_400_000, ttlDays: 730 }, // 2 years
 };
 
-/** Probability per minute for 60m flush — ~1/60 ≈ expected once per hour per key */
-const SIXTY_MIN_FLUSH_PROBABILITY = 1 / 60;
-
 function alignTime(ts: number, intervalMs: number): number {
     return Math.floor(ts / intervalMs) * intervalMs;
 }
@@ -74,13 +71,10 @@ export class BucketManager {
     private readonly timers = new Map<BucketGranularity, ReturnType<typeof setTimeout>>();
     private cleanupTimer: ReturnType<typeof setTimeout> | null = null;
     private _started = false;
-    // Track which 1d bucket has been aggregated today
     private last1dAggregationDay: number = -1;
 
     private constructor() {
-        for (const g of GRANULARITY_ORDER) {
-            this.accumulators.set(g, new Map());
-        }
+        this.accumulators.set("1m", new Map());
     }
 
     static get instance(): BucketManager {
@@ -99,14 +93,8 @@ export class BucketManager {
         if (this._started) return;
         this._started = true;
 
-        for (const g of GRANULARITY_ORDER) {
-            if (g === "1d") {
-                // 1d uses a special daily schedule
-                this.scheduleDaily1dAggregation();
-            } else {
-                this.scheduleFlush(g);
-            }
-        }
+        this.scheduleFlush();
+        this.scheduleDaily1dAggregation();
         this.scheduleCleanup();
     }
 
@@ -123,19 +111,13 @@ export class BucketManager {
 
     /**
      * Called by logUsage() on every request.
-     * Accumulates into 1m and 60m buckets simultaneously.
-     * Pure memory operation — never blocks on I/O.
+     * Accumulates into 1m bucket only. Pure memory operation — never blocks on I/O.
+     * 60m rows are upserted during 1m flush.
      */
     accumulate(data: AccumulateData): void {
-        // Accumulate 1m
         const b1m = alignTime(Date.now(), 60000);
         const k1m = makeKey(b1m, data.account_id, data.model_alias, data.provider_id);
         this.mergeEntry("1m", k1m, data);
-
-        // Accumulate 60m (align to hour boundary)
-        const b60m = alignTime(Date.now(), 3_600_000);
-        const k60m = makeKey(b60m, data.account_id, data.model_alias, data.provider_id);
-        this.mergeEntry("60m", k60m, data);
     }
 
     private mergeEntry(granularity: BucketGranularity, key: string, data: AccumulateData): void {
@@ -161,23 +143,22 @@ export class BucketManager {
 
     // ── Timer scheduling ─────────────────────────────────────────
 
-    private scheduleFlush(granularity: BucketGranularity): void {
-        const config = GRANULARITY_CONFIGS[granularity];
+    private scheduleFlush(): void {
         const now = Date.now();
-        const nextAligned = alignTime(now + config.intervalMs, config.intervalMs);
-        const jitter = Math.random() * config.intervalMs * 0.1;
-        const delay = nextAligned - now + jitter;
+        const nextAligned = alignTime(now + 60000, 60000);
+        const jitter = Math.random() * 6000; // up to 6s jitter
+        const delay = Math.max(nextAligned - now + jitter, 1);
 
         const timer = setTimeout(async () => {
             try {
-                await this.flush(granularity);
+                await this.flush();
             } catch (err) {
-                console.error(`[BucketManager] flush ${granularity} failed:`, err);
+                console.error("[BucketManager] flush failed:", err);
             }
-            this.scheduleFlush(granularity);
-        }, Math.max(delay, 1));
+            this.scheduleFlush();
+        }, delay);
 
-        this.timers.set(granularity, timer);
+        this.timers.set("1m", timer);
     }
 
     /**
@@ -218,85 +199,120 @@ export class BucketManager {
         }, Math.max(delay, 1));
     }
 
-    // ── Flush ─────────────────────────────────────────────────────
-
-    private async flush(granularity: BucketGranularity): Promise<void> {
-        const acc = this.accumulators.get(granularity)!;
+    /**
+     * Flush the 1m accumulator every minute.
+     * Writes 1m rows to DB, then upserts into 60m by business key
+     * (granularity + bucket_time + account_id + model_alias + provider_id).
+     */
+    private async flush(): Promise<void> {
+        const acc = this.accumulators.get("1m")!;
 
         // Double-buffer: swap accumulator reference atomically
         const snapshot = acc;
-        this.accumulators.set(granularity, new Map());
+        this.accumulators.set("1m", new Map());
         if (snapshot.size === 0) return;
 
-        const config = GRANULARITY_CONFIGS[granularity];
-        const now = Date.now();
-        const records: any[] = [];
+        // Track which 60m keys we've upserted during this flush
+        // Map: 60m_key → AccumulatorEntry (monotonically increasing accumulator)
+        const sixtyMinAcc = new Map<string, AccumulatorEntry>();
 
         for (const [key, entry] of snapshot) {
             const { bucketTime, accountId, modelAlias, providerId } = parseKey(key);
+            const cost = Math.round(entry.cost * 1_000_000) / 1_000_000;
 
-            // For 60m granularity, use probabilistic write to reduce DB load
-            if (granularity === "60m" && Math.random() > SIXTY_MIN_FLUSH_PROBABILITY) {
-                // Put it back in the accumulator for a future flush
-                this.mergeBack("60m", key, entry);
-                continue;
-            }
-
-            records.push({
+            // 1. Insert 1m row
+            await this.bucketRepo.insert({
                 account_id: accountId,
                 model_alias: modelAlias,
                 provider_id: providerId,
                 bucket_time: bucketTime,
-                granularity,
+                granularity: "1m",
                 input_tokens: entry.input_tokens,
                 output_tokens: entry.output_tokens,
-                cost: Math.round(entry.cost * 1_000_000) / 1_000_000,
+                cost,
                 request_count: entry.request_count,
-            });
+            } as any);
+
+            // 2. Accumulate into in-memory 60m grouping (dedup by hour-aligned key)
+            const b60m = alignTime(bucketTime, 3_600_000);
+            const k60m = makeKey(b60m, accountId, modelAlias, providerId);
+            let acc60 = sixtyMinAcc.get(k60m);
+            if (!acc60) {
+                acc60 = {
+                    account_id: accountId,
+                    model_alias: modelAlias,
+                    provider_id: providerId,
+                    input_tokens: 0,
+                    output_tokens: 0,
+                    cost: 0,
+                    request_count: 0,
+                };
+                sixtyMinAcc.set(k60m, acc60);
+            }
+            acc60.input_tokens += entry.input_tokens;
+            acc60.output_tokens += entry.output_tokens;
+            acc60.cost += entry.cost;
+            acc60.request_count += entry.request_count;
         }
 
-        if (records.length > 0) {
-            await this.bucketRepo.batchInsert(records);
+        // 3. Upsert each 60m bucket into DB (by business key)
+        for (const [k60m, acc60] of sixtyMinAcc) {
+            const { bucketTime: b60m, accountId, modelAlias, providerId } = parseKey(k60m);
+            const cost60 = Math.round(acc60.cost * 1_000_000) / 1_000_000;
+
+            const existing = await this.bucketRepo.findOne({
+                granularity: "60m",
+                bucket_time: b60m,
+                account_id: accountId,
+                model_alias: modelAlias,
+                provider_id: providerId,
+            }, true);
+            if (existing) {
+                await this.bucketRepo.update({ id: existing.id }, {
+                    input_tokens: (existing.input_tokens || 0) + acc60.input_tokens,
+                    output_tokens: (existing.output_tokens || 0) + acc60.output_tokens,
+                    cost: Math.round(((existing.cost || 0) + acc60.cost) * 1_000_000) / 1_000_000,
+                    request_count: (existing.request_count || 0) + acc60.request_count,
+                });
+            } else {
+                await this.bucketRepo.insert({
+                    account_id: accountId,
+                    model_alias: modelAlias,
+                    provider_id: providerId,
+                    bucket_time: b60m,
+                    granularity: "60m",
+                    input_tokens: acc60.input_tokens,
+                    output_tokens: acc60.output_tokens,
+                    cost: cost60,
+                    request_count: acc60.request_count,
+                });
+            }
         }
     }
-
-    /**
-     * Merge an entry back into the accumulator (used for probabilistic skip).
-     * This is NOT a double-buffer swap — we merge back into the live accumulator.
-     */
-    private mergeBack(granularity: BucketGranularity, key: string, entry: AccumulatorEntry): void {
-        const acc = this.accumulators.get(granularity)!;
-        const existing = acc.get(key);
-        if (existing) {
-            existing.input_tokens += entry.input_tokens;
-            existing.output_tokens += entry.output_tokens;
-            existing.cost += entry.cost;
-            existing.request_count += entry.request_count;
-        } else {
-            acc.set(key, { ...entry });
-        }
-    }
-
-    // ── 1d Aggregation ───────────────────────────────────────────
 
     /**
      * Run once daily at ~00:05.
      * Aggregate all 60m records from the previous day into a single 1d record per (account, model, provider).
+     * Idempotent: if a 1d record already exists for the same day+key, it updates instead of inserting.
      */
     private async aggregate1d(): Promise<void> {
         const now = Date.now();
         const yesterdayStart = midnight(now) - 86_400_000;
         const yesterdayEnd = midnight(now);
 
-        const buckets = await this.bucketRepo.find(
-            { granularity: "60m" },
-            { since: yesterdayStart },
-        );
+        // Guard: skip if already aggregated today (after restart etc.)
+        const todayKey = midnight(now);
+        if (this.last1dAggregationDay === todayKey) return;
+        this.last1dAggregationDay = todayKey;
 
-        // Filter by bucket_time and group by (account, model, provider)
+        const buckets = await this.bucketRepo.find({
+            granularity: "60m",
+            bucket_time: { $gte: yesterdayStart, $lt: yesterdayEnd },
+        });
+
+        // Group by (account, model, provider)
         const groups = new Map<string, AccumulatorEntry>();
         for (const b of buckets) {
-            if (b.bucket_time < yesterdayStart || b.bucket_time >= yesterdayEnd) continue;
             const key = `${b.account_id}|${b.model_alias}|${b.provider_id}`;
             let entry = groups.get(key);
             if (!entry) {
@@ -319,9 +335,14 @@ export class BucketManager {
 
         if (groups.size === 0) return;
 
-        const records: any[] = [];
         for (const [, entry] of groups) {
-            records.push({
+            const cost = Math.round(entry.cost * 1_000_000) / 1_000_000;
+            // Stable ID: hard-delete old row then insert fresh, ensures exactly one row per key
+            const id = `${yesterdayStart}|${entry.account_id}|${entry.model_alias}|${entry.provider_id}`;
+
+            await this.bucketRepo.hardDelete({ id });
+            await this.bucketRepo.insert({
+                id,
                 account_id: entry.account_id,
                 model_alias: entry.model_alias,
                 provider_id: entry.provider_id,
@@ -329,22 +350,12 @@ export class BucketManager {
                 granularity: "1d",
                 input_tokens: entry.input_tokens,
                 output_tokens: entry.output_tokens,
-                cost: Math.round(entry.cost * 1_000_000) / 1_000_000,
+                cost,
                 request_count: entry.request_count,
             });
         }
-
-        if (records.length > 0) {
-            await this.bucketRepo.batchInsert(records);
-        }
     }
 
-    // ── Cleanup ───────────────────────────────────────────────────
-
-    /**
-     * Run once daily at ~00:10.
-     * Deletes expired records based on granularity and bucket_time.
-     */
     private async cleanup(): Promise<void> {
         const now = Date.now();
         const todayMidnight = midnight(now);
@@ -353,26 +364,16 @@ export class BucketManager {
             const config = GRANULARITY_CONFIGS[g];
             const cutoff = todayMidnight - config.ttlDays * 86_400_000;
 
-            // Find expired records for this granularity
-            const expired = await this.bucketRepo.find(
-                { granularity: g },
-                { since: 0 },
-            );
-
-            const expiredIds = expired
-                .filter(r => r.bucket_time < cutoff)
-                .map(r => r.id);
+            const expired = await this.bucketRepo.find({
+                granularity: g,
+                bucket_time: { $lt: cutoff },
+            });
+            const expiredIds = expired.map(r => r.id);
 
             if (expiredIds.length === 0) continue;
 
-            // Batch delete: hardDelete one by one (JSONL rewrite per delete — same as before)
-            // But we do all of them for this granularity at once
             for (const id of expiredIds) {
                 await this.bucketRepo.hardDelete({ id });
-            }
-
-            if (expiredIds.length > 0) {
-                console.log(`[BucketManager] cleanup ${g}: removed ${expiredIds.length} records (bucket_time < ${new Date(cutoff).toISOString()})`);
             }
         }
     }

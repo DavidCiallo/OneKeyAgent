@@ -13,7 +13,7 @@ async function chatcompletions(request: any) {
     if (!account_id) throw new Error("Invalid API Key");
     if (request.stream) {
         const stream = await AiService.chatCompletionsStream(request, account_id);
-        return new Response(stream as any, {
+        return new Response(stream, {
             headers: {
                 "Content-Type": "text/event-stream",
                 "Cache-Control": "no-cache",
@@ -35,7 +35,7 @@ async function completions(request: any) {
 
     if (request.stream) {
         const stream = await AiService.completionsStream(request, account_id);
-        return new Response(stream as any, {
+        return new Response(stream, {
             headers: {
                 "Content-Type": "text/event-stream",
                 "Cache-Control": "no-cache",
@@ -78,7 +78,7 @@ async function v1messages(request: any) {
     if (request.stream) {
         try {
             const stream = await AiService.antMessagesStream(request, account_id);
-            return new Response(stream as any, {
+            return new Response(stream, {
                 headers: {
                     "Content-Type": "text/event-stream",
                     "Cache-Control": "no-cache",
