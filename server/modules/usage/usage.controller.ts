@@ -92,24 +92,15 @@ async function sessions(request: UsageSessionsRequest) {
     const account = await resolveAccount(auth);
     const effectiveAccountIds = account.is_admin ? request.account_ids : [account.id];
 
-    const { groups, totals } = await UsageService.getUserSessions(request.gapMinutes, request.since, effectiveAccountIds, account.is_admin ? true : false);
+    const { groups, totals, recentSessions: rawSessions } = await UsageService.getUserSessions(request.gapMinutes, request.since, effectiveAccountIds, account.is_admin ? true : false);
 
-    const { groups: rawGroups } = await UsageService.getUserSessions(1, request.since, effectiveAccountIds, account.is_admin ? true : false);
-
-    const allGroupIds = [...new Set([...groups, ...rawGroups].map(g => g.account_id))];
+    const allGroupIds = [...new Set([...groups.map(g => g.account_id), ...rawSessions.map(s => s.account_id)])];
     const accounts = await Promise.all(
         allGroupIds.map(id => AccountService.findOne(id).then(a => ({ id, name: a ? `${a.name} (${a.email})` : id })))
     );
     const accountMap = new Map(accounts.map(a => [a.id, a.name]));
 
-    const allRawSessions: (UserSession & { account_id: string })[] = [];
-    for (const g of rawGroups) {
-        for (const s of g.sessions) {
-            allRawSessions.push({ ...s, account_id: g.account_id });
-        }
-    }
-    allRawSessions.sort((a, b) => b.startTime - a.startTime);
-    const recentSessions = allRawSessions.slice(0, 10).map(s => ({
+    const recentSessions = rawSessions.map(s => ({
         ...s,
         accountName: accountMap.get(s.account_id) || s.account_id,
     }));
