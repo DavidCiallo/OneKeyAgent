@@ -188,6 +188,40 @@ class Repository<
         return results;
     }
 
+    /** Stream rows one at a time via callback — never accumulates, avoids OOM */
+    async findEach(
+        where: Record<string, any> | undefined,
+        callback: (row: T) => void,
+        config?: { limit?: number; since?: number },
+    ): Promise<number> {
+        let count = 0;
+        const since = config?.since;
+        const limit = config?.limit;
+
+        for await (const row of readLines(this.collection)) {
+            if (row.delete_time) continue;
+            if (since && row.create_time < since) continue;
+            if (where && !matches(row, where as Record<string, any>)) continue;
+
+            callback(row as T);
+            count++;
+            if (limit && count >= limit) break;
+        }
+        return count;
+    }
+
+    /** Streaming sum of a numeric field — avoids loading all rows into memory */
+    async sum(field: string, where?: Record<string, any>, since?: number): Promise<number> {
+        let total = 0;
+        for await (const row of readLines(this.collection)) {
+            if (row.delete_time) continue;
+            if (since && row.create_time < since) continue;
+            if (where && !matches(row, where as Record<string, any>)) continue;
+            total += row[field] || 0;
+        }
+        return total;
+    }
+
     async findOne(where: Partial<T>, reverse = false): Promise<T | null> {
         const reader = reverse ? readLinesReverse(this.collection) : readLines(this.collection);
         for await (const row of reader) {
@@ -312,9 +346,10 @@ class Repository<
     /** Permanently delete matching records */
     async hardDelete(where: Partial<T>): Promise<boolean> {
         return this.withLock(async () => {
-            let deleted = false;
             const file = this.filePath();
             if (!fs.existsSync(file)) return false;
+
+            let deleted = false;
 
             const content = fs.readFileSync(file, "utf-8");
             const lines = content.split("\n");

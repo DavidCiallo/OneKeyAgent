@@ -102,8 +102,7 @@ async function profile(request: AccountProfileRequest) {
 
     const since = Date.now() - 7 * 86400000;
     const bucketRepo = Repository.instance<any>("usage_bucket");
-    const buckets = await bucketRepo.find({ account_id: account.id, granularity: "1m" }, { since });
-    const weeklyUsage = buckets.reduce((sum: number, b: any) => sum + (b.cost || 0), 0);
+    const weeklyUsage = await bucketRepo.sum("cost", { account_id: account.id, granularity: "1m" }, since);
 
     return {
         account: new AccountDTO(account),
