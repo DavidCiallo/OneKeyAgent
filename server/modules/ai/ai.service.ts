@@ -17,11 +17,7 @@ const WEEKLY_LIMIT = 100; // $100 per week
 async function getWeeklySpending(account_id: string): Promise<number> {
     const since = Date.now() - 7 * 86400000;
     const repo = Repository.instance<any>("usage_bucket");
-    const buckets = await repo.find({ account_id: account_id }, { since });
-    let total = 0;
-    for (const bucket of buckets) {
-        total += bucket.cost || 0;
-    }
+    const total = await repo.sum("cost", { account_id: account_id }, since);
     return Math.round(total * 1_000_000) / 1_000_000;
 }
 

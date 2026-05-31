@@ -27,33 +27,13 @@ function bucketSlots(granularity: string): number {
     }
 }
 
-/** Build a cumulative usage period from pre-aggregated bucket records. */
-function buildBucketPeriod(buckets: any[], periodStart: number, periodEnd: number): UsageStatsPeriod {
-    // Pre-generate all 10-min buckets in the period
-    const bucketMap = new Map<number, number>();
-    for (let t = periodStart; t < periodEnd; t += TEN_MIN) {
-        bucketMap.set(t, 0);
-    }
-
-    for (const bucket of buckets) {
-        const bt = bucket.bucket_time;
-        const tokens = (bucket.input_tokens || 0) + (bucket.output_tokens || 0);
-        const slots = bucketSlots(bucket.granularity);
-        const tokensPerSlot = tokens / slots;
-
-        for (let i = 0; i < slots; i++) {
-            const slot = bt + i * TEN_MIN;
-            if (slot >= periodStart && slot < periodEnd) {
-                bucketMap.set(slot, (bucketMap.get(slot) || 0) + tokensPerSlot);
-            }
-        }
-    }
-
+/** Convert a pre-filled map (time slot → tokens) into a UsageStatsPeriod with cumulative sums */
+function mapToPeriod(bucketMap: Map<number, number>): UsageStatsPeriod {
     const amounts: UsageAmountData[] = [];
     let cumulative = 0;
-    const sortedBuckets = [...bucketMap.entries()].sort(([a], [b]) => a - b);
+    const sorted = [...bucketMap.entries()].sort(([a], [b]) => a - b);
 
-    for (const [ts, bucketAmount] of sortedBuckets) {
+    for (const [ts, bucketAmount] of sorted) {
         cumulative += bucketAmount;
         const amount = Math.round(cumulative / 1_000_000 * 100) / 100;
         if (amounts.length === 0 || amounts[amounts.length - 1].amount !== amount) {
@@ -61,27 +41,12 @@ function buildBucketPeriod(buckets: any[], periodStart: number, periodEnd: numbe
         }
     }
 
-    if (amounts.length === 0 && sortedBuckets.length > 0) {
-        amounts.push({ ts: sortedBuckets[0][0], amount: 0 });
+    if (amounts.length === 0 && sorted.length > 0) {
+        amounts.push({ ts: sorted[0][0], amount: 0 });
     }
 
     const total = amounts.length > 0 ? amounts[amounts.length - 1].amount : 0;
     return { total, amounts };
-}
-
-/** Group an array of bucket records by model_alias */
-function groupByModel(buckets: any[]): Map<string, any[]> {
-    const map = new Map<string, any[]>();
-    for (const b of buckets) {
-        const alias = b.model_alias || "__unknown__";
-        let list = map.get(alias);
-        if (!list) {
-            list = [];
-            map.set(alias, list);
-        }
-        list.push(b);
-    }
-    return map;
 }
 
 export class UsageService {
@@ -95,29 +60,59 @@ export class UsageService {
 
     static async stats(model_alias?: string, account_id?: string): Promise<UsageStatsResult> {
         const now = Date.now();
-
         const todayStart = localDayStart(now);
         const last24hStart = now - DAY;
         const weekStart = now - 7 * DAY;
 
-        const baseFilter: any = {};
-        if (model_alias) baseFilter.model_alias = model_alias;
-        if (account_id) baseFilter.account_id = account_id;
+        // Pre-fill maps with 0 for each 10-min slot
+        const todayMap = new Map<number, number>();
+        const last24hMap = new Map<number, number>();
+        for (let t = todayStart; t < now; t += TEN_MIN) todayMap.set(t, 0);
+        for (let t = last24hStart; t < now; t += TEN_MIN) last24hMap.set(t, 0);
 
-        // Use 1m for fine-grained short ranges, 1d for weekly overview
-        const [todayBuckets, last24hBuckets, weekBuckets] = await Promise.all([
-            UsageService.loadBucketsByTime(baseFilter, todayStart, "1m"),
-            UsageService.loadBucketsByTime(baseFilter, last24hStart, "1m"),
-            UsageService.loadBucketsByTime(baseFilter, weekStart, "1d"),
-        ]);
+        // Pass 1: stream 1m records (covers today and last24h)
+        const filter1m: any = { granularity: "1m", bucket_time: { $gte: last24hStart } };
+        if (model_alias) filter1m.model_alias = model_alias;
+        if (account_id) filter1m.account_id = account_id;
 
-        const result = {
-            today: buildBucketPeriod(todayBuckets, todayStart, now),
-            last24h: buildBucketPeriod(last24hBuckets, last24hStart, now),
-            last7Days: buildBucketPeriod(weekBuckets, weekStart, now),
+        await bucketRepo.findEach(filter1m, (bucket: any) => {
+            const bt = bucket.bucket_time;
+            const tokens = (bucket.input_tokens || 0) + (bucket.output_tokens || 0);
+            if (bt >= todayStart && todayMap.has(bt)) {
+                todayMap.set(bt, (todayMap.get(bt) || 0) + tokens);
+            }
+            if (bt >= last24hStart && last24hMap.has(bt)) {
+                last24hMap.set(bt, (last24hMap.get(bt) || 0) + tokens);
+            }
+        });
+
+        // Pre-fill week map
+        const weekMap = new Map<number, number>();
+        for (let t = weekStart; t < now; t += TEN_MIN) weekMap.set(t, 0);
+
+        // Pass 2: stream 1d records for weekly overview
+        const filter1d: any = { granularity: "1d", bucket_time: { $gte: weekStart } };
+        if (model_alias) filter1d.model_alias = model_alias;
+        if (account_id) filter1d.account_id = account_id;
+
+        await bucketRepo.findEach(filter1d, (bucket: any) => {
+            const bt = bucket.bucket_time;
+            const tokens = (bucket.input_tokens || 0) + (bucket.output_tokens || 0);
+            const slots = bucketSlots("1d");
+            const tokensPerSlot = tokens / slots;
+            for (let i = 0; i < slots; i++) {
+                const slot = bt + i * TEN_MIN;
+                if (weekMap.has(slot)) {
+                    weekMap.set(slot, (weekMap.get(slot) || 0) + tokensPerSlot);
+                }
+            }
+        });
+
+        return {
+            today: mapToPeriod(todayMap),
+            last24h: mapToPeriod(last24hMap),
+            last7Days: mapToPeriod(weekMap),
         };
-
-        return result;
     }
 
     /**
@@ -133,36 +128,74 @@ export class UsageService {
         const baseFilter: any = {};
         if (account_id) baseFilter.account_id = account_id;
 
-        // Read all 1m and 1d data once for the time ranges
-        const [todayBuckets, last24hBuckets, weekBuckets] = await Promise.all([
-            UsageService.loadBucketsByTime(baseFilter, todayStart, "1m"),
-            UsageService.loadBucketsByTime(baseFilter, last24hStart, "1m"),
-            UsageService.loadBucketsByTime(baseFilter, weekStart, "1d"),
-        ]);
+        // Pre-fill maps for each alias
+        const aliasesSet = new Set(model_aliases);
+        const todayMaps = new Map<string, Map<number, number>>();
+        const last24hMaps = new Map<string, Map<number, number>>();
+        const weekMaps = new Map<string, Map<number, number>>();
 
-        // Group by model_alias
-        const groupToday = groupByModel(todayBuckets);
-        const group24h = groupByModel(last24hBuckets);
-        const groupWeek = groupByModel(weekBuckets);
+        for (const alias of aliasesSet) {
+            const tm = new Map<number, number>();
+            const l24m = new Map<number, number>();
+            const wm = new Map<number, number>();
+            for (let t = todayStart; t < now; t += TEN_MIN) tm.set(t, 0);
+            for (let t = last24hStart; t < now; t += TEN_MIN) l24m.set(t, 0);
+            for (let t = weekStart; t < now; t += TEN_MIN) wm.set(t, 0);
+            todayMaps.set(alias, tm);
+            last24hMaps.set(alias, l24m);
+            weekMaps.set(alias, wm);
+        }
+
+        // Pass 1: stream 1m records
+        await bucketRepo.findEach(
+            { ...baseFilter, granularity: "1m", bucket_time: { $gte: last24hStart } },
+            (bucket: any) => {
+                const alias = bucket.model_alias || "__unknown__";
+                const todayMap = todayMaps.get(alias);
+                const last24hMap = last24hMaps.get(alias);
+                if (!todayMap && !last24hMap) return;
+
+                const bt = bucket.bucket_time;
+                const tokens = (bucket.input_tokens || 0) + (bucket.output_tokens || 0);
+                if (bt >= todayStart && todayMap?.has(bt)) {
+                    todayMap.set(bt, (todayMap.get(bt) || 0) + tokens);
+                }
+                if (bt >= last24hStart && last24hMap?.has(bt)) {
+                    last24hMap.set(bt, (last24hMap.get(bt) || 0) + tokens);
+                }
+            },
+        );
+
+        // Pass 2: stream 1d records
+        await bucketRepo.findEach(
+            { ...baseFilter, granularity: "1d", bucket_time: { $gte: weekStart } },
+            (bucket: any) => {
+                const alias = bucket.model_alias || "__unknown__";
+                const weekMap = weekMaps.get(alias);
+                if (!weekMap) return;
+
+                const bt = bucket.bucket_time;
+                const tokens = (bucket.input_tokens || 0) + (bucket.output_tokens || 0);
+                const slots = bucketSlots("1d");
+                const tokensPerSlot = tokens / slots;
+                for (let i = 0; i < slots; i++) {
+                    const slot = bt + i * TEN_MIN;
+                    if (weekMap.has(slot)) {
+                        weekMap.set(slot, (weekMap.get(slot) || 0) + tokensPerSlot);
+                    }
+                }
+            },
+        );
 
         const results = new Map<string, UsageStatsResult>();
         for (const alias of model_aliases) {
             results.set(alias, {
-                today: buildBucketPeriod(groupToday.get(alias) || [], todayStart, now),
-                last24h: buildBucketPeriod(group24h.get(alias) || [], last24hStart, now),
-                last7Days: buildBucketPeriod(groupWeek.get(alias) || [], weekStart, now),
+                today: mapToPeriod(todayMaps.get(alias) || new Map()),
+                last24h: mapToPeriod(last24hMaps.get(alias) || new Map()),
+                last7Days: mapToPeriod(weekMaps.get(alias) || new Map()),
             });
         }
         return results;
-    }
-
-    /** Load bucket records at a given granularity since a time, filtering by bucket_time. Capped at 200K rows (~40 MB) to prevent OOM. */
-    private static async loadBucketsByTime(filter: any, since: number, granularity: string): Promise<any[]> {
-        return bucketRepo.find({
-            ...filter,
-            granularity,
-            bucket_time: { $gte: since },
-        }, { limit: 200_000 });
     }
 
     /** Pick the coarsest granularity that still provides adequate precision for the query */
@@ -209,138 +242,137 @@ export class UsageService {
         const now = Date.now();
         const effectiveSince = since ?? now - 7 * DAY;
         const gapMs = (gapMinutes || 30) * 60 * 1000;
-
-        // Select the best available bucket granularity for this query
         const granularity = UsageService.selectGranularity(gapMinutes || 30, effectiveSince);
+        const accountSet = account_ids && account_ids.length > 0 ? new Set(account_ids) : null;
+        const ONE_MIN_MS = 60_000;
 
-        // Load bucket records (the bucket cleanup ensures old data is gone)
-        const buckets = await UsageService.loadBucketsByTime({ granularity }, effectiveSince, granularity);
-        if (buckets.length === 0) {
+        // Window accumulator types — built inline during streaming
+        type WinAcc = {
+            input_tokens: number; output_tokens: number; cost: number; requestCount: number;
+            providerMap: Map<string, ProviderUsage>; modelMap: Map<string, ModelUsage>;
+            modelAliases: Set<string>;
+        };
+        type WinAcc1m = {
+            input_tokens: number; output_tokens: number; cost: number; requestCount: number;
+            modelAliases: Set<string>;
+        };
+
+        const byAccountWindow = new Map<string, Map<number, WinAcc>>();
+        const byAccountWindow1m = new Map<string, Map<number, WinAcc1m>>();
+
+        // Single streaming pass — aggregate into window accumulators per account
+        const rowCount = await bucketRepo.findEach(
+            { granularity, bucket_time: { $gte: effectiveSince } },
+            (bucket: any) => {
+                const aid = bucket.account_id;
+                if (accountSet && !accountSet.has(aid)) return;
+
+                const wStart = this.windowStart(bucket.bucket_time, gapMs);
+                const wStart1m = this.windowStart(bucket.bucket_time, ONE_MIN_MS);
+
+                // --- gapMs window accumulator ---
+                let acWin = byAccountWindow.get(aid);
+                if (!acWin) { acWin = new Map(); byAccountWindow.set(aid, acWin); }
+                let acc = acWin.get(wStart);
+                if (!acc) {
+                    acc = {
+                        input_tokens: 0, output_tokens: 0, cost: 0, requestCount: 0,
+                        providerMap: new Map(), modelMap: new Map(), modelAliases: new Set(),
+                    };
+                    acWin.set(wStart, acc);
+                }
+
+                acc.input_tokens += bucket.input_tokens || 0;
+                acc.output_tokens += bucket.output_tokens || 0;
+                acc.cost += bucket.cost || 0;
+                acc.requestCount += bucket.request_count || 0;
+                acc.modelAliases.add(bucket.model_alias);
+
+                const pkey = bucket.provider_id || "unknown";
+                if (!acc.providerMap.has(pkey)) {
+                    acc.providerMap.set(pkey, { providerName: pkey, input_tokens: 0, output_tokens: 0 });
+                }
+                const p = acc.providerMap.get(pkey)!;
+                p.input_tokens += bucket.input_tokens || 0;
+                p.output_tokens += bucket.output_tokens || 0;
+
+                const mkey = bucket.model_alias || "default";
+                if (!acc.modelMap.has(mkey)) {
+                    acc.modelMap.set(mkey, { model_alias: mkey, input_tokens: 0, output_tokens: 0 });
+                }
+                const m = acc.modelMap.get(mkey)!;
+                m.input_tokens += bucket.input_tokens || 0;
+                m.output_tokens += bucket.output_tokens || 0;
+
+                // --- 1m window accumulator ---
+                let acWin1m = byAccountWindow1m.get(aid);
+                if (!acWin1m) { acWin1m = new Map(); byAccountWindow1m.set(aid, acWin1m); }
+                let acc1m = acWin1m.get(wStart1m);
+                if (!acc1m) {
+                    acc1m = { input_tokens: 0, output_tokens: 0, cost: 0, requestCount: 0, modelAliases: new Set() };
+                    acWin1m.set(wStart1m, acc1m);
+                }
+
+                acc1m.input_tokens += bucket.input_tokens || 0;
+                acc1m.output_tokens += bucket.output_tokens || 0;
+                acc1m.cost += bucket.cost || 0;
+                acc1m.requestCount += bucket.request_count || 0;
+                acc1m.modelAliases.add(bucket.model_alias);
+            },
+        );
+
+        if (rowCount === 0) {
             return { groups: [], totals: { totalTokens: 0, totalCost: 0, totalRequests: 0 }, recentSessions: [] };
         }
 
-        // Filter by requested account_ids if provided
-        const accountSet = account_ids && account_ids.length > 0 ? new Set(account_ids) : null;
-        const filteredBuckets = accountSet ? buckets.filter((b: any) => accountSet.has(b.account_id)) : buckets;
-
-        // Group raw buckets by account_id
-        const byAccount = new Map<string, any[]>();
-        for (const bucket of filteredBuckets) {
-            const aid = bucket.account_id;
-            if (!byAccount.has(aid)) byAccount.set(aid, []);
-            byAccount.get(aid)!.push(bucket);
-        }
-
-        let totalTokens = 0;
-        let totalCost = 0;
-        let totalRequests = 0;
+        // Build sessions from window accumulators
+        let totalTokens = 0, totalCost = 0, totalRequests = 0;
         const groups: UserSessionGroup[] = [];
-        const ONE_MIN_MS = 60_000;
         const recentSessionsFlat: (UserSession & { account_id: string })[] = [];
 
-        for (const [accountId, accountBuckets] of byAccount) {
-            accountBuckets.sort((a: any, b: any) => a.bucket_time - b.bucket_time);
-
-            // Group into time windows matching gapMinutes
-            const byWindow = new Map<number, any[]>();
-            // Also group into 1-minute windows for recent sessions
-            const byWindow1m = new Map<number, any[]>();
-            for (const bucket of accountBuckets) {
-                const wStart = this.windowStart(bucket.bucket_time, gapMs);
-                if (!byWindow.has(wStart)) byWindow.set(wStart, []);
-                byWindow.get(wStart)!.push(bucket);
-
-                const wStart1m = this.windowStart(bucket.bucket_time, ONE_MIN_MS);
-                if (!byWindow1m.has(wStart1m)) byWindow1m.set(wStart1m, []);
-                byWindow1m.get(wStart1m)!.push(bucket);
-            }
-
+        for (const [aid, acWin] of byAccountWindow) {
             const sessions: UserSession[] = [];
-            for (const [wStart, windowBuckets] of byWindow) {
-                let input_tokens = 0, output_tokens = 0, cost = 0, requestCount = 0;
-                const providerMap = new Map<string, ProviderUsage>();
-                const modelMap = new Map<string, ModelUsage>();
-                const modelAliases = new Set<string>();
-
-                for (const bucket of windowBuckets) {
-                    input_tokens += bucket.input_tokens || 0;
-                    output_tokens += bucket.output_tokens || 0;
-                    cost += bucket.cost || 0;
-                    requestCount += bucket.request_count || 0;
-                    modelAliases.add(bucket.model_alias);
-
-                    const pkey = bucket.provider_id || "unknown";
-                    if (!providerMap.has(pkey)) {
-                        providerMap.set(pkey, { providerName: pkey, input_tokens: 0, output_tokens: 0 });
-                    }
-                    const p = providerMap.get(pkey)!;
-                    p.input_tokens += bucket.input_tokens || 0;
-                    p.output_tokens += bucket.output_tokens || 0;
-
-                    const mkey = bucket.model_alias || "default";
-                    if (!modelMap.has(mkey)) {
-                        modelMap.set(mkey, { model_alias: mkey, input_tokens: 0, output_tokens: 0 });
-                    }
-                    const m = modelMap.get(mkey)!;
-                    m.input_tokens += bucket.input_tokens || 0;
-                    m.output_tokens += bucket.output_tokens || 0;
-                }
-
-                cost = Math.round(cost * 1_000_000) / 1_000_000;
-
+            for (const [wStart, acc] of acWin) {
+                acc.cost = Math.round(acc.cost * 1_000_000) / 1_000_000;
                 sessions.push({
-                    startTime: wStart,
-                    endTime: wStart + gapMs,
-                    model_aliases: Array.from(modelAliases),
-                    requestCount,
-                    input_tokens,
-                    output_tokens,
-                    cost,
-                    providerUsage: Array.from(providerMap.values()),
-                    modelUsage: Array.from(modelMap.values()),
+                    startTime: wStart, endTime: wStart + gapMs,
+                    model_aliases: Array.from(acc.modelAliases),
+                    requestCount: acc.requestCount,
+                    input_tokens: acc.input_tokens, output_tokens: acc.output_tokens,
+                    cost: acc.cost,
+                    providerUsage: Array.from(acc.providerMap.values()),
+                    modelUsage: Array.from(acc.modelMap.values()),
                     windowLabel: this.formatWindowLabel(wStart, gapMs),
                 });
-
-                totalTokens += input_tokens + output_tokens;
-                totalCost += cost;
-                totalRequests += requestCount;
+                totalTokens += acc.input_tokens + acc.output_tokens;
+                totalCost += acc.cost;
+                totalRequests += acc.requestCount;
             }
 
-            // Latest sessions first
             sessions.sort((a, b) => b.startTime - a.startTime);
 
-            // Build 1m-window sessions from the same data for recentSessions
-            for (const [wStart1m, buckets1m] of byWindow1m) {
-                let input_tokens = 0, output_tokens = 0, cost = 0, requestCount = 0;
-                const modelAliases = new Set<string>();
-                for (const bucket of buckets1m) {
-                    input_tokens += bucket.input_tokens || 0;
-                    output_tokens += bucket.output_tokens || 0;
-                    cost += bucket.cost || 0;
-                    requestCount += bucket.request_count || 0;
-                    modelAliases.add(bucket.model_alias);
+            // Build 1m sessions
+            const acWin1m = byAccountWindow1m.get(aid);
+            if (acWin1m) {
+                for (const [wStart1m, acc1m] of acWin1m) {
+                    acc1m.cost = Math.round(acc1m.cost * 1_000_000) / 1_000_000;
+                    recentSessionsFlat.push({
+                        account_id: aid, startTime: wStart1m, endTime: wStart1m + ONE_MIN_MS,
+                        model_aliases: Array.from(acc1m.modelAliases),
+                        requestCount: acc1m.requestCount,
+                        input_tokens: acc1m.input_tokens, output_tokens: acc1m.output_tokens,
+                        cost: acc1m.cost,
+                        providerUsage: [], modelUsage: [],
+                        windowLabel: this.formatWindowLabel(wStart1m, ONE_MIN_MS),
+                    });
                 }
-                cost = Math.round(cost * 1_000_000) / 1_000_000;
-                recentSessionsFlat.push({
-                    account_id: accountId,
-                    startTime: wStart1m,
-                    endTime: wStart1m + ONE_MIN_MS,
-                    model_aliases: Array.from(modelAliases),
-                    requestCount,
-                    input_tokens,
-                    output_tokens,
-                    cost,
-                    providerUsage: [],
-                    modelUsage: [],
-                    windowLabel: this.formatWindowLabel(wStart1m, ONE_MIN_MS),
-                });
             }
 
-            const acct = await accountRepository.findIgnoreDelete({ id: accountId });
+            const acct = await accountRepository.findIgnoreDelete({ id: aid });
             const accountName = acct ? acct.name : "--";
             const groupTokens = sessions.reduce((sum, s) => sum + s.input_tokens + s.output_tokens, 0);
             const groupRequests = sessions.reduce((sum, s) => sum + s.requestCount, 0);
-            groups.push({ account_id: accountId, accountName, sessions, totalTokens: groupTokens, totalRequests: groupRequests });
+            groups.push({ account_id: aid, accountName, sessions, totalTokens: groupTokens, totalRequests: groupRequests });
         }
 
         // Sort groups by latest session time
@@ -355,9 +387,7 @@ export class UsageService {
         groups.forEach((g, gi) => g.sessions.forEach((s, si) => allSpans.push({ gi, si, st: s.startTime })));
         allSpans.sort((a, b) => b.st - a.st);
         const keep = new Set(allSpans.slice(0, 20).map(s => `${s.gi}:${s.si}`));
-        groups.forEach((g, gi) => {
-            g.sessions = g.sessions.filter((_, si) => keep.has(`${gi}:${si}`));
-        });
+        groups.forEach((g, gi) => { g.sessions = g.sessions.filter((_, si) => keep.has(`${gi}:${si}`)); });
 
         // Filter out sessions whose model has been deleted
         const activeModels = await modelRepo.find({});
@@ -379,7 +409,6 @@ export class UsageService {
 
         totalCost = Math.round(totalCost * 1_000_000) / 1_000_000;
 
-        // Sort recentSessions by startTime desc, take top 10
         recentSessionsFlat.sort((a, b) => b.startTime - a.startTime);
         const topRecent = recentSessionsFlat.slice(0, 10);
 

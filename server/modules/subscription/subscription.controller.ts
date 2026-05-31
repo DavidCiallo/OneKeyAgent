@@ -115,21 +115,24 @@ async function statement(request: StatementRequest) {
     const bucketRepo = Repository.instance<any>("usage_bucket");
     // Use 60m granularity buckets for cost aggregation (last 90 days)
     const since = Date.now() - 90 * 86400000;
-    const usageBuckets = await bucketRepo.find({ account_id: account.id, granularity: "60m", delete_time: null }, { since });
 
-    // Group by "day|model_alias"
+    // Group by "day|model_alias" — streamed, no intermediate array
     const dailyModelUsage = new Map<string, { logs: any[]; maxTimestamp: number }>();
-    for (const bucket of usageBuckets) {
-        const day = new Date(bucket.bucket_time).toISOString().slice(0, 10);
-        const model = bucket.model_alias || "Unknown";
-        const key = `${day}|${model}`;
-        if (!dailyModelUsage.has(key)) {
-            dailyModelUsage.set(key, { logs: [], maxTimestamp: 0 });
-        }
-        const entry = dailyModelUsage.get(key)!;
-        entry.logs.push(bucket);
-        if (bucket.create_time > entry.maxTimestamp) entry.maxTimestamp = bucket.create_time;
-    }
+    await bucketRepo.findEach(
+        { account_id: account.id, granularity: "60m", delete_time: null },
+        (bucket: any) => {
+            const day = new Date(bucket.bucket_time).toISOString().slice(0, 10);
+            const model = bucket.model_alias || "Unknown";
+            const key = `${day}|${model}`;
+            if (!dailyModelUsage.has(key)) {
+                dailyModelUsage.set(key, { logs: [], maxTimestamp: 0 });
+            }
+            const entry = dailyModelUsage.get(key)!;
+            entry.logs.push(bucket);
+            if (bucket.create_time > entry.maxTimestamp) entry.maxTimestamp = bucket.create_time;
+        },
+        { since },
+    );
 
     const items: StatementItem[] = [];
 
