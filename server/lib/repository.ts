@@ -90,11 +90,29 @@ async function* readLines(name: string): AsyncGenerator<Row, void, void> {
     }
 }
 
-/** Check if a row matches the where conditions */
+/** Check if a row matches the where conditions. Supports operators: $eq, $ne, $gt, $gte, $lt, $lte, $in. */
 function matches<T extends Row>(row: T, where: Record<string, any>): boolean {
     for (const [key, val] of Object.entries(where)) {
-        if (val === undefined || val === null || val === "") continue;
-        if (row[key] !== val) return false;
+        if (val === undefined || val === "") continue;
+        // null is a valid value for $eq / $ne
+        if (val === null) {
+            if (row[key] !== null) return false;
+            continue;
+        }
+        if (typeof val === "object" && !Array.isArray(val)) {
+            for (const [op, opVal] of Object.entries(val)) {
+                const rowVal = row[key];
+                if (op === "$eq")  { if (rowVal !== opVal) return false; }
+                if (op === "$ne")  { if (rowVal === opVal) return false; }
+                if (op === "$gt")  { if (!(rowVal > opVal)) return false; }
+                if (op === "$gte") { if (!(rowVal >= opVal)) return false; }
+                if (op === "$lt")  { if (!(rowVal < opVal)) return false; }
+                if (op === "$lte") { if (!(rowVal <= opVal)) return false; }
+                if (op === "$in")  { if (!Array.isArray(opVal) || !opVal.includes(rowVal)) return false; }
+            }
+        } else {
+            if (row[key] !== val) return false;
+        }
     }
     return true;
 }
@@ -144,7 +162,7 @@ class Repository<
     }
 
     async find(
-        where?: Partial<T>,
+        where?: Record<string, any>,
         config?: { limit?: number; offset?: number; since?: number },
     ): Promise<T[]> {
         const results: T[] = [];
@@ -170,8 +188,9 @@ class Repository<
         return results;
     }
 
-    async findOne(where: Partial<T>): Promise<T | null> {
-        for await (const row of readLines(this.collection)) {
+    async findOne(where: Partial<T>, reverse = false): Promise<T | null> {
+        const reader = reverse ? readLinesReverse(this.collection) : readLines(this.collection);
+        for await (const row of reader) {
             if (row.delete_time) continue;
             if (matches(row, where as Record<string, any>)) return row as T;
         }
@@ -223,12 +242,12 @@ class Repository<
     async insert(entity: Partial<T>): Promise<T> {
         return this.withLock(async () => {
             const now = Date.now();
-            const id = (entity as any)?.id || nanoid(6);
+            const id = entity.id || nanoid(6);
             const row = {
                 ...entity,
                 id,
-                create_time: (entity as any)?.create_time || now,
-                update_time: (entity as any)?.update_time || now,
+                create_time: entity.create_time || now,
+                update_time: entity.update_time || now,
                 delete_time: null,
             };
             fs.appendFileSync(this.filePath(), JSON.stringify(row) + "\n");
@@ -280,7 +299,7 @@ class Repository<
 
     async delete(where: Partial<T>): Promise<boolean> {
         const now = Date.now();
-        return this.update(where, { delete_time: now } as any);
+        return this.update(where, { delete_time: now } as Partial<T>);
     }
 
     /** Clear all data — used before import */
@@ -377,15 +396,13 @@ class Repository<
         return this.withLock(async () => {
             if (entities.length === 0) return 0;
             const now = Date.now();
-            const rows = entities.map((e) => {
-                return {
-                    ...e,
-                    id: (e as any)?.id || nanoid(6),
-                    create_time: (e as any)?.create_time || now,
-                    update_time: (e as any)?.update_time || now,
-                    delete_time: null,
-                };
-            });
+            const rows = entities.map((e) => ({
+                ...e,
+                id: e.id || nanoid(6),
+                create_time: e.create_time || now,
+                update_time: e.update_time || now,
+                delete_time: null,
+            }));
             fs.appendFileSync(this.filePath(), rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
             return rows.length;
         });

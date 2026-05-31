@@ -25,7 +25,7 @@ export default function SettingsPage() {
 
     const fetchSettings = async () => {
         setLoading(true);
-        const res = await settingsApi.list({} as any);
+        const res = await settingsApi.list({});
         if (res.success && res.data) {
             setEntries(res.data.entries);
         }
@@ -39,7 +39,7 @@ export default function SettingsPage() {
     const handleSave = async () => {
         setSaving(true);
         setMsg("");
-        const res = await settingsApi.save({ entries } as any);
+        const res = await settingsApi.save({ entries });
         if (res.success) {
             setMsg("Saved!");
         } else {

@@ -177,22 +177,23 @@ export class UsageService {
         return results;
     }
 
-    /** Load bucket records at a given granularity since a time, filtering by bucket_time for accuracy */
+    /** Load bucket records at a given granularity since a time, filtering by bucket_time */
     private static async loadBucketsByTime(filter: any, since: number, granularity: string): Promise<any[]> {
-        const bufferMs = 7_200_000; // 2 hour safety margin for create_time vs bucket_time skew
-        const buckets = await bucketRepo.find(
-            { ...filter, granularity },
-            { since: since - bufferMs }
-        );
-        return buckets.filter((b: any) => b.bucket_time >= since);
+        return bucketRepo.find({
+            ...filter,
+            granularity,
+            bucket_time: { $gte: since },
+        });
     }
 
     /** Pick the coarsest granularity that still provides adequate precision for the query */
     private static selectGranularity(gapMinutes: number, since: number): string {
+        // If the caller wants minute-level precision, always use 1m regardless of range
+        if (gapMinutes <= 5) return "1m";
         const rangeDays = (Date.now() - since) / DAY;
-        if (rangeDays <= 1) return "1m";          // up to 1 day → 1m precision
-        if (rangeDays <= 90) return "60m";         // up to 90 days → hourly precision
-        return "1d";                                // beyond 90 days → daily
+        if (rangeDays <= 1) return "1m";
+        if (rangeDays <= 90) return "60m";
+        return "1d";
     }
 
     static windowStart(ts: number, gapMs: number): number {

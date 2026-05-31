@@ -199,8 +199,8 @@ async function statement(request: StatementRequest) {
  * NowPayments POSTs here when payment status changes.
  */
 async function ipnwebhook(request: Record<string, unknown>): Promise<{ success: boolean; message: string }> {
-    const rawBody = (request as any).__raw_body as string || "";
-    const headers = (request as any).__headers as Record<string, string> || {};
+    const rawBody = (request).__raw_body as string || "";
+    const headers = (request).__headers as Record<string, string> || {};
     const signature = headers["x-nowpayments-sig"] || headers["x-nowpayments-signature"] || "";
     const secret = SettingsService.get("ipn_secret");
     if (secret) {

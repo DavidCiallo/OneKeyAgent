@@ -30,7 +30,7 @@ export default function Component() {
     const [emailLocal, setEmailLocal] = useState<string>("");
 
     useEffect(() => {
-        authApi.config({} as any).then(res => {
+        authApi.config({}).then(res => {
             if (res.success && res.data?.allowed_domains?.length > 0) {
                 setAllowedDomains(res.data.allowed_domains);
                 setEmailDomain(res.data.allowed_domains[0]);
@@ -46,7 +46,7 @@ export default function Component() {
                 email: email.toString(),
                 password: password.toString(),
             }
-        } as any);
+        });
         if (!success || !data) {
             toast({ title: message || locale.LoginFailed, color: "danger" });
             return;
@@ -70,7 +70,7 @@ export default function Component() {
                 email: emailStr,
                 password: password.toString(),
             }
-        } as any);
+        });
         if (!success || !data) {
             toast({ title: message || locale.RegisterFailed, color: "danger" });
             return;

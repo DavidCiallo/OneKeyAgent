@@ -18,7 +18,7 @@ async function list(request: ModelListRequest) {
     const search: Partial<Record<string, any>> = {};
     if (filter?.alias) search.alias = filter.alias;
 
-    const { list: data, total } = await ModelService.find(page, search as any);
+    const { list: data, total } = await ModelService.find(page, search);
     const list = data.map(item => new ModelDTO(item));
 
     return { list, total };
@@ -46,7 +46,7 @@ async function update(request: ModelUpdateRequest) {
     request = ModelUpdateRequest.self(request);
     await requireAdmin(request?.auth);
     if (!request.id || !request.model) throw "miss params";
-    const data = await ModelService.update(request.id, request.model as any);
+    const data = await ModelService.update(request.id, request.model);
     if (!data) throw "update failed";
     const model = new ModelDTO(data);
     return { model };

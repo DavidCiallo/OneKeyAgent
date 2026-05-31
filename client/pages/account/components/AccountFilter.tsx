@@ -14,7 +14,7 @@ type Props = {
 
 async function handleExport() {
     try {
-        const res = await accountApi.export({} as any);
+        const res = await accountApi.export({});
         if (res.success && res.data) {
             const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: "application/json" });
             const url = URL.createObjectURL(blob);
@@ -41,7 +41,7 @@ async function handleImport() {
         try {
             const text = await file.text();
             const data = JSON.parse(text);
-            const res = await accountApi.import({ data } as any);
+            const res = await accountApi.import({ data });
             if (res.success) {
                 const details = res.data?.imported
                     ? Object.entries(res.data.imported)

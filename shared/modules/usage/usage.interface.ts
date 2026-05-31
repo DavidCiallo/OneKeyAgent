@@ -197,7 +197,7 @@ export class UsageStatsBatchRequest implements BaseRequest {
     }
 }
 
-export class UsageStatsBatchResponse implements BaseResponse<Record<string, UsageStatsResult>> {
+export class UsageStatsBatchResponse implements BaseResponse<UsageStatsResult> {
     public success: boolean;
     public message: string;
     public data: Record<string, UsageStatsResult>;

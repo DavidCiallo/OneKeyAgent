@@ -36,7 +36,7 @@ export default function ModelPage() {
     const fetchList = useCallback(async (p: number) => {
         const filter: Record<string, string | number> = {};
 
-        const res = await modelApi.list({ page: p, filter } as any);
+        const res = await modelApi.list({ page: p, filter });
         if (res.success && res.data) {
             setList(res.data.list);
             setTotal(res.data.total);
@@ -45,7 +45,7 @@ export default function ModelPage() {
             const map: Record<string, { todayPeriod: UsageStatsPeriod; last24hPeriod: UsageStatsPeriod; weekPeriod: UsageStatsPeriod }> = {};
             await Promise.all(res.data.list.map(async (item) => {
                 try {
-                    const statsRes = await usageApi.stats({ model_alias: item.alias } as any);
+                    const statsRes = await usageApi.stats({ model_alias: item.alias });
                     if (statsRes.success && statsRes.data) {
                         map[item.id] = {
                             todayPeriod: statsRes.data.today,
@@ -90,7 +90,7 @@ export default function ModelPage() {
                     output_price: form.output_price,
                     is_public: form.is_public ?? 0,
                 },
-            } as any);
+            });
             if (res.success) {
                 onFormClose();
                 fetchList(1);
@@ -105,7 +105,7 @@ export default function ModelPage() {
                     output_price: form.output_price,
                     is_public: form.is_public,
                 },
-            } as any);
+            });
             if (res.success) {
                 onFormClose();
                 fetchList(page);
@@ -114,7 +114,7 @@ export default function ModelPage() {
     };
 
     const handleDelete = async (id: string) => {
-        const res = await modelApi.delete({ id } as any);
+        const res = await modelApi.delete({ id });
         if (res.success) {
             fetchList(page);
         }

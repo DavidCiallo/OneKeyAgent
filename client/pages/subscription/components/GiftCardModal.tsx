@@ -23,7 +23,7 @@ export default function GiftCardModal({
         setActivating(true);
         setError("");
         try {
-            const res = await giftCardApi.redeem({ code: code.trim() } as any);
+            const res = await giftCardApi.redeem({ code: code.trim() });
             if (res.success) {
                 setCode("");
                 setError(`Redeemed successfully! +${res.data?.token_amount || 0} tokens`);

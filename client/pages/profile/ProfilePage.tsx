@@ -20,7 +20,7 @@ export default function ProfilePage() {
     const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onClose: onConfirmClose, onOpenChange: onConfirmChange } = useDisclosure();
 
     const fetchProfile = useCallback(async () => {
-        const res = await accountApi.profile({} as any);
+        const res = await accountApi.profile({});
         if (res.success && res.data?.account) {
             setAccount(res.data.account);
             setBalance(res.data.balance ?? 0);
@@ -29,7 +29,7 @@ export default function ProfilePage() {
     }, []);
 
     const fetchModels = useCallback(async () => {
-        const res = await aiApi.models({} as any);
+        const res = await aiApi.models({});
         if (res.success && res.data) {
             const allModels = res.data.map((m: any) => ({ id: m.id, input_price: m.input_price, output_price: m.output_price }));
             setModels(allModels);
@@ -41,7 +41,7 @@ export default function ProfilePage() {
         const signDate = localStorage.getItem("sign_date");
         const today = new Date().toDateString();
         if (signDate === today) return;
-        const res = await authApi.daily({} as any);
+        const res = await authApi.daily({});
         if (res.success && res.data?.amount && res.data.amount > 0) {
             localStorage.setItem("sign_date", today);
             fetchProfile();
@@ -61,7 +61,7 @@ export default function ProfilePage() {
         onConfirmClose();
         setRegenerating(true);
         try {
-            const res = await accountApi.regenerate({} as any);
+            const res = await accountApi.regenerate({});
             if (res.success && res.data) {
                 await fetchProfile();
             }
