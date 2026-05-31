@@ -1,18 +1,19 @@
 import Repository from "../../lib/repository";
 import { AccountEntity } from "../../../shared/modules/account/account.entity";
 import { ModelEntity } from "../../../shared/modules/model/model.entity";
-import { ProviderEntity } from "../../../shared/modules/provider/provider.entity";
 import { UsageBucketEntity } from "../../../shared/modules/usage/usage_bucket.entity";
 import { UsageStatsPeriod, UsageStatsResult, UsageAmountData, UserSession, UserSessionGroup, ProviderUsage, ModelUsage } from "../../../shared/modules/usage/usage.interface";
 
 const bucketRepo = Repository.instance<UsageBucketEntity>("usage_bucket");
 const modelRepo = Repository.instance<ModelEntity>("Model");
-const providerRepo = Repository.instance<ProviderEntity>("Provider");
 const accountRepository = Repository.instance<AccountEntity>("Account");
-
 const TEN_MIN = 10 * 60 * 1000;
 const DAY = 86400000;
 const MONTH = 30 * DAY;
+const STATS_CACHE_TTL = 5_000; // 5 seconds
+
+// Simple in-memory cache for stats results
+const statsCache = new Map<string, { result: UsageStatsResult; expiry: number }>();
 
 /** Get the local-timezone midnight timestamp (in ms since epoch) */
 function localDayStart(ts: number): number {
@@ -72,6 +73,21 @@ function buildBucketPeriod(buckets: any[], periodStart: number, periodEnd: numbe
     return { total, amounts };
 }
 
+/** Group an array of bucket records by model_alias */
+function groupByModel(buckets: any[]): Map<string, any[]> {
+    const map = new Map<string, any[]>();
+    for (const b of buckets) {
+        const alias = b.model_alias || "__unknown__";
+        let list = map.get(alias);
+        if (!list) {
+            list = [];
+            map.set(alias, list);
+        }
+        list.push(b);
+    }
+    return map;
+}
+
 export class UsageService {
     static async find(page: number, filter: { account_id?: string; model_alias?: string }, since?: number): Promise<{ list: UsageBucketEntity[], total: number }> {
         // 30-day window → use 60m granularity (1m data only kept 7 days)
@@ -82,6 +98,13 @@ export class UsageService {
     }
 
     static async stats(model_alias?: string, account_id?: string): Promise<UsageStatsResult> {
+        // Check cache
+        const cacheKey = `${account_id || ""}|${model_alias || ""}`;
+        const cached = statsCache.get(cacheKey);
+        if (cached && cached.expiry > Date.now()) {
+            return cached.result;
+        }
+
         const now = Date.now();
 
         const todayStart = localDayStart(now);
@@ -99,11 +122,59 @@ export class UsageService {
             UsageService.loadBucketsByTime(baseFilter, weekStart, "1d"),
         ]);
 
-        return {
+        const result = {
             today: buildBucketPeriod(todayBuckets, todayStart, now),
             last24h: buildBucketPeriod(last24hBuckets, last24hStart, now),
             last7Days: buildBucketPeriod(weekBuckets, weekStart, now),
         };
+
+        // Store in cache
+        statsCache.set(cacheKey, { result, expiry: now + STATS_CACHE_TTL });
+        if (statsCache.size > 500) {
+            // Evict expired entries if cache gets too large
+            const now2 = Date.now();
+            for (const [k, v] of statsCache) {
+                if (v.expiry <= now2) statsCache.delete(k);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Batch stats: query all model_aliases at once by reading 1m and 1d data once.
+     * Returns a map of model_alias → UsageStatsResult.
+     */
+    static async statsBatch(model_aliases: string[], account_id?: string): Promise<Map<string, UsageStatsResult>> {
+        const now = Date.now();
+        const todayStart = localDayStart(now);
+        const last24hStart = now - DAY;
+        const weekStart = now - 7 * DAY;
+
+        const baseFilter: any = {};
+        if (account_id) baseFilter.account_id = account_id;
+
+        // Read all 1m and 1d data once for the time ranges
+        const [todayBuckets, last24hBuckets, weekBuckets] = await Promise.all([
+            UsageService.loadBucketsByTime(baseFilter, todayStart, "1m"),
+            UsageService.loadBucketsByTime(baseFilter, last24hStart, "1m"),
+            UsageService.loadBucketsByTime(baseFilter, weekStart, "1d"),
+        ]);
+
+        // Group by model_alias
+        const groupToday = groupByModel(todayBuckets);
+        const group24h = groupByModel(last24hBuckets);
+        const groupWeek = groupByModel(weekBuckets);
+
+        const results = new Map<string, UsageStatsResult>();
+        for (const alias of model_aliases) {
+            results.set(alias, {
+                today: buildBucketPeriod(groupToday.get(alias) || [], todayStart, now),
+                last24h: buildBucketPeriod(group24h.get(alias) || [], last24hStart, now),
+                last7Days: buildBucketPeriod(groupWeek.get(alias) || [], weekStart, now),
+            });
+        }
+        return results;
     }
 
     /** Load bucket records at a given granularity since a time, filtering by bucket_time for accuracy */
@@ -272,25 +343,23 @@ export class UsageService {
             g.sessions = g.sessions.filter((_, si) => keep.has(`${gi}:${si}`));
         });
 
-        // Filter out sessions whose provider or model has been deleted
-        const [activeProviders, activeModels] = await Promise.all([
-            providerRepo.find({}),
-            modelRepo.find({}),
-        ]);
-        const activeProviderIds = new Set(activeProviders.map(p => p.id));
+        // Filter out sessions whose model has been deleted
+        const activeModels = await modelRepo.find({});
         const activeModelAliases = new Set(activeModels.map(m => m.alias));
 
-        const filtered = groups.filter(g => g.sessions.length > 0).map(g => ({
-            ...g,
-            sessions: g.sessions
-                .map(s => ({
-                    ...s,
-                    providerUsage: account_ids && account_ids.length > 0 && !isAdmin
-                        ? s.modelUsage.map(mu => ({ providerName: mu.model_alias, input_tokens: mu.input_tokens, output_tokens: mu.output_tokens }))
-                        : s.providerUsage.filter(pu => activeProviderIds.has(pu.providerName)),
-                }))
-                .filter(s => s.providerUsage.length > 0 && s.model_aliases.some(m => activeModelAliases.has(m))),
-        })).filter(g => g.sessions.length > 0);
+        const filtered = groups
+            .map(g => ({
+                ...g,
+                sessions: g.sessions
+                    .map(s => ({
+                        ...s,
+                        providerUsage: account_ids && account_ids.length > 0 && !isAdmin
+                            ? s.modelUsage.map(mu => ({ providerName: mu.model_alias, input_tokens: mu.input_tokens, output_tokens: mu.output_tokens }))
+                            : s.providerUsage,
+                    }))
+                    .filter(s => s.model_aliases.some(m => activeModelAliases.has(m))),
+            }))
+            .filter(g => g.sessions.length > 0);
 
         totalCost = Math.round(totalCost * 1_000_000) / 1_000_000;
 

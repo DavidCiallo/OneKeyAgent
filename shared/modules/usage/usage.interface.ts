@@ -181,3 +181,31 @@ export interface UsageSessionTotals {
     totalRequests: number;
 }
 
+// --- Batch stats types ---
+
+export class UsageStatsBatchRequest implements BaseRequest {
+    public auth?: string;
+    public model_aliases: string[];
+
+    constructor(origin: Partial<UsageStatsBatchRequest>) {
+        if (!origin.model_aliases || origin.model_aliases.length === 0) throw new Error("model_aliases is required");
+        origin.auth && (this.auth = origin.auth);
+        this.model_aliases = origin.model_aliases;
+    }
+    static self(unsafe: UsageStatsBatchRequest) {
+        return new UsageStatsBatchRequest(unsafe);
+    }
+}
+
+export class UsageStatsBatchResponse implements BaseResponse<Record<string, UsageStatsResult>> {
+    public success: boolean;
+    public message: string;
+    public data: Record<string, UsageStatsResult>;
+
+    constructor(origin: UsageStatsBatchResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+        this.data = origin.data;
+    }
+}
+
