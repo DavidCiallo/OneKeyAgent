@@ -56,7 +56,7 @@ export function AccountFormModal({ isOpen, onOpenChange, mode, form, onFormChang
         if (isOpen && mode === "edit") {
             (async () => {
                 try {
-                    const res = await aiApi.models({} as any);
+                    const res = await aiApi.models({});
                     if (res.success && res.data) {
                         setAllModels(res.data.map((m: any) => m.id));
                     }

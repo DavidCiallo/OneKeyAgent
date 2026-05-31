@@ -112,22 +112,27 @@ async function statement(request: StatementRequest) {
     const cardRepo = Repository.instance<any>("gift_card");
     const cards = await cardRepo.find({ redeemed_by: account.id, status: "redeemed" });
 
-    const usageRepo = Repository.instance<any>("usage_log");
-    const usageLogs = await usageRepo.find({ account_id: account.id, delete_time: null });
+    const bucketRepo = Repository.instance<any>("usage_bucket");
+    // Use 60m granularity buckets for cost aggregation (last 90 days)
+    const since = Date.now() - 90 * 86400000;
 
-    // Group by "day|model_alias"
+    // Group by "day|model_alias" — streamed, no intermediate array
     const dailyModelUsage = new Map<string, { logs: any[]; maxTimestamp: number }>();
-    for (const log of usageLogs) {
-        const day = new Date(log.create_time).toISOString().slice(0, 10);
-        const model = log.model_alias || "Unknown";
-        const key = `${day}|${model}`;
-        if (!dailyModelUsage.has(key)) {
-            dailyModelUsage.set(key, { logs: [], maxTimestamp: 0 });
-        }
-        const entry = dailyModelUsage.get(key)!;
-        entry.logs.push(log);
-        if (log.create_time > entry.maxTimestamp) entry.maxTimestamp = log.create_time;
-    }
+    await bucketRepo.findEach(
+        { account_id: account.id, granularity: "60m", delete_time: null },
+        (bucket: any) => {
+            const day = new Date(bucket.bucket_time).toISOString().slice(0, 10);
+            const model = bucket.model_alias || "Unknown";
+            const key = `${day}|${model}`;
+            if (!dailyModelUsage.has(key)) {
+                dailyModelUsage.set(key, { logs: [], maxTimestamp: 0 });
+            }
+            const entry = dailyModelUsage.get(key)!;
+            entry.logs.push(bucket);
+            if (bucket.create_time > entry.maxTimestamp) entry.maxTimestamp = bucket.create_time;
+        },
+        { since },
+    );
 
     const items: StatementItem[] = [];
 
@@ -180,7 +185,7 @@ async function statement(request: StatementRequest) {
         items.push(new StatementItem({
             id: `usage_${key}`,
             type: "usage",
-            amount: AccountService.computeUsageCost(entry.logs),
+            amount: Math.round(entry.logs.reduce((sum, b) => sum + (b.cost || 0), 0) * 1_000_000) / 1_000_000,
             description: "AI Usage",
             remark: model,
             create_time: entry.maxTimestamp,
@@ -197,8 +202,8 @@ async function statement(request: StatementRequest) {
  * NowPayments POSTs here when payment status changes.
  */
 async function ipnwebhook(request: Record<string, unknown>): Promise<{ success: boolean; message: string }> {
-    const rawBody = (request as any).__raw_body as string || "";
-    const headers = (request as any).__headers as Record<string, string> || {};
+    const rawBody = (request).__raw_body as string || "";
+    const headers = (request).__headers as Record<string, string> || {};
     const signature = headers["x-nowpayments-sig"] || headers["x-nowpayments-signature"] || "";
     const secret = SettingsService.get("ipn_secret");
     if (secret) {

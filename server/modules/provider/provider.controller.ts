@@ -19,7 +19,7 @@ async function list(request: ProviderListRequest) {
     if (request.filter?.model_alias) search.model_alias = request.filter.model_alias;
     if (request.filter?.enabled !== undefined) search.enabled = request.filter.enabled;
 
-    const { list: data, total } = await ProviderService.find(request.page, search as any);
+    const { list: data, total } = await ProviderService.find(request.page, search );
     const list = data.map(item => new ProviderDTO(item));
 
     return { list, total };

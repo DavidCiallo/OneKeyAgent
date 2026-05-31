@@ -39,7 +39,7 @@ export default function ProviderPage() {
         const filter: Record<string, string | number> = {};
         if (filterModelAlias) filter.model_alias = filterModelAlias;
 
-        const res = await providerApi.list({ page: p, filter } as any);
+        const res = await providerApi.list({ page: p, filter });
         if (res.success && res.data) {
             setList(res.data.list);
             setTotal(res.data.total);
@@ -56,12 +56,12 @@ export default function ProviderPage() {
     }, [list]);
 
     const handleMoveUp = async (id: string) => {
-        const res = await providerApi.updatepriority({ id, delta: -1 } as any);
+        const res = await providerApi.updatepriority({ id, delta: -1 });
         if (res.success) fetchList(page);
     };
 
     const handleMoveDown = async (id: string) => {
-        const res = await providerApi.updatepriority({ id, delta: 1 } as any);
+        const res = await providerApi.updatepriority({ id, delta: 1 });
         if (res.success) fetchList(page);
     };
 
@@ -85,7 +85,7 @@ export default function ProviderPage() {
                 proxy_url: item.proxy_url || undefined,
                 enabled: item.enabled,
             },
-        } as any);
+        });
         if (res.success) {
             fetchList(page);
         }
@@ -124,7 +124,7 @@ export default function ProviderPage() {
                     proxy_url: form.proxy_url || undefined,
                     enabled: form.enabled,
                 },
-            } as any);
+            });
             if (res.success) {
                 onFormClose();
                 fetchList(1);
@@ -145,7 +145,7 @@ export default function ProviderPage() {
                     proxy_url: form.proxy_url !== undefined ? form.proxy_url : undefined,
                     enabled: form.enabled !== undefined ? form.enabled : undefined,
                 },
-            } as any);
+            });
             if (res.success) {
                 onFormClose();
                 fetchList(page);
@@ -154,7 +154,7 @@ export default function ProviderPage() {
     };
 
     const handleDelete = async (id: string) => {
-        const res = await providerApi.delete({ id } as any);
+        const res = await providerApi.delete({ id });
         if (res.success) {
             fetchList(page);
         }

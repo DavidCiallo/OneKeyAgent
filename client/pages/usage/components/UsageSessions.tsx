@@ -3,7 +3,7 @@ import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid,
 } from "recharts";
 import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell } from "@heroui/react";
-import { UsageSessionTotals, UserSessionGroup, UserSession } from "../../../../shared/modules/usage/usage.interface";
+import { UsageSessionTotals, UserSessionGroup, UserSession, ProviderUsage } from "../../../../shared/modules/usage/usage.interface";
 import { stringToColor, fmtM, fmtK, format24Time, stripEmail } from "./utils";
 
 type Props = {
@@ -69,8 +69,39 @@ export function UsageSessions({ groups, totals, recentSessions, gapMinutes }: Pr
 
     const chartSessions = useMemo(() => {
         const all = groups.flatMap(g => g.sessions);
-        all.sort((a, b) => a.startTime - b.startTime);
-        return all;
+        // Merge sessions with same startTime (from different users) to deduplicate x-axis labels
+        const merged = new Map<number, UserSession>();
+        for (const s of all) {
+            const existing = merged.get(s.startTime);
+            if (existing) {
+                existing.input_tokens += s.input_tokens;
+                existing.output_tokens += s.output_tokens;
+                existing.cost += s.cost;
+                existing.requestCount += s.requestCount;
+                // Merge model_aliases (dedup)
+                for (const m of s.model_aliases) {
+                    if (!existing.model_aliases.includes(m)) existing.model_aliases.push(m);
+                }
+                // Merge providerUsage by providerName
+                const provMap = new Map<string, ProviderUsage>();
+                for (const p of existing.providerUsage) provMap.set(p.providerName, { ...p });
+                for (const p of s.providerUsage) {
+                    const ep = provMap.get(p.providerName);
+                    if (ep) {
+                        ep.input_tokens += p.input_tokens;
+                        ep.output_tokens += p.output_tokens;
+                    } else {
+                        provMap.set(p.providerName, { ...p });
+                    }
+                }
+                existing.providerUsage = Array.from(provMap.values());
+            } else {
+                merged.set(s.startTime, { ...s, model_aliases: [...s.model_aliases], providerUsage: s.providerUsage.map(p => ({ ...p })) });
+            }
+        }
+        const result = Array.from(merged.values());
+        result.sort((a, b) => a.startTime - b.startTime);
+        return result;
     }, [groups]);
 
     const chartData = useMemo(() => {

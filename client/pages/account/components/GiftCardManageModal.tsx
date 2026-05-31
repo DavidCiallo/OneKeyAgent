@@ -26,7 +26,7 @@ export default function GiftCardManageModal({
     const fetchCards = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await giftCardApi.list({} as any);
+            const res = await giftCardApi.list({});
             if (res.success && res.data) {
                 setCards(res.data.list.sort((a, b) => b.create_time - a.create_time));
             }
@@ -46,7 +46,7 @@ export default function GiftCardManageModal({
         setError("");
         setNewCardCode("");
         try {
-            const res = await giftCardApi.create({ token_amount: tokenAmount } as any);
+            const res = await giftCardApi.create({ token_amount: tokenAmount });
             if (res.success && res.data?.card) {
                 setNewCardCode(res.data.card.code);
                 setAmount("");

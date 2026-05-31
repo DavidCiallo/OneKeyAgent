@@ -2,7 +2,7 @@ import { BaseRequest, BaseResponse } from "../../lib/default/decorator";
 import { AccountEntity } from "../account/account.entity";
 
 // Auth Body
-// 用于封装登录和注册请求的具体数据
+// Encapsulates login and registration request data
 
 export class LoginBody {
     public email: string;
@@ -22,7 +22,7 @@ export class LoginBody {
 }
 
 // Interface
-// 遵循 account.interface.ts 的 Request/Response 模式
+// Follows the Request/Response pattern from account.interface.ts
 
 export class RegisterBody {
     public name: string;
@@ -174,7 +174,6 @@ export class VerifyEmailRequest implements BaseRequest {
     public token: string;
 
     constructor(origin: Partial<VerifyEmailRequest>) {
-        console.log(origin);
         if (!origin.token) throw new Error("Token is required");
         this.token = origin.token;
     }

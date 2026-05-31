@@ -1,9 +1,9 @@
-import { UsageLogEntity } from "../../../shared/modules/usage/usage.entity";
 import {
     UsageListRequest,
     UsageDTO,
     UsageStatsRequest,
     UsageSessionsRequest,
+    UsageStatsBatchRequest,
     UserSessionGroup,
     UserSession,
 } from "../../../shared/modules/usage/usage.interface";
@@ -27,7 +27,7 @@ async function list(request: UsageListRequest) {
 
     const account = await resolveAccount(auth);
 
-    const search: Partial<UsageLogEntity> = {};
+    const search: { account_id?: string; model_alias?: string } = {};
     if (account.is_admin) {
         if (filter?.account_id) search.account_id = filter.account_id;
     } else {
@@ -52,12 +52,11 @@ async function list(request: UsageListRequest) {
     const providerMap = new Map(providers.map(p => [p.id, p.name]));
 
     const list = data.map(item => {
-        const cost = (item.input_tokens * (item.input_price || 0) + item.output_tokens * (item.output_price || 0)) / 1_000_000;
         return new UsageDTO({
             ...item,
             accountName: accountMap.get(item.account_id) || item.account_id,
             providerName: item.provider_id ? providerMap.get(item.provider_id) || item.provider_id : undefined,
-            cost: Math.round(cost * 1_000_000) / 1_000_000,
+            cost: Math.round((item.cost || 0) * 1_000_000) / 1_000_000,
         });
     });
 
@@ -73,6 +72,19 @@ async function stats(request: UsageStatsRequest) {
     return data;
 }
 
+async function statsBatch(request: UsageStatsBatchRequest) {
+    request = UsageStatsBatchRequest.self(request);
+    const { auth, model_aliases } = request;
+    if (!auth) throw "Authorization failed";
+    const account = await resolveAccount(auth);
+    const results = await UsageService.statsBatch(model_aliases, account.is_admin ? undefined : account.id);
+    const data: Record<string, any> = {};
+    for (const [alias, result] of results) {
+        data[alias] = result;
+    }
+    return data;
+}
+
 async function sessions(request: UsageSessionsRequest) {
     request = UsageSessionsRequest.self(request);
     const { auth } = request;
@@ -80,24 +92,15 @@ async function sessions(request: UsageSessionsRequest) {
     const account = await resolveAccount(auth);
     const effectiveAccountIds = account.is_admin ? request.account_ids : [account.id];
 
-    const { groups, totals } = await UsageService.getUserSessions(request.gapMinutes, request.since, effectiveAccountIds, account.is_admin ? true : false);
+    const { groups, totals, recentSessions: rawSessions } = await UsageService.getUserSessions(request.gapMinutes, request.since, effectiveAccountIds, account.is_admin ? true : false);
 
-    const { groups: rawGroups } = await UsageService.getUserSessions(1, request.since, effectiveAccountIds, account.is_admin ? true : false);
-
-    const allGroupIds = [...new Set([...groups, ...rawGroups].map(g => g.account_id))];
+    const allGroupIds = [...new Set([...groups.map(g => g.account_id), ...rawSessions.map(s => s.account_id)])];
     const accounts = await Promise.all(
         allGroupIds.map(id => AccountService.findOne(id).then(a => ({ id, name: a ? `${a.name} (${a.email})` : id })))
     );
     const accountMap = new Map(accounts.map(a => [a.id, a.name]));
 
-    const allRawSessions: (UserSession & { account_id: string })[] = [];
-    for (const g of rawGroups) {
-        for (const s of g.sessions) {
-            allRawSessions.push({ ...s, account_id: g.account_id });
-        }
-    }
-    allRawSessions.sort((a, b) => b.startTime - a.startTime);
-    const recentSessions = allRawSessions.slice(0, 10).map(s => ({
+    const recentSessions = rawSessions.map(s => ({
         ...s,
         accountName: accountMap.get(s.account_id) || s.account_id,
     }));
@@ -131,5 +134,5 @@ async function sessions(request: UsageSessionsRequest) {
 
 export const usageMount = {
     routes: usageRoutes,
-    handlers: { list, stats, sessions },
+    handlers: { list, stats, statsBatch, sessions },
 };

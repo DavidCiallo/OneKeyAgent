@@ -23,7 +23,7 @@ const taskRepo = Repository.instance<TaskEntity>("Task");
 export class TelegramService {
 
     static async handleMessage(chatId: string, text: string, messageId?: number): Promise<void> {
-        // 先检查是否已绑定
+        // Check if already bound
         const account = await accountRepo.findOne({ tg_chat_id: chatId, delete_time: null });
         if (!account) {
             if (text.startsWith("/auth")) {
@@ -215,11 +215,11 @@ export class TelegramService {
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
         }
-        // 清理已删除的消息，并防止数组无限增长
+        // Clean up deleted messages and prevent unbounded array growth
         waitDelMessage.filter(item => item.chat_id === chat_id).forEach(item => {
             this.deleteMessage(chat_id, item.message_id);
         });
-        // 移除已处理项并限制最大长度
+        // Remove processed items and cap maximum length
         const remaining = waitDelMessage.filter(item => item.chat_id !== chat_id);
         if (isJsonPayload && message_id) {
             remaining.push({ chat_id, message_id });

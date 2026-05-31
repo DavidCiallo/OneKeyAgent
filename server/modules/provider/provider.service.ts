@@ -80,6 +80,6 @@ export class ProviderService {
         const p = await providerRepository.findOne({ id });
         if (!p) throw "Provider not found";
         const newPriority = Math.max(1, p.priority + delta);
-        await providerRepository.update({ id }, { priority: newPriority } as any);
+        await providerRepository.update({ id }, { priority: newPriority });
     }
 }

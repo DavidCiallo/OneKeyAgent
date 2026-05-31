@@ -1,5 +1,5 @@
 import { BaseRequest, BaseResponse } from "../../lib/default/decorator";
-import { UsageLogEntity } from "./usage.entity";
+import { UsageBucketEntity } from "./usage_bucket.entity";
 
 export interface UsageAmountData {
     ts: number;
@@ -61,7 +61,7 @@ export class UsageDTO {
     public cost: number;
     public create_time: number;
 
-    constructor(origin: UsageLogEntity & { accountName?: string; providerName?: string; cost?: number }) {
+    constructor(origin: UsageBucketEntity & { accountName?: string; providerName?: string; cost?: number }) {
         this.id = origin.id;
         this.account_id = origin.account_id;
         this.accountName = origin.accountName;
@@ -79,13 +79,13 @@ export class UsageQueryBody {
     public account_id?: string;
     public model_alias?: string;
 
-    constructor(origin: Partial<UsageLogEntity>) {
+    constructor(origin: Partial<UsageBucketEntity>) {
         if (false) throw new Error("Unexpected error");
         origin.account_id && (this.account_id = origin.account_id);
         origin.model_alias && (this.model_alias = origin.model_alias);
     }
 
-    static self(unsafe: Partial<UsageLogEntity>) {
+    static self(unsafe: Partial<UsageBucketEntity>) {
         return new UsageQueryBody(unsafe);
     }
 }
@@ -181,18 +181,31 @@ export interface UsageSessionTotals {
     totalRequests: number;
 }
 
-export class UsageSessionsResponse implements BaseResponse<UserSessionGroup> {
+// --- Batch stats types ---
+
+export class UsageStatsBatchRequest implements BaseRequest {
+    public auth?: string;
+    public model_aliases: string[];
+
+    constructor(origin: Partial<UsageStatsBatchRequest>) {
+        if (!origin.model_aliases || origin.model_aliases.length === 0) throw new Error("model_aliases is required");
+        origin.auth && (this.auth = origin.auth);
+        this.model_aliases = origin.model_aliases;
+    }
+    static self(unsafe: UsageStatsBatchRequest) {
+        return new UsageStatsBatchRequest(unsafe);
+    }
+}
+
+export class UsageStatsBatchResponse implements BaseResponse<UsageStatsResult> {
     public success: boolean;
     public message: string;
-    public data: UserSessionGroup[];
-    public totals: UsageSessionTotals;
-    public recentSessions?: UserSession[];
+    public data: Record<string, UsageStatsResult>;
 
-    constructor(origin: UsageSessionsResponse) {
+    constructor(origin: UsageStatsBatchResponse) {
         this.success = origin.success;
         this.message = origin.message;
         this.data = origin.data;
-        this.totals = origin.totals;
-        this.recentSessions = origin.recentSessions;
     }
 }
+

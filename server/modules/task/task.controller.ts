@@ -26,7 +26,7 @@ async function poll(request: TaskPollRequest) {
 async function receive(request: TaskReceiveRequest) {
     request = TaskReceiveRequest.self(request);
 
-    const account = await accountRepo.findOne({ tg_chat_id: request.task.tg_chat_id } as any);
+    const account = await accountRepo.findOne({ tg_chat_id: request.task.tg_chat_id });
     if (!account) throw "no account bound to this tg_chat_id";
 
     const data = await TaskService.create({

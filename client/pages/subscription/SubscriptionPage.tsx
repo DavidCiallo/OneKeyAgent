@@ -27,14 +27,14 @@ export default function SubscriptionPage() {
     const [refreshing, setRefreshing] = useState(false);
 
     const fetchProfile = useCallback(async () => {
-        const res = await accountApi.profile({} as any);
+        const res = await accountApi.profile({});
         if (res.success && res.data?.account) {
             setAccount({ ...res.data.account, balance: res.data.balance });
         }
     }, []);
 
     const fetchRecords = useCallback(async () => {
-        const res = await subscriptionApi.statement({} as any);
+        const res = await subscriptionApi.statement({});
         if (res.success && res.data) {
             setRecords(res.data.list || []);
         }

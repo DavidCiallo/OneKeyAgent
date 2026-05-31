@@ -101,12 +101,12 @@ async function profile(request: AccountProfileRequest) {
     if (!account) throw new Error("Account not found");
 
     const since = Date.now() - 7 * 86400000;
-    const usageRepo = Repository.instance<any>("usage_log");
-    const logs = await usageRepo.find({ account_id: account.id }, { since });
+    const bucketRepo = Repository.instance<any>("usage_bucket");
+    const weeklyUsage = await bucketRepo.sum("cost", { account_id: account.id, granularity: "1m" }, since);
 
     return {
         account: new AccountDTO(account),
-        weeklyUsage: AccountService.computeUsageCost(logs),
+        weeklyUsage: Math.round(weeklyUsage * 1_000_000) / 1_000_000,
         balance: account.balance,
     };
 }
@@ -134,7 +134,7 @@ async function exportData(request: AccountExportRequest) {
     const accountRoleRepo = Repository.instance<any>("account_role");
     const recordRepo = Repository.instance<any>("Transaction");
     const taskRepo = Repository.instance<any>("Task");
-    const usageRepo = Repository.instance<any>("usage_log");
+    const bucketRepo = Repository.instance<any>("usage_bucket");
     const giftCardRepo = Repository.instance<any>("gift_card");
 
     const [accounts, models, providers, roles, accountRoles, tasks, giftCards] = await Promise.all([
@@ -147,14 +147,10 @@ async function exportData(request: AccountExportRequest) {
         giftCardRepo.findAllIgnoreDelete(),
     ]);
 
-    const transactions: any[] = [];
-    for await (const batch of recordRepo.findAllIgnoreDeleteBatch(2000)) {
-        transactions.push(...batch);
-    }
-    const usageLogs: any[] = [];
-    for await (const batch of usageRepo.findAllIgnoreDeleteBatch(2000)) {
-        usageLogs.push(...batch);
-    }
+    const [transactions, usageBuckets] = await Promise.all([
+        (async () => { const r: any[] = []; for await (const b of recordRepo.findAllIgnoreDeleteBatch(2000)) r.push(...b); return r; })(),
+        (async () => { const r: any[] = []; for await (const b of bucketRepo.findAllIgnoreDeleteBatch(2000)) r.push(...b); return r; })(),
+    ]);
 
     return {
         version: 1,
@@ -167,39 +163,9 @@ async function exportData(request: AccountExportRequest) {
             account_roles: accountRoles || [],
             transactions,
             tasks: tasks || [],
-            usage_logs: usageLogs,
+            usage_buckets: usageBuckets,
             gift_cards: giftCards || [],
         },
-    };
-}
-
-async function exportUsage(request: AccountExportRequest) {
-    await requireAdmin(request.auth);
-
-    const usageRepo = Repository.instance<any>("usage_log");
-
-    const usageLogs: any[] = [];
-    for await (const batch of usageRepo.findAllIgnoreDeleteBatch(2000)) {
-        usageLogs.push(...batch);
-    }
-
-    return {
-        version: 1,
-        exported_at: Date.now(),
-        data: { usage_logs: usageLogs },
-    };
-}
-
-async function exportTasks(request: AccountExportRequest) {
-    await requireAdmin(request.auth);
-
-    const taskRepo = Repository.instance<any>("Task");
-    const tasks = await taskRepo.findAllIgnoreDelete();
-
-    return {
-        version: 1,
-        exported_at: Date.now(),
-        data: { tasks: tasks || [] },
     };
 }
 
@@ -216,7 +182,7 @@ async function importData(request: AccountImportRequest) {
     const accountRoleRepo = Repository.instance<any>("account_role");
     const recordRepo = Repository.instance<any>("Transaction");
     const taskRepo = Repository.instance<any>("Task");
-    const usageRepo = Repository.instance<any>("usage_log");
+    const bucketRepo = Repository.instance<any>("usage_bucket");
     const giftCardRepo = Repository.instance<any>("gift_card");
 
     type TableDef = { repo: Repository<any>; items: any[] | undefined; name: string };
@@ -227,16 +193,17 @@ async function importData(request: AccountImportRequest) {
         { repo: modelRepo, items: data.models, name: "models" },
         { repo: providerRepo, items: data.providers, name: "providers" },
         { repo: taskRepo, items: data.tasks, name: "tasks" },
-        { repo: usageRepo, items: data.usage_logs, name: "usage_logs" },
+        { repo: bucketRepo, items: data.usage_buckets, name: "usage_buckets" },
         { repo: recordRepo, items: data.transactions, name: "transactions" },
         { repo: giftCardRepo, items: data.gift_cards, name: "gift_cards" },
     ];
 
     async function importTable(repo: Repository<any>, items: any[] | undefined, name: string) {
         if (!items || items.length === 0) return;
+        const alive = items.filter(item => !item.delete_time);
         let count = 0;
-        for (let i = 0; i < items.length; i += 1000) {
-            const chunk = items.slice(i, i + 1000);
+        for (let i = 0; i < alive.length; i += 1000) {
+            const chunk = alive.slice(i, i + 1000);
             count += await repo.batchInsert(chunk);
         }
         imported[name] = count;
@@ -244,18 +211,23 @@ async function importData(request: AccountImportRequest) {
 
     for (const { repo, items, name } of tables) {
         if (!items || items.length === 0) continue;
-        await repo.hardDelete({});
+        await repo.truncate();
         await importTable(repo, items, name);
     }
 
     if (data.accounts && data.accounts.length > 0) {
-        await AccountService.initBalances();
+        // Recalculate balances from transactions and gift cards
+        for (const a of data.accounts) {
+            const txs = (data.transactions || []).filter((t: any) => t.account_id === a.id && t.status === "confirmed");
+            const cards = (data.gift_cards || []).filter((c: any) => c.redeemed_by === a.id && c.status === "redeemed");
+            const credit = txs.reduce((s: number, t: any) => s + (t.amount || 0), 0) + cards.reduce((s: number, c: any) => s + (c.token_amount || 0), 0);
+            await accountRepo.update({ id: a.id }, { balance: credit });
+        }
     }
 
     return { imported };
 }
-
 export const accountMount = {
     routes: accountRoutes,
-    handlers: { list, detail, create, update, delete: del, profile, regenerate, export: exportData, export_usage: exportUsage, export_tasks: exportTasks, import: importData },
+    handlers: { list, detail, create, update, delete: del, profile, regenerate, export: exportData, import: importData },
 };

@@ -55,7 +55,7 @@ export default function UsagePage() {
     // Fetch accounts list for admin selector
     useEffect(() => {
         if (!isAdmin()) return;
-        accountApi.list({ page: 1, filter: {} } as any).then((res) => {
+        accountApi.list({ page: 1, filter: {} }).then((res) => {
             if (res.success && res.data) {
                 // Fetch all pages to get all accounts
                 const totalPages = Math.ceil(res.data.total / 40);
@@ -64,7 +64,7 @@ export default function UsagePage() {
                 } else {
                     Promise.all(
                         Array.from({ length: totalPages - 1 }, (_, i) =>
-                            accountApi.list({ page: i + 2, filter: {} } as any)
+                            accountApi.list({ page: i + 2, filter: {} })
                         )
                     ).then((pages) => {
                         const all = [res.data.list, ...pages.map((p: any) => p.data?.list || [])].flat();
@@ -82,11 +82,11 @@ export default function UsagePage() {
             gapMinutes: gap,
             since,
             account_ids: ids.size > 0 ? Array.from(ids) : undefined,
-        } as any);
+        });
         if (res.success && res.data) {
-            setGroups(res.data);
-            setTotals(res.totals);
-            setRecentSessions(res.recentSessions || []);
+            setGroups(res.data.list);
+            setTotals(res.data.totals);
+            setRecentSessions(res.data.recentSessions || []);
         }
         setLoading(false);
     }, []);
