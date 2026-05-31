@@ -10,10 +10,6 @@ const accountRepository = Repository.instance<AccountEntity>("Account");
 const TEN_MIN = 10 * 60 * 1000;
 const DAY = 86400000;
 const MONTH = 30 * DAY;
-const STATS_CACHE_TTL = 5_000; // 5 seconds
-
-// Simple in-memory cache for stats results
-const statsCache = new Map<string, { result: UsageStatsResult; expiry: number }>();
 
 /** Get the local-timezone midnight timestamp (in ms since epoch) */
 function localDayStart(ts: number): number {
@@ -98,13 +94,6 @@ export class UsageService {
     }
 
     static async stats(model_alias?: string, account_id?: string): Promise<UsageStatsResult> {
-        // Check cache
-        const cacheKey = `${account_id || ""}|${model_alias || ""}`;
-        const cached = statsCache.get(cacheKey);
-        if (cached && cached.expiry > Date.now()) {
-            return cached.result;
-        }
-
         const now = Date.now();
 
         const todayStart = localDayStart(now);
@@ -127,16 +116,6 @@ export class UsageService {
             last24h: buildBucketPeriod(last24hBuckets, last24hStart, now),
             last7Days: buildBucketPeriod(weekBuckets, weekStart, now),
         };
-
-        // Store in cache
-        // statsCache.set(cacheKey, { result, expiry: now + STATS_CACHE_TTL });
-        // if (statsCache.size > 500) {
-        //     // Evict expired entries if cache gets too large
-        //     const now2 = Date.now();
-        //     for (const [k, v] of statsCache) {
-        //         if (v.expiry <= now2) statsCache.delete(k);
-        //     }
-        // }
 
         return result;
     }
@@ -177,13 +156,13 @@ export class UsageService {
         return results;
     }
 
-    /** Load bucket records at a given granularity since a time, filtering by bucket_time */
+    /** Load bucket records at a given granularity since a time, filtering by bucket_time. Capped at 200K rows (~40 MB) to prevent OOM. */
     private static async loadBucketsByTime(filter: any, since: number, granularity: string): Promise<any[]> {
         return bucketRepo.find({
             ...filter,
             granularity,
             bucket_time: { $gte: since },
-        });
+        }, { limit: 200_000 });
     }
 
     /** Pick the coarsest granularity that still provides adequate precision for the query */
@@ -225,7 +204,8 @@ export class UsageService {
         return `${MM}/${DD} ${hh}:${mm}-${ehh}:${emm}`;
     }
 
-    static async getUserSessions(gapMinutes?: number, since?: number, account_ids?: string[], isAdmin?: boolean): Promise<{ groups: UserSessionGroup[]; totals: { totalTokens: number; totalCost: number; totalRequests: number } }> {
+    static async getUserSessions(gapMinutes?: number, since?: number, account_ids?: string[], isAdmin?: boolean):
+    Promise<{ groups: UserSessionGroup[]; totals: { totalTokens: number; totalCost: number; totalRequests: number }; recentSessions: (UserSession & { account_id: string })[] }> {
         const now = Date.now();
         const effectiveSince = since ?? now - 7 * DAY;
         const gapMs = (gapMinutes || 30) * 60 * 1000;
@@ -236,7 +216,7 @@ export class UsageService {
         // Load bucket records (the bucket cleanup ensures old data is gone)
         const buckets = await UsageService.loadBucketsByTime({ granularity }, effectiveSince, granularity);
         if (buckets.length === 0) {
-            return { groups: [], totals: { totalTokens: 0, totalCost: 0, totalRequests: 0 } };
+            return { groups: [], totals: { totalTokens: 0, totalCost: 0, totalRequests: 0 }, recentSessions: [] };
         }
 
         // Filter by requested account_ids if provided
@@ -255,16 +235,24 @@ export class UsageService {
         let totalCost = 0;
         let totalRequests = 0;
         const groups: UserSessionGroup[] = [];
+        const ONE_MIN_MS = 60_000;
+        const recentSessionsFlat: (UserSession & { account_id: string })[] = [];
 
         for (const [accountId, accountBuckets] of byAccount) {
             accountBuckets.sort((a: any, b: any) => a.bucket_time - b.bucket_time);
 
             // Group into time windows matching gapMinutes
             const byWindow = new Map<number, any[]>();
+            // Also group into 1-minute windows for recent sessions
+            const byWindow1m = new Map<number, any[]>();
             for (const bucket of accountBuckets) {
                 const wStart = this.windowStart(bucket.bucket_time, gapMs);
                 if (!byWindow.has(wStart)) byWindow.set(wStart, []);
                 byWindow.get(wStart)!.push(bucket);
+
+                const wStart1m = this.windowStart(bucket.bucket_time, ONE_MIN_MS);
+                if (!byWindow1m.has(wStart1m)) byWindow1m.set(wStart1m, []);
+                byWindow1m.get(wStart1m)!.push(bucket);
             }
 
             const sessions: UserSession[] = [];
@@ -321,6 +309,33 @@ export class UsageService {
             // Latest sessions first
             sessions.sort((a, b) => b.startTime - a.startTime);
 
+            // Build 1m-window sessions from the same data for recentSessions
+            for (const [wStart1m, buckets1m] of byWindow1m) {
+                let input_tokens = 0, output_tokens = 0, cost = 0, requestCount = 0;
+                const modelAliases = new Set<string>();
+                for (const bucket of buckets1m) {
+                    input_tokens += bucket.input_tokens || 0;
+                    output_tokens += bucket.output_tokens || 0;
+                    cost += bucket.cost || 0;
+                    requestCount += bucket.request_count || 0;
+                    modelAliases.add(bucket.model_alias);
+                }
+                cost = Math.round(cost * 1_000_000) / 1_000_000;
+                recentSessionsFlat.push({
+                    account_id: accountId,
+                    startTime: wStart1m,
+                    endTime: wStart1m + ONE_MIN_MS,
+                    model_aliases: Array.from(modelAliases),
+                    requestCount,
+                    input_tokens,
+                    output_tokens,
+                    cost,
+                    providerUsage: [],
+                    modelUsage: [],
+                    windowLabel: this.formatWindowLabel(wStart1m, ONE_MIN_MS),
+                });
+            }
+
             const acct = await accountRepository.findIgnoreDelete({ id: accountId });
             const accountName = acct ? acct.name : "--";
             const groupTokens = sessions.reduce((sum, s) => sum + s.input_tokens + s.output_tokens, 0);
@@ -364,6 +379,10 @@ export class UsageService {
 
         totalCost = Math.round(totalCost * 1_000_000) / 1_000_000;
 
-        return { groups: filtered, totals: { totalTokens, totalCost, totalRequests } };
+        // Sort recentSessions by startTime desc, take top 10
+        recentSessionsFlat.sort((a, b) => b.startTime - a.startTime);
+        const topRecent = recentSessionsFlat.slice(0, 10);
+
+        return { groups: filtered, totals: { totalTokens, totalCost, totalRequests }, recentSessions: topRecent };
     }
 }

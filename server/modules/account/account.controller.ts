@@ -201,9 +201,10 @@ async function importData(request: AccountImportRequest) {
 
     async function importTable(repo: Repository<any>, items: any[] | undefined, name: string) {
         if (!items || items.length === 0) return;
+        const alive = items.filter(item => !item.delete_time);
         let count = 0;
-        for (let i = 0; i < items.length; i += 1000) {
-            const chunk = items.slice(i, i + 1000);
+        for (let i = 0; i < alive.length; i += 1000) {
+            const chunk = alive.slice(i, i + 1000);
             count += await repo.batchInsert(chunk);
         }
         imported[name] = count;
