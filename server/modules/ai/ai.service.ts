@@ -17,7 +17,11 @@ const WEEKLY_LIMIT = 100; // $100 per week
 async function getWeeklySpending(account_id: string): Promise<number> {
     const since = Date.now() - 7 * 86400000;
     const repo = Repository.instance<any>("usage_bucket");
-    const total = await repo.sum("cost", { account_id: account_id }, since);
+    const buckets = await repo.find({ account_id: account_id }, { since });
+    let total = 0;
+    for (const bucket of buckets) {
+        total += bucket.cost || 0;
+    }
     return Math.round(total * 1_000_000) / 1_000_000;
 }
 
@@ -256,15 +260,15 @@ export class AiService {
             // Deduct balance
             const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
             await deductBalance(account_id, cost);
-            await logUsage({
-                account_id,
-                model_alias: requestedAlias,
-                provider_id: provider.id,
-                input_tokens: rawInput,
-                output_tokens: rawOutput,
-                input_price: input_price,
-                output_price: output_price,
-            });
+            // await logUsage({
+            //     account_id,
+            //     model_alias: requestedAlias,
+            //     provider_id: provider.id,
+            //     input_tokens: rawInput,
+            //     output_tokens: rawOutput,
+            //     input_price: input_price,
+            //     output_price: output_price,
+            // });
             await AccountService.updateBalance(account_id, -cost);
             rdata.model = requestedAlias;
             return rdata;
@@ -374,15 +378,15 @@ export class AiService {
                     const rawOutput = usageData?.output_tokens ?? usageData?.completion_tokens ?? Math.max(1, Math.round(estimatedOutputChars / 4));
                     const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
                     await deductBalance(account_id, cost);
-                    await logUsage({
-                        account_id,
-                        model_alias: requestedAlias,
-                        provider_id: provider.id,
-                        input_tokens: rawInput,
-                        output_tokens: rawOutput,
-                        input_price,
-                        output_price,
-                    });
+                    // await logUsage({
+                    //     account_id,
+                    //     model_alias: requestedAlias,
+                    //     provider_id: provider.id,
+                    //     input_tokens: rawInput,
+                    //     output_tokens: rawOutput,
+                    //     input_price,
+                    //     output_price,
+                    // });
                     await AccountService.updateBalance(account_id, -cost);
                 } catch { }
             })();
