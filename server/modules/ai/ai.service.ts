@@ -2,7 +2,7 @@ import { HttpsProxyAgent } from "https-proxy-agent";
 import https from "https";
 import http from "http";
 import { CompletionServiceResponse, ModelsServiceResponse } from "../../../shared/modules/ai/ai.interface";
-import { getAllModels } from "./ai.session";
+import { getAllModels, logUsage } from "./ai.session";
 import { ProviderService } from "../provider/provider.service";
 import { AccountService } from "../account/account.service";
 import { AccountRoleService } from "../role/role.service";
@@ -244,15 +244,15 @@ export class AiService {
             // Deduct balance
             const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
             await deductBalance(account_id, cost);
-            // await logUsage({
-            //     account_id,
-            //     model_alias: requestedAlias,
-            //     provider_id: provider.id,
-            //     input_tokens: rawInput,
-            //     output_tokens: rawOutput,
-            //     input_price: input_price,
-            //     output_price: output_price,
-            // });
+            await logUsage({
+                account_id,
+                model_alias: requestedAlias,
+                provider_id: provider.id,
+                input_tokens: rawInput,
+                output_tokens: rawOutput,
+                input_price: input_price,
+                output_price: output_price,
+            });
             await AccountService.updateBalance(account_id, -cost);
             rdata.model = requestedAlias;
             return rdata;
@@ -348,6 +348,15 @@ export class AiService {
                     const rawOutput = usageData?.output_tokens ?? usageData?.completion_tokens ?? Math.max(1, Math.round(estimatedOutputChars / 4));
                     const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
                     await deductBalance(account_id, cost);
+                    await logUsage({
+                        account_id,
+                        model_alias: requestedAlias,
+                        provider_id: provider.id,
+                        input_tokens: rawInput,
+                        output_tokens: rawOutput,
+                        input_price,
+                        output_price,
+                    });
                     await AccountService.updateBalance(account_id, -cost);
                 } catch { }
             }

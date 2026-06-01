@@ -296,37 +296,36 @@ class Repository<
             const file = this.filePath();
             if (!fs.existsSync(file)) return false;
 
-            const content = fs.readFileSync(file, "utf-8");
-            const lines = content.split("\n");
-            const out: string[] = [];
+            const tempFile = file + ".tmp";
+            const writeStream = fs.createWriteStream(tempFile);
 
-            for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed) continue;
-                const row = JSON.parse(trimmed);
-                if (!includeDeleted && row.delete_time) {
-                    out.push(line);
-                    continue;
-                }
-
-                let match = true;
-                for (const [key, val] of Object.entries(where)) {
-                    if (row[key] !== val) {
-                        match = false;
-                        break;
+            try {
+                for await (const row of readLines(this.collection)) {
+                    if (!includeDeleted && row.delete_time) {
+                        writeStream.write(JSON.stringify(row) + "\n");
+                        continue;
                     }
-                }
 
-                if (match) {
-                    Object.assign(row, updateData, { update_time: now });
-                    out.push(JSON.stringify(row));
-                    updated = true;
-                } else {
-                    out.push(line);
+                    let match = true;
+                    for (const [key, val] of Object.entries(where)) {
+                        if (row[key] !== val) { match = false; break; }
+                    }
+
+                    if (match) {
+                        Object.assign(row, updateData, { update_time: now });
+                        updated = true;
+                    }
+                    writeStream.write(JSON.stringify(row) + "\n");
                 }
+            } finally {
+                writeStream.end();
             }
 
-            fs.writeFileSync(file, out.join("\n") + "\n");
+            if (updated) {
+                fs.renameSync(tempFile, file);
+            } else {
+                fs.unlinkSync(tempFile);
+            }
             return updated;
         });
     }
@@ -350,32 +349,31 @@ class Repository<
             if (!fs.existsSync(file)) return false;
 
             let deleted = false;
+            const tempFile = file + ".tmp";
+            const writeStream = fs.createWriteStream(tempFile);
 
-            const content = fs.readFileSync(file, "utf-8");
-            const lines = content.split("\n");
-            const out: string[] = [];
+            try {
+                for await (const row of readLines(this.collection)) {
+                    let match = true;
+                    for (const [key, val] of Object.entries(where)) {
+                        if (row[key] !== val) { match = false; break; }
+                    }
 
-            for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed) continue;
-                const row = JSON.parse(trimmed);
-
-                let match = true;
-                for (const [key, val] of Object.entries(where)) {
-                    if (row[key] !== val) {
-                        match = false;
-                        break;
+                    if (match) {
+                        deleted = true;
+                    } else {
+                        writeStream.write(JSON.stringify(row) + "\n");
                     }
                 }
-
-                if (match) {
-                    deleted = true;
-                } else {
-                    out.push(line);
-                }
+            } finally {
+                writeStream.end();
             }
 
-            fs.writeFileSync(file, out.join("\n") + "\n");
+            if (deleted) {
+                fs.renameSync(tempFile, file);
+            } else {
+                fs.unlinkSync(tempFile);
+            }
             return deleted;
         });
     }
@@ -393,34 +391,40 @@ class Repository<
             const file = this.filePath();
             if (!fs.existsSync(file)) return false;
 
-            const content = fs.readFileSync(file, "utf-8");
-            const lines = content.split("\n");
             const now = Date.now();
             let updated = false;
+            const tempFile = file + ".tmp";
+            const writeStream = fs.createWriteStream(tempFile);
 
-            for (let i = 0; i < lines.length; i++) {
-                const trimmed = lines[i].trim();
-                if (!trimmed) continue;
-                const row = JSON.parse(trimmed);
-                if (!includeDeleted && row.delete_time) continue;
-
-                let match = true;
-                for (const [key, val] of Object.entries(where)) {
-                    if (row[key] !== val) { match = false; break; }
-                }
-
-                if (match) {
-                    const patchData = patch(row);
-                    if (patchData) {
-                        Object.assign(row, patchData, { update_time: now });
-                        lines[i] = JSON.stringify(row);
-                        updated = true;
+            try {
+                for await (const row of readLines(this.collection)) {
+                    if (!includeDeleted && row.delete_time) {
+                        writeStream.write(JSON.stringify(row) + "\n");
+                        continue;
                     }
+
+                    let match = true;
+                    for (const [key, val] of Object.entries(where)) {
+                        if (row[key] !== val) { match = false; break; }
+                    }
+
+                    if (match) {
+                        const patchData = patch(row);
+                        if (patchData) {
+                            Object.assign(row, patchData, { update_time: now });
+                            updated = true;
+                        }
+                    }
+                    writeStream.write(JSON.stringify(row) + "\n");
                 }
+            } finally {
+                writeStream.end();
             }
 
             if (updated) {
-                fs.writeFileSync(file, lines.join("\n") + "\n");
+                fs.renameSync(tempFile, file);
+            } else {
+                fs.unlinkSync(tempFile);
             }
             return updated;
         });
