@@ -143,8 +143,15 @@ async function tryProviderStream(
 
             const rawStream = new ReadableStream({
                 start(controller) {
+                    let closed = false;
                     res.on("data", (chunk: Buffer) => {
-                        controller.enqueue(new Uint8Array(chunk));
+                        if (closed) return;
+                        try {
+                            controller.enqueue(new Uint8Array(chunk));
+                        } catch {
+                            closed = true;
+                            return;
+                        }
 
                         // Parse chunk to extract reasoning_content (server-side logging only)
                         const text = chunk.toString();
@@ -161,10 +168,15 @@ async function tryProviderStream(
                             }
                         }
                     });
-                    res.on("end", () => { controller.close(); });
+                    res.on("end", () => {
+                        if (closed) return;
+                        try { controller.close(); } catch { closed = true; }
+                    });
                     res.on("error", (e: any) => {
+                        if (closed) return;
+                        closed = true;
                         console.log("[AI] Error response:", e);
-                        controller.error(e);
+                        try { controller.error(e); } catch { }
                     });
                 },
             });
@@ -230,11 +242,9 @@ export class AiService {
 
             const rdata = await tryProvider(provider.base_url, provider.model, provider.api_key, provider.proxy_url, requestBody, provider.auth_type, provider.api_type);
             if (!rdata) {
-                ProviderService.recordFail(provider.id);
+                await new Promise((r) => setTimeout(r, 500));
                 continue;
             }
-
-            ProviderService.recordSuccess(provider.id);
 
             const { input_price: input_price, output_price: output_price } = await getModelPrices(requestedAlias);
             const { usage } = data;
@@ -272,7 +282,7 @@ export class AiService {
         const sessionKey = `${account_id}::${Buffer.from(JSON.stringify(firstUserMsg)).toString("base64url").slice(0, 16)}`;
 
 
-        for (const provider of providers) {
+        for (const provider of [...providers, ...providers]) {
             const requestBody: Record<string, any> = { ...data, stream: true, model: provider.model };
             const thinkConfig = getThinkingConfig(requestedAlias);
             Object.assign(requestBody, thinkConfig);
@@ -303,8 +313,10 @@ export class AiService {
             const { base_url, api_key, proxy_url, auth_type, api_type } = provider;
             const result = await tryProviderStream(base_url, api_key, proxy_url, requestBody, auth_type, api_type);
 
-            if (!result?.stream) { ProviderService.recordFail(provider.id); continue; }
-            ProviderService.recordSuccess(provider.id);
+            if (!result?.stream) {
+                await new Promise((r) => setTimeout(r, 500));
+                continue;
+            }
 
             // Save reasoning content keyed by tool_call id
             if (thinkConfig.thinking.type === "enabled" && result.reasoningContent) {
@@ -392,7 +404,7 @@ export class AiService {
                     }
                 },
                 cancel() {
-                    upstreamReader.cancel().catch(() => {});
+                    upstreamReader.cancel().catch(() => { });
                 },
             });
 

@@ -25,6 +25,7 @@
   },
   "include": [
     "shared",
-    "client"
+    "client",
+    "server"
   ]
 }
