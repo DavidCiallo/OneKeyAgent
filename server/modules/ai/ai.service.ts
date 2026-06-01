@@ -2,7 +2,7 @@ import { HttpsProxyAgent } from "https-proxy-agent";
 import https from "https";
 import http from "http";
 import { CompletionServiceResponse, ModelsServiceResponse } from "../../../shared/modules/ai/ai.interface";
-import { getAllModels, logUsage } from "./ai.session";
+import { getAllModels } from "./ai.session";
 import { ProviderService } from "../provider/provider.service";
 import { AccountService } from "../account/account.service";
 import { AccountRoleService } from "../role/role.service";
@@ -137,46 +137,41 @@ async function tryProviderStream(
                 return;
             }
 
-            // Accumulate the full reasoning_content for this request
+            // Build a ReadableStream directly from the Node response to avoid
+            // TransformStream backpressure buffering (especially with thinking mode)
             let localReasoning = "";
 
-            const ts = new TransformStream<Uint8Array, Uint8Array>();
-            const writer = ts.writable.getWriter();
+            const rawStream = new ReadableStream({
+                start(controller) {
+                    res.on("data", (chunk: Buffer) => {
+                        controller.enqueue(new Uint8Array(chunk));
 
-            res.on("data", (chunk: Buffer) => {
-                // Forward chunk as-is to downstream
-                writer.write(chunk);
-
-                // Parse chunk to extract reasoning_content (server-side logging only)
-                const text = chunk.toString();
-                const lines = text.split("\n");
-                for (const line of lines) {
-                    if (line.startsWith("data: ") && !line.startsWith("data: [DONE]")) {
-                        try {
-                            const data = JSON.parse(line.slice(6));
-                            const delta = data.choices?.[0]?.delta;
-                            if (delta?.reasoning_content) {
-                                localReasoning += delta.reasoning_content;
-                                // Console logging is available for debugging but not recommended in production
-                                // process.stdout.write(delta.reasoning_content);
+                        // Parse chunk to extract reasoning_content (server-side logging only)
+                        const text = chunk.toString();
+                        const lines = text.split("\n");
+                        for (const line of lines) {
+                            if (line.startsWith("data: ") && !line.startsWith("data: [DONE]")) {
+                                try {
+                                    const data = JSON.parse(line.slice(6));
+                                    const delta = data.choices?.[0]?.delta;
+                                    if (delta?.reasoning_content) {
+                                        localReasoning += delta.reasoning_content;
+                                    }
+                                } catch { }
                             }
-                        } catch { }
-                    }
-                }
+                        }
+                    });
+                    res.on("end", () => { controller.close(); });
+                    res.on("error", (e: any) => {
+                        console.log("[AI] Error response:", e);
+                        controller.error(e);
+                    });
+                },
             });
 
-            res.on("end", () => {
-                writer.close();
-                resolve({
-                    stream: apiType === "anthropic" ? antStreamToOpenAI(ts.readable) : ts.readable,
-                    reasoningContent: localReasoning,
-                });
-            });
-
-            res.on("error", (e: any) => {
-                console.log("[AI] Error response:", e);
-                writer.close();
-                resolve({ stream: null, reasoningContent: "" });
+            resolve({
+                stream: apiType === "anthropic" ? antStreamToOpenAI(rawStream) : rawStream,
+                reasoningContent: localReasoning,
             });
         });
 
@@ -214,17 +209,6 @@ async function requireModelAccess(account_id: string, alias: string): Promise<vo
     }
 }
 
-async function safePipe(reader: ReadableStreamDefaultReader<Uint8Array>, writer: WritableStreamDefaultWriter<Uint8Array>) {
-    try {
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            await writer.write(value);
-        }
-        await writer.close();
-    } catch (err) {
-    }
-}
 const reasoningRepo = Repository.instance<SessionReasoningEntity>("session_reasoning");
 
 export class AiService {
@@ -347,18 +331,38 @@ export class AiService {
                 }
             }
 
-            const [upstreamForward, parseStream] = result.stream.tee() as [ReadableStream<Uint8Array>, ReadableStream<Uint8Array>];
+            // Stream pass-through with inline cost parsing — avoids tee() which buffers
+            // both branches in memory (OOM risk with thinking mode & slow consumers)
+            const upstreamReader = result.stream.getReader();
+            const decoder = new TextDecoder();
+            let usageData: any = null;
+            let estimatedOutputChars = 0;
+            let costDeducted = false;
 
-            (async () => {
+            async function tryDeductCost() {
+                if (costDeducted) return;
+                costDeducted = true;
                 try {
-                    const reader = parseStream.getReader();
-                    const decoder = new TextDecoder();
-                    let usageData: any = null;
-                    let estimatedOutputChars = 0;
+                    const { input_price, output_price } = await getModelPrices(requestedAlias);
+                    const rawInput = usageData?.input_tokens ?? usageData?.prompt_tokens ?? 0;
+                    const rawOutput = usageData?.output_tokens ?? usageData?.completion_tokens ?? Math.max(1, Math.round(estimatedOutputChars / 4));
+                    const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
+                    await deductBalance(account_id, cost);
+                    await AccountService.updateBalance(account_id, -cost);
+                } catch { }
+            }
 
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
+            const passthrough = new ReadableStream<Uint8Array>({
+                async pull(controller) {
+                    try {
+                        const { done, value } = await upstreamReader.read();
+                        if (done) {
+                            await tryDeductCost();
+                            controller.close();
+                            return;
+                        }
+
+                        // Parse SSE data from the chunk (for cost tracking)
                         const text = decoder.decode(value, { stream: true });
                         const lines = text.split('\n');
                         for (const line of lines) {
@@ -371,30 +375,19 @@ export class AiService {
                                 } catch { }
                             }
                         }
+
+                        controller.enqueue(value);
+                    } catch (e) {
+                        await tryDeductCost();
+                        controller.error(e);
                     }
+                },
+                cancel() {
+                    upstreamReader.cancel().catch(() => {});
+                },
+            });
 
-                    const { input_price, output_price } = await getModelPrices(requestedAlias);
-                    const rawInput = usageData?.input_tokens ?? usageData?.prompt_tokens ?? 0;
-                    const rawOutput = usageData?.output_tokens ?? usageData?.completion_tokens ?? Math.max(1, Math.round(estimatedOutputChars / 4));
-                    const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
-                    await deductBalance(account_id, cost);
-                    // await logUsage({
-                    //     account_id,
-                    //     model_alias: requestedAlias,
-                    //     provider_id: provider.id,
-                    //     input_tokens: rawInput,
-                    //     output_tokens: rawOutput,
-                    //     input_price,
-                    //     output_price,
-                    // });
-                    await AccountService.updateBalance(account_id, -cost);
-                } catch { }
-            })();
-
-            const ts = new TransformStream<Uint8Array, Uint8Array>();
-            safePipe(upstreamForward.getReader(), ts.writable.getWriter());
-
-            return ts.readable;
+            return passthrough;
         }
         throw new Error("All providers failed for streaming");
     }
