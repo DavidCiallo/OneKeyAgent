@@ -190,7 +190,7 @@ class Repository<
 
     /** Stream rows one at a time via callback — never accumulates, avoids OOM */
     async findEach(
-        where: Record<string, any> | undefined,
+        where: Record<string, any>,
         callback: (row: T) => void,
         config?: { limit?: number; since?: number },
     ): Promise<number> {
@@ -201,7 +201,7 @@ class Repository<
         for await (const row of readLines(this.collection)) {
             if (row.delete_time) continue;
             if (since && row.create_time < since) continue;
-            if (where && !matches(row, where as Record<string, any>)) continue;
+            if (!matches(row, where)) continue;
 
             callback(row as T);
             count++;
