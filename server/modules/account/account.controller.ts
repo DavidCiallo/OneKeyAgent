@@ -219,16 +219,6 @@ async function importData(request: AccountImportRequest) {
         await importTable(repo, items, name);
     }
 
-    if (data.accounts && data.accounts.length > 0) {
-        // Recalculate balances from transactions and gift cards
-        for (const a of data.accounts) {
-            const txs = (data.transactions || []).filter((t: any) => t.account_id === a.id && t.status === "confirmed");
-            const cards = (data.gift_cards || []).filter((c: any) => c.redeemed_by === a.id && c.status === "redeemed");
-            const credit = txs.reduce((s: number, t: any) => s + (t.amount || 0), 0) + cards.reduce((s: number, c: any) => s + (c.token_amount || 0), 0);
-            await accountRepo.update({ id: a.id }, { balance: credit });
-        }
-    }
-
     return { imported };
 }
 export const accountMount = {
