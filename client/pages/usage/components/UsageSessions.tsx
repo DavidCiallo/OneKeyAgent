@@ -11,6 +11,7 @@ type Props = {
     totals: UsageSessionTotals;
     recentSessions: UserSession[];
     gapMinutes?: number;
+    isAdmin?: boolean;
 };
 
 function getActiveProviders(
@@ -62,7 +63,7 @@ function buildChartData(
     });
 }
 
-export function UsageSessions({ groups, totals, recentSessions, gapMinutes }: Props) {
+export function UsageSessions({ groups, totals, recentSessions, gapMinutes, isAdmin }: Props) {
     const showDate = (gapMinutes ?? 60) >= 60;
 
     const providers = useMemo(() => getActiveProviders(groups), [groups]);
@@ -162,6 +163,7 @@ export function UsageSessions({ groups, totals, recentSessions, gapMinutes }: Pr
                             formatter={(value: string) => (
                                 <span style={{ fontSize: 12, color: "hsl(var(--heroui-foreground))" }}>{value}</span>
                             )}
+                            wrapperStyle={{ paddingTop: 8 }}
                         />
                         {providers.map((provider) => (
                             <Bar
@@ -178,32 +180,51 @@ export function UsageSessions({ groups, totals, recentSessions, gapMinutes }: Pr
 
             {/* Recent sessions table */}
             <div className="overflow-auto">
-                <Table aria-label="Recent sessions" className="min-w-max">
-                    <TableHeader>
-                        <TableColumn align="center">Time</TableColumn>
-                        <TableColumn align="center" className="hidden md:table-cell">Account</TableColumn>
-                        <TableColumn align="center">Model</TableColumn>
-                        <TableColumn align="center" className="hidden md:table-cell">Input</TableColumn>
-                        <TableColumn align="center" className="hidden md:table-cell">Output</TableColumn>
-                        <TableColumn align="center">Cost</TableColumn>
-                    </TableHeader>
-                    <TableBody emptyContent="No sessions">
-                        {recentSessions.map((session, idx) => (
-                            <TableRow key={`${session.startTime}-${idx}`}>
-                                <TableCell className="whitespace-nowrap font-mono text-sm text-center">
-                                    {format24Time(session.startTime)}
-                                </TableCell>
-                                <TableCell className="max-w-32 truncate text-center hidden md:table-cell">
-                                    {stripEmail(session.accountName || "")}
-                                </TableCell>
-                                <TableCell className="font-semibold text-center max-w-28 truncate">{session.model_aliases.join(", ")}</TableCell>
-                                <TableCell className="hidden md:table-cell text-center font-mono">{fmtM(session.input_tokens)}</TableCell>
-                                <TableCell className="hidden md:table-cell text-center font-mono">{fmtK(session.output_tokens)}</TableCell>
-                                <TableCell className="text-center font-mono">${session.cost?.toFixed(4) || "0"}</TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
+                {isAdmin ? (
+                    <Table aria-label="Recent sessions" className="min-w-max">
+                        <TableHeader>
+                            <TableColumn align="center">Time</TableColumn>
+                            <TableColumn align="center" className="hidden md:table-cell">Account</TableColumn>
+                            <TableColumn align="center">Model</TableColumn>
+                            <TableColumn align="center" className="hidden md:table-cell">Input</TableColumn>
+                            <TableColumn align="center" className="hidden md:table-cell">Output</TableColumn>
+                            <TableColumn align="center">Cost</TableColumn>
+                        </TableHeader>
+                        <TableBody emptyContent="No sessions">
+                            {recentSessions.map((session, idx) => (
+                                <TableRow key={`${session.startTime}-${idx}`}>
+                                    <TableCell className="whitespace-nowrap font-mono text-sm text-center">{format24Time(session.startTime)}</TableCell>
+                                    <TableCell className="max-w-32 truncate text-center hidden md:table-cell">{stripEmail(session.accountName || "")}</TableCell>
+                                    <TableCell className="font-semibold text-center max-w-28 truncate">{session.model_aliases.join(", ")}</TableCell>
+                                    <TableCell className="hidden md:table-cell text-center font-mono">{fmtM(session.input_tokens)}</TableCell>
+                                    <TableCell className="hidden md:table-cell text-center font-mono">{fmtK(session.output_tokens)}</TableCell>
+                                    <TableCell className="text-center font-mono">${session.cost?.toFixed(4) || "0"}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                ) : (
+                    <Table aria-label="Recent sessions" className="min-w-max">
+                        <TableHeader>
+                            <TableColumn align="center">Time</TableColumn>
+                            <TableColumn align="center" className="min-w-[10rem] md:min-w-[24rem]">Model</TableColumn>
+                            <TableColumn align="center" className="hidden md:table-cell">Input</TableColumn>
+                            <TableColumn align="center" className="hidden md:table-cell">Output</TableColumn>
+                            <TableColumn align="center">Cost</TableColumn>
+                        </TableHeader>
+                        <TableBody emptyContent="No sessions">
+                            {recentSessions.map((session, idx) => (
+                                <TableRow key={`${session.startTime}-${idx}`}>
+                                    <TableCell className="whitespace-nowrap font-mono text-sm text-center">{format24Time(session.startTime)}</TableCell>
+                                    <TableCell className="font-semibold text-center min-w-[10rem] md:min-w-[24rem] truncate">{session.model_aliases.join(", ")}</TableCell>
+                                    <TableCell className="hidden md:table-cell text-center font-mono">{fmtM(session.input_tokens)}</TableCell>
+                                    <TableCell className="hidden md:table-cell text-center font-mono">{fmtK(session.output_tokens)}</TableCell>
+                                    <TableCell className="text-center font-mono">${session.cost?.toFixed(4) || "0"}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                )}
             </div>
         </div>
     );
