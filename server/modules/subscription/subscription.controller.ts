@@ -194,7 +194,12 @@ async function statement(request: StatementRequest) {
 
     items.sort((a, b) => b.create_time - a.create_time);
 
-    return { list: items };
+    const pageSize = 20;
+    const page = request.page || 1;
+    const offset = (page - 1) * pageSize;
+    const paged = items.slice(offset, offset + pageSize);
+
+    return { list: paged, total: items.length };
 }
 
 /**
