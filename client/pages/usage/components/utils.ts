@@ -4,8 +4,11 @@ export function stringToColor(s: string): string {
     for (let i = 0; i < s.length; i++) {
         hash = s.charCodeAt(i) + ((hash << 5) - hash);
     }
-    const hue = Math.abs(hash) % 360;
-    return `hsl(${hue}, 55%, 45%)`;
+    const abs = Math.abs(hash);
+    const hue = abs % 360;
+    const sat = 50 + (abs % 30);       // 50%–80%
+    const lit = 35 + ((abs >> 8) % 25); // 35%–60%
+    return `hsl(${hue}, ${sat}%, ${lit}%)`;
 }
 
 /** Format tokens in millions */

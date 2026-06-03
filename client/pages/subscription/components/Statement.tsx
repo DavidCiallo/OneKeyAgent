@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader, Divider, Chip, Button } from "@heroui/react";
+import { Card, CardBody, CardHeader, Divider, Chip, Button, Pagination } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
 
 // Statement.tsx
@@ -36,7 +36,7 @@ function getTypeChip(type: string, locale: any): { color: "success" | "primary" 
     }
 }
 
-export default function Statement({ records, onRefresh, refreshing }: { records: StatementRecord[]; onRefresh?: () => void; refreshing?: boolean }) {
+export default function Statement({ records, total, page, onPageChange, onRefresh, refreshing }: { records: StatementRecord[]; total: number; page: number; onPageChange: (p: number) => void; onRefresh?: () => void; refreshing?: boolean }) {
     const locale = Locale("SubscriptionPage");
 
     return (
@@ -83,6 +83,11 @@ export default function Statement({ records, onRefresh, refreshing }: { records:
                                 </div>
                             );
                         })}
+                    </div>
+                )}
+                {total > 20 && (
+                    <div className="flex justify-center pt-3">
+                        <Pagination total={Math.ceil(total / 20)} page={page} onChange={onPageChange} size="sm" />
                     </div>
                 )}
             </CardBody>

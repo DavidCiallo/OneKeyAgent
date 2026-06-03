@@ -24,6 +24,8 @@ export default function SubscriptionPage() {
     } | null>(null);
 
     const [records, setRecords] = useState<StatementRecord[]>([]);
+    const [total, setTotal] = useState(0);
+    const [page, setPage] = useState(1);
     const [refreshing, setRefreshing] = useState(false);
 
     const fetchProfile = useCallback(async () => {
@@ -33,21 +35,22 @@ export default function SubscriptionPage() {
         }
     }, []);
 
-    const fetchRecords = useCallback(async () => {
-        const res = await subscriptionApi.statement({});
+    const fetchRecords = useCallback(async (p: number) => {
+        const res = await subscriptionApi.statement({ page: p });
         if (res.success && res.data) {
             setRecords(res.data.list || []);
+            setTotal(res.data.total || 0);
         }
     }, []);
 
     useEffect(() => {
         fetchProfile();
-        fetchRecords();
-    }, [fetchProfile, fetchRecords]);
+        fetchRecords(page);
+    }, [fetchProfile, fetchRecords, page]);
 
     const handleRefresh = async () => {
         setRefreshing(true);
-        await fetchRecords();
+        await fetchRecords(page);
         await fetchProfile();
         setRefreshing(false);
     };
@@ -63,7 +66,7 @@ export default function SubscriptionPage() {
                         <TopupPack onSuccess={handleRefresh} />
                     </PlanSelector>
 
-                    <Statement records={records} onRefresh={handleRefresh} refreshing={refreshing} />
+                    <Statement records={records} total={total} page={page} onPageChange={setPage} onRefresh={handleRefresh} refreshing={refreshing} />
                 </div>
             </div>
         </div>

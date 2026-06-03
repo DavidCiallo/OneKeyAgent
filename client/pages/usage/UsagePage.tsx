@@ -26,6 +26,7 @@ const TIME_PRESETS = [
     { value: 1, label: "24h" },
     { value: 3, label: "3d" },
     { value: 7, label: "7d" },
+    { value: 30, label: "30d" },
 ] as const;
 
 function computeSince(preset: number): number {
@@ -154,7 +155,7 @@ export default function UsagePage() {
                                 ))}
                             </ButtonGroup>
                         </div>
-                        <UsageSessions groups={groups} totals={totals} recentSessions={recentSessions} gapMinutes={gapMinutes} />
+                        <UsageSessions groups={groups} totals={totals} recentSessions={recentSessions} gapMinutes={gapMinutes} isAdmin={isAdmin()} />
                     </div>
                 )}
             </div>

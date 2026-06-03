@@ -63,8 +63,7 @@ export function ProviderTable({ list, onEdit, onCopy, onDelete, onMoveUp, onMove
                                 <div className="flex flex-row gap-3">
                                     <div className="flex flex-row gap-1 items-center">
                                         <button
-                                            className="text-gray-400 hover:text-gray-700 disabled:opacity-30 p-0.5"
-                                            disabled={i === 0}
+                                            className="text-gray-400 hover:text-gray-700 p-0.5"
                                             onClick={() => onMoveUp(item)}
                                         >
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -72,8 +71,7 @@ export function ProviderTable({ list, onEdit, onCopy, onDelete, onMoveUp, onMove
                                             </svg>
                                         </button>
                                         <button
-                                            className="text-gray-400 hover:text-gray-700 disabled:opacity-30 p-0.5"
-                                            disabled={i === list.length - 1}
+                                            className="text-gray-400 hover:text-gray-700 p-0.5"
                                             onClick={() => onMoveDown(item)}
                                         >
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

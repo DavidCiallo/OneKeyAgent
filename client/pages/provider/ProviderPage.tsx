@@ -50,6 +50,14 @@ export default function ProviderPage() {
         fetchList(page);
     }, [page, fetchList]);
 
+    // Fetch model_aliases for filter dropdown (from all providers, not just current page)
+    const [modelAliasOptions, setModelAliasOptions] = useState<string[]>([]);
+    useEffect(() => {
+        providerApi.modelaliases({}).then((res: any) => {
+            if (res.success && Array.isArray(res.data)) setModelAliasOptions(res.data);
+        });
+    }, []);
+
     // Sort by model_alias ASC first, then by priority ASC
     const sortedList = useMemo(() => {
         return [...list].sort((a, b) => a.model_alias.localeCompare(b.model_alias) || a.priority - b.priority);
@@ -168,6 +176,7 @@ export default function ProviderPage() {
                     filterModelAlias={filterModelAlias}
                     onModelAliasChange={v => { setFilterModelAlias(v); setPage(1); }}
                     onAdd={openCreate}
+                    modelAliasOptions={modelAliasOptions}
                 />
 
                 <ProviderTable

@@ -5,9 +5,10 @@ type Props = {
     filterModelAlias: string;
     onModelAliasChange: (v: string) => void;
     onAdd: () => void;
+    modelAliasOptions: string[];
 };
 
-export function ProviderFilter({ filterModelAlias, onModelAliasChange, onAdd }: Props) {
+export function ProviderFilter({ filterModelAlias, onModelAliasChange, onAdd, modelAliasOptions }: Props) {
     const locale = Locale("ProviderPage");
     const common = Locale("Common");
 
@@ -19,10 +20,13 @@ export function ProviderFilter({ filterModelAlias, onModelAliasChange, onAdd }: 
                     placeholder={locale.ModelAliasPlaceholder}
                     selectedKeys={filterModelAlias ? [filterModelAlias] : []}
                     onChange={e => onModelAliasChange(e.target.value)}
-                    className="w-40"
+                    className="w-60"
                     size="sm"
                 >
                     <SelectItem key="">不筛选</SelectItem>
+                    {modelAliasOptions.map((alias) => (
+                        <SelectItem key={alias}>{alias}</SelectItem>
+                    ))}
                 </Select>
             </div>
             <Button color="primary" size="sm" onPress={onAdd}>
