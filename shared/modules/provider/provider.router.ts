@@ -5,6 +5,7 @@ import {
     ProviderUpdateRequest, ProviderUpdateResponse,
     ProviderDeleteRequest, ProviderDeleteResponse,
     ProviderUpdatePriorityRequest, ProviderUpdatePriorityResponse,
+    ProviderModelAliasesRequest, ProviderModelAliasesResponse,
 } from "./provider.interface";
 
 export const providerRoutes = {
@@ -16,4 +17,5 @@ export const providerRoutes = {
     update:         { path: "/update",         request: {} as ProviderUpdateRequest,           response: {} as ProviderUpdateResponse },
     updatepriority: { path: "/updatepriority", request: {} as ProviderUpdatePriorityRequest,   response: {} as ProviderUpdatePriorityResponse },
     delete:         { path: "/delete",         request: {} as ProviderDeleteRequest,           response: {} as ProviderDeleteResponse },
+    modelaliases:   { path: "/modelaliases",   request: {} as ProviderModelAliasesRequest,     response: {} as ProviderModelAliasesResponse },
 } as const;
