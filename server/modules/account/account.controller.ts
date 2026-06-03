@@ -209,9 +209,13 @@ async function importData(request: AccountImportRequest) {
         imported[name] = count;
     }
 
+    // Truncate ALL tables first, regardless of whether data exists in the import
+    for (const { repo } of tables) {
+        await repo.truncate();
+    }
+
     for (const { repo, items, name } of tables) {
         if (!items || items.length === 0) continue;
-        await repo.truncate();
         await importTable(repo, items, name);
     }
 

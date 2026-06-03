@@ -245,6 +245,8 @@ export class UsageService {
         const granularity = UsageService.selectGranularity(gapMinutes || 30, effectiveSince);
         const accountSet = account_ids && account_ids.length > 0 ? new Set(account_ids) : null;
         const ONE_MIN_MS = 60_000;
+        // 1m recent sessions: at most 1 day back, capped to 20 rows
+        const since1m = Math.max(effectiveSince, now - DAY);
 
         // Window accumulator types — built inline during streaming
         type WinAcc = {
@@ -304,20 +306,22 @@ export class UsageService {
                 m.input_tokens += bucket.input_tokens || 0;
                 m.output_tokens += bucket.output_tokens || 0;
 
-                // --- 1m window accumulator ---
-                let acWin1m = byAccountWindow1m.get(aid);
-                if (!acWin1m) { acWin1m = new Map(); byAccountWindow1m.set(aid, acWin1m); }
-                let acc1m = acWin1m.get(wStart1m);
-                if (!acc1m) {
-                    acc1m = { input_tokens: 0, output_tokens: 0, cost: 0, requestCount: 0, modelAliases: new Set() };
-                    acWin1m.set(wStart1m, acc1m);
-                }
+                // --- 1m window accumulator (only for last 20 minutes) ---
+                if (bucket.bucket_time >= since1m) {
+                    let acWin1m = byAccountWindow1m.get(aid);
+                    if (!acWin1m) { acWin1m = new Map(); byAccountWindow1m.set(aid, acWin1m); }
+                    let acc1m = acWin1m.get(wStart1m);
+                    if (!acc1m) {
+                        acc1m = { input_tokens: 0, output_tokens: 0, cost: 0, requestCount: 0, modelAliases: new Set() };
+                        acWin1m.set(wStart1m, acc1m);
+                    }
 
-                acc1m.input_tokens += bucket.input_tokens || 0;
-                acc1m.output_tokens += bucket.output_tokens || 0;
-                acc1m.cost += bucket.cost || 0;
-                acc1m.requestCount += bucket.request_count || 0;
-                acc1m.modelAliases.add(bucket.model_alias);
+                    acc1m.input_tokens += bucket.input_tokens || 0;
+                    acc1m.output_tokens += bucket.output_tokens || 0;
+                    acc1m.cost += bucket.cost || 0;
+                    acc1m.requestCount += bucket.request_count || 0;
+                    acc1m.modelAliases.add(bucket.model_alias);
+                }
             },
         );
 
@@ -382,11 +386,11 @@ export class UsageService {
             return bMax - aMax;
         });
 
-        // Keep only top 20 sessions across all groups
+        // Keep only top 200 sessions across all groups (allows full chart rendering for longer ranges)
         const allSpans: { gi: number; si: number; st: number }[] = [];
         groups.forEach((g, gi) => g.sessions.forEach((s, si) => allSpans.push({ gi, si, st: s.startTime })));
         allSpans.sort((a, b) => b.st - a.st);
-        const keep = new Set(allSpans.slice(0, 20).map(s => `${s.gi}:${s.si}`));
+        const keep = new Set(allSpans.slice(0, 200).map(s => `${s.gi}:${s.si}`));
         groups.forEach((g, gi) => { g.sessions = g.sessions.filter((_, si) => keep.has(`${gi}:${si}`)); });
 
         // Filter out sessions whose model has been deleted
@@ -410,7 +414,7 @@ export class UsageService {
         totalCost = Math.round(totalCost * 1_000_000) / 1_000_000;
 
         recentSessionsFlat.sort((a, b) => b.startTime - a.startTime);
-        const topRecent = recentSessionsFlat.slice(0, 10);
+        const topRecent = recentSessionsFlat.slice(0, 20);
 
         return { groups: filtered, totals: { totalTokens, totalCost, totalRequests }, recentSessions: topRecent };
     }

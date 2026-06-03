@@ -299,3 +299,26 @@ export class ProviderUpdatePriorityResponse implements BaseResponse<null> {
         this.message = origin.message;
     }
 }
+
+export class ProviderModelAliasesRequest implements BaseRequest {
+    public auth?: string;
+
+    constructor(origin: Partial<ProviderModelAliasesRequest>) {
+        origin.auth && (this.auth = origin.auth);
+    }
+    static self(unsafe: ProviderModelAliasesRequest) {
+        return new ProviderModelAliasesRequest(unsafe);
+    }
+}
+
+export class ProviderModelAliasesResponse implements BaseResponse<string[]> {
+    public success: boolean;
+    public message: string;
+    public data: string[];
+
+    constructor(origin: ProviderModelAliasesResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+        this.data = origin.data;
+    }
+}

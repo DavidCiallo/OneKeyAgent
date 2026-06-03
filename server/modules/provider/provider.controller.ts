@@ -6,6 +6,7 @@ import {
     ProviderUpdateRequest,
     ProviderDeleteRequest,
     ProviderUpdatePriorityRequest,
+    ProviderModelAliasesRequest,
 } from "../../../shared/modules/provider/provider.interface";
 import { providerRoutes } from "../../../shared/modules/provider/provider.router";
 import { requireAdmin } from "../auth/auth.service";
@@ -71,7 +72,15 @@ async function updatepriority(request: ProviderUpdatePriorityRequest) {
     return {};
 }
 
+async function modelaliases(request: ProviderModelAliasesRequest) {
+    request = ProviderModelAliasesRequest.self(request);
+    await requireAdmin(request.auth);
+
+    const aliases = await ProviderService.getModelAliases();
+    return aliases;
+}
+
 export const providerMount = {
     routes: providerRoutes,
-    handlers: { list, detail, create, update, updatepriority, delete: del },
+    handlers: { list, detail, create, update, updatepriority, modelaliases, delete: del },
 };

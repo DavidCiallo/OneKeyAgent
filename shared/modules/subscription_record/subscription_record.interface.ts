@@ -90,10 +90,12 @@ export class StatementItem {
 
 export class StatementRequest implements BaseRequest {
     public auth?: string;
+    public page?: number;
 
     constructor(origin: Partial<StatementRequest>) {
         if (false) throw new Error("Unexpected error");
         origin.auth && (this.auth = origin.auth);
+        if (origin.page && origin.page > 0) this.page = origin.page;
     }
     static self(unsafe: StatementRequest) {
         return new StatementRequest(unsafe);
@@ -103,7 +105,7 @@ export class StatementRequest implements BaseRequest {
 export class StatementResponse implements BaseResponse<StatementItem[]> {
     public success: boolean;
     public message: string;
-    public data: { list: StatementItem[] };
+    public data: { list: StatementItem[]; total: number };
 
     constructor(origin: StatementResponse) {
         this.success = origin.success;

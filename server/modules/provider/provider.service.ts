@@ -42,6 +42,13 @@ export class ProviderService {
         });
     }
 
+    /** Get all distinct model_aliases (for filter dropdown) */
+    static async getModelAliases(): Promise<string[]> {
+        const all = await providerRepository.findAllIgnoreDelete();
+        const aliases = new Set(all.map(p => p.model_alias).filter(Boolean));
+        return Array.from(aliases).sort((a, b) => a.localeCompare(b));
+    }
+
     /** Increase or decrease a provider's priority */
     static async updatePriority(id: string, delta: number): Promise<void> {
         const p = await providerRepository.findOne({ id });
