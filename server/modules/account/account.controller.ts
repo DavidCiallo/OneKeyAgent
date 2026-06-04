@@ -136,8 +136,10 @@ async function exportData(request: AccountExportRequest) {
     const taskRepo = Repository.instance<any>("Task");
     const bucketRepo = Repository.instance<any>("usage_bucket");
     const giftCardRepo = Repository.instance<any>("gift_card");
+    const settingsRepo = Repository.instance<any>("Settings");
+    const sessionReasoningRepo = Repository.instance<any>("session_reasoning");
 
-    const [accounts, models, providers, roles, accountRoles, tasks, giftCards] = await Promise.all([
+    const [accounts, models, providers, roles, accountRoles, tasks, giftCards, settings] = await Promise.all([
         accountRepo.findAllIgnoreDelete(),
         modelRepo.findAllIgnoreDelete(),
         providerRepo.findAllIgnoreDelete(),
@@ -145,11 +147,13 @@ async function exportData(request: AccountExportRequest) {
         accountRoleRepo.findAllIgnoreDelete(),
         taskRepo.findAllIgnoreDelete(),
         giftCardRepo.findAllIgnoreDelete(),
+        settingsRepo.findAllIgnoreDelete(),
     ]);
 
-    const [transactions, usageBuckets] = await Promise.all([
+    const [transactions, usageBuckets, sessionReasonings] = await Promise.all([
         (async () => { const r: any[] = []; for await (const b of recordRepo.findAllIgnoreDeleteBatch(2000)) r.push(...b); return r; })(),
         (async () => { const r: any[] = []; for await (const b of bucketRepo.findAllIgnoreDeleteBatch(2000)) r.push(...b); return r; })(),
+        (async () => { const r: any[] = []; for await (const b of sessionReasoningRepo.findAllIgnoreDeleteBatch(2000)) r.push(...b); return r; })(),
     ]);
 
     return {
@@ -165,6 +169,8 @@ async function exportData(request: AccountExportRequest) {
             tasks: tasks || [],
             usage_buckets: usageBuckets,
             gift_cards: giftCards || [],
+            settings: settings || [],
+            session_reasonings: sessionReasonings || [],
         },
     };
 }
@@ -184,6 +190,8 @@ async function importData(request: AccountImportRequest) {
     const taskRepo = Repository.instance<any>("Task");
     const bucketRepo = Repository.instance<any>("usage_bucket");
     const giftCardRepo = Repository.instance<any>("gift_card");
+    const settingsRepo = Repository.instance<any>("Settings");
+    const sessionReasoningRepo = Repository.instance<any>("session_reasoning");
 
     type TableDef = { repo: Repository<any>; items: any[] | undefined; name: string };
     const tables: TableDef[] = [
@@ -196,6 +204,8 @@ async function importData(request: AccountImportRequest) {
         { repo: bucketRepo, items: data.usage_buckets, name: "usage_buckets" },
         { repo: recordRepo, items: data.transactions, name: "transactions" },
         { repo: giftCardRepo, items: data.gift_cards, name: "gift_cards" },
+        { repo: settingsRepo, items: data.settings, name: "settings" },
+        { repo: sessionReasoningRepo, items: data.session_reasonings, name: "session_reasonings" },
     ];
 
     async function importTable(repo: Repository<any>, items: any[] | undefined, name: string) {
@@ -217,16 +227,6 @@ async function importData(request: AccountImportRequest) {
     for (const { repo, items, name } of tables) {
         if (!items || items.length === 0) continue;
         await importTable(repo, items, name);
-    }
-
-    if (data.accounts && data.accounts.length > 0) {
-        // Recalculate balances from transactions and gift cards
-        for (const a of data.accounts) {
-            const txs = (data.transactions || []).filter((t: any) => t.account_id === a.id && t.status === "confirmed");
-            const cards = (data.gift_cards || []).filter((c: any) => c.redeemed_by === a.id && c.status === "redeemed");
-            const credit = txs.reduce((s: number, t: any) => s + (t.amount || 0), 0) + cards.reduce((s: number, c: any) => s + (c.token_amount || 0), 0);
-            await accountRepo.update({ id: a.id }, { balance: credit });
-        }
     }
 
     return { imported };

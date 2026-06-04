@@ -305,6 +305,8 @@ export interface ExportData {
         tasks?: any[];
         usage_buckets?: any[];
         gift_cards?: any[];
+        settings?: any[];
+        session_reasonings?: any[];
     };
 }
 
