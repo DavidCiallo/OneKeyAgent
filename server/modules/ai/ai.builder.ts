@@ -39,9 +39,19 @@ export function buildRequestConfig(
 }
 
 /** Calculate cost in USDT for a request */
-export function calculateCost(input_tokens: number, output_tokens: number, input_price: number, output_price: number): number {
-    // input_price/output_price are in dollars per 1M tokens
-    const cost = (input_tokens * input_price + output_tokens * output_price) / 1_000_000;
+export function calculateCost(
+    input_tokens: number,
+    cached_input_tokens: number,
+    output_tokens: number,
+    input_price: number,
+    cache_price: number,
+    output_price: number,
+): number {
+    // input_price/cache_price/output_price are in dollars per 1M tokens
+    // If cache_price is not set (0), fall back to input_price
+    const effectiveCachePrice = cache_price > 0 ? cache_price : input_price;
+    const nonCached = Math.max(0, input_tokens - cached_input_tokens);
+    const cost = (cached_input_tokens * effectiveCachePrice + nonCached * input_price + output_tokens * output_price) / 1_000_000;
     return Math.round(cost * 1_000_000) / 1_000_000; // 6 decimal precision
 }
 

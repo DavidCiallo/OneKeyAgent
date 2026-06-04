@@ -23,6 +23,7 @@ async function upsertBucket(
     model_alias: string,
     provider_id: string,
     input_tokens: number,
+    cached_input_tokens: number,
     output_tokens: number,
     cost: number,
 ): Promise<void> {
@@ -37,6 +38,7 @@ async function upsertBucket(
             { id: existing.id },
             (row) => ({
                 input_tokens: (row!.input_tokens || 0) + input_tokens,
+                cached_input_tokens: (row!.cached_input_tokens || 0) + cached_input_tokens,
                 output_tokens: (row!.output_tokens || 0) + output_tokens,
                 cost: Math.round(((row!.cost || 0) + cost) * 1_000_000) / 1_000_000,
                 request_count: (row!.request_count || 0) + 1,
@@ -51,6 +53,7 @@ async function upsertBucket(
             bucket_time: bucketTime,
             granularity,
             input_tokens,
+            cached_input_tokens,
             output_tokens,
             cost: Math.round(cost * 1_000_000) / 1_000_000,
             request_count: 1,
@@ -72,11 +75,17 @@ export async function logUsage(usage: {
     model_alias: string,
     provider_id?: string,
     input_tokens: number,
+    cached_input_tokens: number,
     output_tokens: number,
     input_price: number,
+    cache_price: number,
     output_price: number,
 }) {
-    const cost = Math.round((usage.input_tokens * (usage.input_price || 0) + usage.output_tokens * (usage.output_price || 0)) / 1_000_000 * 1_000_000) / 1_000_000;
+    const cachedInput = usage.cached_input_tokens || 0;
+    const effectiveCachePrice = (usage.cache_price || 0) > 0 ? usage.cache_price! : (usage.input_price || 0);
+    const inputCost = (cachedInput * effectiveCachePrice + Math.max(0, usage.input_tokens - cachedInput) * (usage.input_price || 0)) / 1_000_000;
+    const outputCost = usage.output_tokens * (usage.output_price || 0) / 1_000_000;
+    const cost = Math.round((inputCost + outputCost) * 1_000_000) / 1_000_000;
     const now = Date.now();
     const provider = usage.provider_id || "unknown";
 
@@ -85,9 +94,9 @@ export async function logUsage(usage: {
     const b1d = midnight(now);
 
     await Promise.all([
-        upsertBucket(b1m, "1m", usage.account_id, usage.model_alias, provider, usage.input_tokens, usage.output_tokens, cost),
-        upsertBucket(b60m, "60m", usage.account_id, usage.model_alias, provider, usage.input_tokens, usage.output_tokens, cost),
-        upsertBucket(b1d, "1d", usage.account_id, usage.model_alias, provider, usage.input_tokens, usage.output_tokens, cost),
+        upsertBucket(b1m, "1m", usage.account_id, usage.model_alias, provider, usage.input_tokens, cachedInput, usage.output_tokens, cost),
+        upsertBucket(b60m, "60m", usage.account_id, usage.model_alias, provider, usage.input_tokens, cachedInput, usage.output_tokens, cost),
+        upsertBucket(b1d, "1d", usage.account_id, usage.model_alias, provider, usage.input_tokens, cachedInput, usage.output_tokens, cost),
     ]);
 
     // Distributed cleanup: delete oldest expired row per granularity
