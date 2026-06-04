@@ -8,6 +8,7 @@ import ApiKeyCard from "./components/ApiKeyCard";
 import ModelsCard from "./components/ModelsCard";
 import RegenerateModal from "./components/RegenerateModal";
 import { useDisclosure } from "@heroui/react";
+import { Currency } from "../../methods/currency";
 
 export default function ProfilePage() {
     const menuLocale = Locale("Menu");
@@ -16,6 +17,7 @@ export default function ProfilePage() {
     const [balance, setBalance] = useState(0);
     const [weeklyUsage, setWeeklyUsage] = useState(0);
     const [models, setModels] = useState<{ id: string; input_price: number; output_price: number }[]>([]);
+    const [currency, setCurrency] = useState<Currency>(() => (localStorage.getItem("currency") as Currency) || "USD");
     const [regenerating, setRegenerating] = useState(false);
     const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onClose: onConfirmClose, onOpenChange: onConfirmChange } = useDisclosure();
 
@@ -91,7 +93,11 @@ export default function ProfilePage() {
                         endpoint={endpoint}
                         onCopy={handleCopy}
                     />
-                    <ModelsCard models={models} />
+                    <ModelsCard models={models} currency={currency} onToggleCurrency={() => {
+                        const next = currency === "USD" ? "CNY" : "USD";
+                        setCurrency(next);
+                        localStorage.setItem("currency", next);
+                    }} />
                 </div>
             </div>
 

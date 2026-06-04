@@ -5,6 +5,7 @@ import { Locale } from "../../../methods/locale";
 type ModelForm = {
     alias?: string;
     input_price: number;
+    cache_price: number;
     output_price: number;
     is_public?: number;
 };
@@ -23,19 +24,22 @@ export function ModelFormModal({ isOpen, onOpenChange, mode, form, onFormChange,
     const common = Locale("Common");
 
     const [input_priceStr, setInputPriceStr] = useState(String(form.input_price));
+    const [cache_priceStr, setCachePriceStr] = useState(String(form.cache_price));
     const [output_priceStr, setOutputPriceStr] = useState(String(form.output_price));
 
     // Sync from parent form when opening
     useEffect(() => {
         setInputPriceStr(String(form.input_price));
+        setCachePriceStr(String(form.cache_price));
         setOutputPriceStr(String(form.output_price));
     }, [isOpen]);
 
     const commitPrices = () => {
         const ip = parseFloat(input_priceStr);
+        const cp = parseFloat(cache_priceStr);
         const op = parseFloat(output_priceStr);
-        if (!isNaN(ip) && !isNaN(op)) {
-            onFormChange({ ...form, input_price: ip, output_price: op });
+        if (!isNaN(ip) && !isNaN(cp) && !isNaN(op)) {
+            onFormChange({ ...form, input_price: ip, cache_price: cp, output_price: op });
         }
     };
 
@@ -58,6 +62,15 @@ export function ModelFormModal({ isOpen, onOpenChange, mode, form, onFormChange,
                             onBlur={commitPrices}
                             startContent={<span className="text-default-400 text-sm font-mono">$</span>}
                             className="font-mono"
+                        />
+                        <Input
+                            label={locale.CachePrice || "Cache Price"}
+                            value={cache_priceStr}
+                            onValueChange={setCachePriceStr}
+                            onBlur={commitPrices}
+                            startContent={<span className="text-default-400 text-sm font-mono">$</span>}
+                            className="font-mono"
+                            description={locale.CachePriceDesc || "0 = same as input price"}
                         />
                         <Input
                             label={locale.OutputPrice || "Output Price"}

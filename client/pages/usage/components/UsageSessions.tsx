@@ -76,6 +76,7 @@ export function UsageSessions({ groups, totals, recentSessions, gapMinutes, isAd
             const existing = merged.get(s.startTime);
             if (existing) {
                 existing.input_tokens += s.input_tokens;
+                existing.cached_input_tokens += s.cached_input_tokens || 0;
                 existing.output_tokens += s.output_tokens;
                 existing.cost += s.cost;
                 existing.requestCount += s.requestCount;
@@ -187,6 +188,7 @@ export function UsageSessions({ groups, totals, recentSessions, gapMinutes, isAd
                             <TableColumn align="center" className="hidden md:table-cell">Account</TableColumn>
                             <TableColumn align="center">Model</TableColumn>
                             <TableColumn align="center" className="hidden md:table-cell">Input</TableColumn>
+                            <TableColumn align="center" className="hidden md:table-cell">Cached</TableColumn>
                             <TableColumn align="center" className="hidden md:table-cell">Output</TableColumn>
                             <TableColumn align="center">Cost</TableColumn>
                         </TableHeader>
@@ -197,6 +199,7 @@ export function UsageSessions({ groups, totals, recentSessions, gapMinutes, isAd
                                     <TableCell className="max-w-32 truncate text-center hidden md:table-cell">{stripEmail(session.accountName || "")}</TableCell>
                                     <TableCell className="font-semibold text-center max-w-28 truncate">{session.model_aliases.join(", ")}</TableCell>
                                     <TableCell className="hidden md:table-cell text-center font-mono">{fmtM(session.input_tokens)}</TableCell>
+                                    <TableCell className="hidden md:table-cell text-center font-mono">{fmtM(session.cached_input_tokens || 0)}</TableCell>
                                     <TableCell className="hidden md:table-cell text-center font-mono">{fmtK(session.output_tokens)}</TableCell>
                                     <TableCell className="text-center font-mono">${session.cost?.toFixed(4) || "0"}</TableCell>
                                 </TableRow>
@@ -209,6 +212,7 @@ export function UsageSessions({ groups, totals, recentSessions, gapMinutes, isAd
                             <TableColumn align="center">Time</TableColumn>
                             <TableColumn align="center" className="min-w-[10rem] md:min-w-[24rem]">Model</TableColumn>
                             <TableColumn align="center" className="hidden md:table-cell">Input</TableColumn>
+                            <TableColumn align="center" className="hidden md:table-cell">Cached</TableColumn>
                             <TableColumn align="center" className="hidden md:table-cell">Output</TableColumn>
                             <TableColumn align="center">Cost</TableColumn>
                         </TableHeader>
@@ -218,6 +222,7 @@ export function UsageSessions({ groups, totals, recentSessions, gapMinutes, isAd
                                     <TableCell className="whitespace-nowrap font-mono text-sm text-center">{format24Time(session.startTime)}</TableCell>
                                     <TableCell className="font-semibold text-center min-w-[10rem] md:min-w-[24rem] truncate">{session.model_aliases.join(", ")}</TableCell>
                                     <TableCell className="hidden md:table-cell text-center font-mono">{fmtM(session.input_tokens)}</TableCell>
+                                    <TableCell className="hidden md:table-cell text-center font-mono">{fmtM(session.cached_input_tokens || 0)}</TableCell>
                                     <TableCell className="hidden md:table-cell text-center font-mono">{fmtK(session.output_tokens)}</TableCell>
                                     <TableCell className="text-center font-mono">${session.cost?.toFixed(4) || "0"}</TableCell>
                                 </TableRow>

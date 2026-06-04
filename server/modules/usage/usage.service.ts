@@ -4,6 +4,8 @@ import { ModelEntity } from "../../../shared/modules/model/model.entity";
 import { UsageBucketEntity } from "../../../shared/modules/usage/usage_bucket.entity";
 import { UsageStatsPeriod, UsageStatsResult, UsageAmountData, UserSession, UserSessionGroup, ProviderUsage, ModelUsage } from "../../../shared/modules/usage/usage.interface";
 
+import { ProviderEntity } from "../../../shared/modules/provider/provider.entity";
+
 const bucketRepo = Repository.instance<UsageBucketEntity>("usage_bucket");
 const modelRepo = Repository.instance<ModelEntity>("Model");
 const accountRepository = Repository.instance<AccountEntity>("Account");
@@ -251,12 +253,12 @@ export class UsageService {
 
         // Window accumulator types — built inline during streaming
         type WinAcc = {
-            input_tokens: number; output_tokens: number; cost: number; requestCount: number;
+            input_tokens: number; cached_input_tokens: number; output_tokens: number; cost: number; requestCount: number;
             providerMap: Map<string, ProviderUsage>; modelMap: Map<string, ModelUsage>;
             modelAliases: Set<string>;
         };
         type WinAcc1m = {
-            input_tokens: number; output_tokens: number; cost: number; requestCount: number;
+            input_tokens: number; cached_input_tokens: number; output_tokens: number; cost: number; requestCount: number;
             modelAliases: Set<string>;
         };
 
@@ -279,13 +281,14 @@ export class UsageService {
                 let acc = acWin.get(wStart);
                 if (!acc) {
                     acc = {
-                        input_tokens: 0, output_tokens: 0, cost: 0, requestCount: 0,
+                        input_tokens: 0, cached_input_tokens: 0, output_tokens: 0, cost: 0, requestCount: 0,
                         providerMap: new Map(), modelMap: new Map(), modelAliases: new Set(),
                     };
                     acWin.set(wStart, acc);
                 }
 
                 acc.input_tokens += bucket.input_tokens || 0;
+                acc.cached_input_tokens += bucket.cached_input_tokens || 0;
                 acc.output_tokens += bucket.output_tokens || 0;
                 acc.cost += bucket.cost || 0;
                 acc.requestCount += bucket.request_count || 0;
@@ -293,18 +296,20 @@ export class UsageService {
 
                 const pkey = bucket.provider_id || "unknown";
                 if (!acc.providerMap.has(pkey)) {
-                    acc.providerMap.set(pkey, { providerName: pkey, input_tokens: 0, output_tokens: 0 });
+                    acc.providerMap.set(pkey, { providerName: pkey, input_tokens: 0, cached_input_tokens: 0, output_tokens: 0 });
                 }
                 const p = acc.providerMap.get(pkey)!;
                 p.input_tokens += bucket.input_tokens || 0;
+                p.cached_input_tokens += bucket.cached_input_tokens || 0;
                 p.output_tokens += bucket.output_tokens || 0;
 
                 const mkey = bucket.model_alias || "default";
                 if (!acc.modelMap.has(mkey)) {
-                    acc.modelMap.set(mkey, { model_alias: mkey, input_tokens: 0, output_tokens: 0 });
+                    acc.modelMap.set(mkey, { model_alias: mkey, input_tokens: 0, cached_input_tokens: 0, output_tokens: 0 });
                 }
                 const m = acc.modelMap.get(mkey)!;
                 m.input_tokens += bucket.input_tokens || 0;
+                m.cached_input_tokens += bucket.cached_input_tokens || 0;
                 m.output_tokens += bucket.output_tokens || 0;
 
                 // --- 1m window accumulator (only for last 20 minutes) ---
@@ -313,11 +318,12 @@ export class UsageService {
                     if (!acWin1m) { acWin1m = new Map(); byAccountWindow1m.set(aid, acWin1m); }
                     let acc1m = acWin1m.get(wStart1m);
                     if (!acc1m) {
-                        acc1m = { input_tokens: 0, output_tokens: 0, cost: 0, requestCount: 0, modelAliases: new Set() };
+                        acc1m = { input_tokens: 0, cached_input_tokens: 0, output_tokens: 0, cost: 0, requestCount: 0, modelAliases: new Set() };
                         acWin1m.set(wStart1m, acc1m);
                     }
 
                     acc1m.input_tokens += bucket.input_tokens || 0;
+                    acc1m.cached_input_tokens += bucket.cached_input_tokens || 0;
                     acc1m.output_tokens += bucket.output_tokens || 0;
                     acc1m.cost += bucket.cost || 0;
                     acc1m.requestCount += bucket.request_count || 0;
@@ -343,7 +349,8 @@ export class UsageService {
                     startTime: wStart, endTime: wStart + gapMs,
                     model_aliases: Array.from(acc.modelAliases),
                     requestCount: acc.requestCount,
-                    input_tokens: acc.input_tokens, output_tokens: acc.output_tokens,
+                    input_tokens: acc.input_tokens, cached_input_tokens: acc.cached_input_tokens,
+                    output_tokens: acc.output_tokens,
                     cost: acc.cost,
                     providerUsage: Array.from(acc.providerMap.values()),
                     modelUsage: Array.from(acc.modelMap.values()),
@@ -365,7 +372,8 @@ export class UsageService {
                         account_id: aid, startTime: wStart1m, endTime: wStart1m + ONE_MIN_MS,
                         model_aliases: Array.from(acc1m.modelAliases),
                         requestCount: acc1m.requestCount,
-                        input_tokens: acc1m.input_tokens, output_tokens: acc1m.output_tokens,
+                        input_tokens: acc1m.input_tokens, cached_input_tokens: acc1m.cached_input_tokens,
+                        output_tokens: acc1m.output_tokens,
                         cost: acc1m.cost,
                         providerUsage: [], modelUsage: [],
                         windowLabel: this.formatWindowLabel(wStart1m, ONE_MIN_MS),
@@ -394,9 +402,13 @@ export class UsageService {
         const keep = new Set(allSpans.slice(0, 200).map(s => `${s.gi}:${s.si}`));
         groups.forEach((g, gi) => { g.sessions = g.sessions.filter((_, si) => keep.has(`${gi}:${si}`)); });
 
-        // Filter out sessions whose model has been deleted
+        // Filter out sessions whose model has been deleted, and resolve provider names
         const activeModels = await modelRepo.find({});
         const activeModelAliases = new Set(activeModels.map(m => m.alias));
+
+        const activeProviders = await Repository.instance<ProviderEntity>("Provider").find({});
+        const providerNameMap = new Map(activeProviders.map(p => [p.id, p.name]));
+        const activeProviderIds = new Set(activeProviders.filter(p => !p.delete_time).map(p => p.id));
 
         const filtered = groups
             .map(g => ({
@@ -405,8 +417,10 @@ export class UsageService {
                     .map(s => ({
                         ...s,
                         providerUsage: account_ids && account_ids.length > 0 && !isAdmin
-                            ? s.modelUsage.map(mu => ({ providerName: mu.model_alias, input_tokens: mu.input_tokens, output_tokens: mu.output_tokens }))
-                            : s.providerUsage,
+                            ? s.modelUsage.map(mu => ({ providerName: mu.model_alias, input_tokens: mu.input_tokens, cached_input_tokens: mu.cached_input_tokens, output_tokens: mu.output_tokens }))
+                            : s.providerUsage
+                                .filter(pu => activeProviderIds.has(pu.providerName))
+                                .map(pu => ({ ...pu, providerName: providerNameMap.get(pu.providerName) || pu.providerName })),
                     }))
                     .filter(s => s.model_aliases.some(m => activeModelAliases.has(m))),
             }))

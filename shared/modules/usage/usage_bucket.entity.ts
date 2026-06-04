@@ -10,6 +10,7 @@ export interface UsageBucketEntity extends BaseEntity {
     bucket_time: number;       // unix timestamp aligned to granularity boundary
     granularity: BucketGranularity;
     input_tokens: number;
+    cached_input_tokens: number;
     output_tokens: number;
     cost: number;              // pre-computed total cost
     request_count: number;
