@@ -247,7 +247,7 @@ export class AiService {
             }
 
             const { input_price: input_price, output_price: output_price } = await getModelPrices(requestedAlias);
-            const { usage } = data;
+            const { usage } = rdata;
             // OpenAI format: prompt_tokens/completion_tokens; Anthropic format: input_tokens/output_tokens
             const rawInput = usage?.input_tokens ?? usage?.prompt_tokens ?? 0;
             const rawOutput = usage?.output_tokens ?? usage?.completion_tokens ?? 0;
