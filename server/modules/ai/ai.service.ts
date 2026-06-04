@@ -335,6 +335,12 @@ export class AiService {
                     }
                 }
                 if (tcId) {
+                    // Piggyback cleanup: delete reasoning records older than 14 days
+                    const first = await reasoningRepo.findOne({});
+                    if (first && first.create_time && Date.now() - first.create_time > 14 * 86400000) {
+                        await reasoningRepo.hardDelete({ id: first.id });
+                    }
+
                     await reasoningRepo.insert({
                         session_key: sessionKey,
                         tool_call_id: tcId,
