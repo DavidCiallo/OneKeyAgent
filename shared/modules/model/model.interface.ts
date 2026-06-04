@@ -5,6 +5,7 @@ export class ModelDTO {
     public id: string;
     public alias: string;
     public input_price: number;
+    public cache_price: number;
     public output_price: number;
     public is_public: number;
     public create_time: number;
@@ -15,6 +16,7 @@ export class ModelDTO {
         this.id = origin.id;
         this.alias = origin.alias;
         this.input_price = origin.input_price;
+        this.cache_price = origin.cache_price;
         this.output_price = origin.output_price;
         this.is_public = origin.is_public;
         this.create_time = origin.create_time;
@@ -41,15 +43,17 @@ export class ModelQueryBody {
 export class ModelCreateBody {
     public alias: string;
     public input_price: number;
+    public cache_price: number;
     public output_price: number;
     public is_public: number;
 
-    constructor(origin: Pick<ModelEntity, "alias"> & Partial<Pick<ModelEntity, "input_price" | "output_price" | "is_public">>) {
+    constructor(origin: Pick<ModelEntity, "alias"> & Partial<Pick<ModelEntity, "input_price" | "cache_price" | "output_price" | "is_public">>) {
         if (!origin.alias) {
             throw new Error("alias is required");
         }
         this.alias = origin.alias;
         this.input_price = origin.input_price ?? 0;
+        this.cache_price = origin.cache_price ?? 0;
         this.output_price = origin.output_price ?? 0;
         this.is_public = origin.is_public ?? 0;
     }
@@ -62,15 +66,17 @@ export class ModelCreateBody {
 export class ModelUpdateBody {
     public alias?: string;
     public input_price?: number;
+    public cache_price?: number;
     public output_price?: number;
     public is_public?: number;
 
     constructor(origin: Partial<ModelEntity> = {}) {
-        if (!origin.alias && origin.input_price === undefined && origin.output_price === undefined && origin.is_public === undefined) {
+        if (!origin.alias && origin.input_price === undefined && origin.cache_price === undefined && origin.output_price === undefined && origin.is_public === undefined) {
             throw new Error("At least one field is required");
         }
         origin.alias && (this.alias = origin.alias);
         origin.input_price !== undefined && (this.input_price = origin.input_price);
+        origin.cache_price !== undefined && (this.cache_price = origin.cache_price);
         origin.output_price !== undefined && (this.output_price = origin.output_price);
         origin.is_public !== undefined && (this.is_public = origin.is_public);
     }
