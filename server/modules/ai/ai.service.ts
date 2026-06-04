@@ -10,7 +10,7 @@ import { anthropicToOpenAI, antMessagesToOpenAI, openAIToAntMessages, openAIToAn
 import Repository from "../../lib/repository";
 import { buildRequestConfig, calculateCost, getThinkingConfig } from "./ai.builder";
 import { SessionReasoningEntity } from "../../../shared/modules/session/session_reasoning.entity";
-import fs from "fs";
+
 const WEEKLY_LIMIT = 100; // $100 per week
 
 /** Get total weekly spending for an account (uses pre-aggregated usage_bucket) */
@@ -327,7 +327,7 @@ export class AiService {
                     }
                 }
             }
-            fs.writeFileSync(`./logs/request_${account_id}_${Date.now()}.json`, JSON.stringify(requestBody, null, 2));
+
             const { base_url, api_key, proxy_url, auth_type, api_type } = provider;
             const result = await tryProviderStream(base_url, api_key, proxy_url, requestBody, auth_type, api_type);
 
@@ -353,6 +353,12 @@ export class AiService {
                     }
                 }
                 if (tcId) {
+                    // Piggyback cleanup: delete reasoning records older than 14 days
+                    const first = await reasoningRepo.findOne({});
+                    if (first && first.create_time && Date.now() - first.create_time > 14 * 86400000) {
+                        await reasoningRepo.hardDelete({ id: first.id });
+                    }
+
                     await reasoningRepo.insert({
                         session_key: sessionKey,
                         tool_call_id: tcId,

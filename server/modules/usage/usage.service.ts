@@ -29,6 +29,12 @@ function bucketSlots(granularity: string): number {
     }
 }
 
+/** Align a timestamp to the local 10-min display slot used by the stats maps */
+function tenMinuteSlot(ts: number): number {
+    const dayStart = localDayStart(ts);
+    return dayStart + Math.floor((ts - dayStart) / TEN_MIN) * TEN_MIN;
+}
+
 /** Convert a pre-filled map (time slot → tokens) into a UsageStatsPeriod with cumulative sums */
 function mapToPeriod(bucketMap: Map<number, number>): UsageStatsPeriod {
     const amounts: UsageAmountData[] = [];
@@ -63,8 +69,8 @@ export class UsageService {
     static async stats(model_alias?: string, account_id?: string): Promise<UsageStatsResult> {
         const now = Date.now();
         const todayStart = localDayStart(now);
-        const last24hStart = now - DAY;
-        const weekStart = now - 7 * DAY;
+        const last24hStart = tenMinuteSlot(now - DAY);
+        const weekStart = tenMinuteSlot(now - 7 * DAY);
 
         // Pre-fill maps with 0 for each 10-min slot
         const todayMap = new Map<number, number>();
@@ -80,19 +86,18 @@ export class UsageService {
         await bucketRepo.findEach(filter1m, (bucket: any) => {
             const bt = bucket.bucket_time;
             const tokens = (bucket.input_tokens || 0) + (bucket.output_tokens || 0);
-            if (bt >= todayStart && todayMap.has(bt)) {
-                todayMap.set(bt, (todayMap.get(bt) || 0) + tokens);
+            const slot = tenMinuteSlot(bt);
+            if (bt >= todayStart && todayMap.has(slot)) {
+                todayMap.set(slot, (todayMap.get(slot) || 0) + tokens);
             }
-            if (bt >= last24hStart && last24hMap.has(bt)) {
-                last24hMap.set(bt, (last24hMap.get(bt) || 0) + tokens);
+            if (bt >= last24hStart && last24hMap.has(slot)) {
+                last24hMap.set(slot, (last24hMap.get(slot) || 0) + tokens);
             }
         });
 
-        // Pre-fill week map
-        const weekMap = new Map<number, number>();
-        for (let t = weekStart; t < now; t += TEN_MIN) weekMap.set(t, 0);
-
         // Pass 2: stream 1d records for weekly overview
+        // 1d bucket_time is UTC midnight, not local midnight — use on-demand map instead of pre-fill
+        const weekMap = new Map<number, number>();
         const filter1d: any = { granularity: "1d", bucket_time: { $gte: weekStart } };
         if (model_alias) filter1d.model_alias = model_alias;
         if (account_id) filter1d.account_id = account_id;
@@ -104,9 +109,7 @@ export class UsageService {
             const tokensPerSlot = tokens / slots;
             for (let i = 0; i < slots; i++) {
                 const slot = bt + i * TEN_MIN;
-                if (weekMap.has(slot)) {
-                    weekMap.set(slot, (weekMap.get(slot) || 0) + tokensPerSlot);
-                }
+                weekMap.set(slot, (weekMap.get(slot) || 0) + tokensPerSlot);
             }
         });
 
@@ -124,13 +127,13 @@ export class UsageService {
     static async statsBatch(model_aliases: string[], account_id?: string): Promise<Map<string, UsageStatsResult>> {
         const now = Date.now();
         const todayStart = localDayStart(now);
-        const last24hStart = now - DAY;
-        const weekStart = now - 7 * DAY;
+        const last24hStart = tenMinuteSlot(now - DAY);
+        const weekStart = tenMinuteSlot(now - 7 * DAY);
 
         const baseFilter: any = {};
         if (account_id) baseFilter.account_id = account_id;
 
-        // Pre-fill maps for each alias
+        // Pre-fill maps for each alias (today & last24h use local 10-min slots)
         const aliasesSet = new Set(model_aliases);
         const todayMaps = new Map<string, Map<number, number>>();
         const last24hMaps = new Map<string, Map<number, number>>();
@@ -139,13 +142,12 @@ export class UsageService {
         for (const alias of aliasesSet) {
             const tm = new Map<number, number>();
             const l24m = new Map<number, number>();
-            const wm = new Map<number, number>();
             for (let t = todayStart; t < now; t += TEN_MIN) tm.set(t, 0);
             for (let t = last24hStart; t < now; t += TEN_MIN) l24m.set(t, 0);
-            for (let t = weekStart; t < now; t += TEN_MIN) wm.set(t, 0);
             todayMaps.set(alias, tm);
             last24hMaps.set(alias, l24m);
-            weekMaps.set(alias, wm);
+            // week maps are populated on-demand from 1d buckets (UTC midnight alignment)
+            weekMaps.set(alias, new Map());
         }
 
         // Pass 1: stream 1m records
@@ -159,11 +161,12 @@ export class UsageService {
 
                 const bt = bucket.bucket_time;
                 const tokens = (bucket.input_tokens || 0) + (bucket.output_tokens || 0);
-                if (bt >= todayStart && todayMap?.has(bt)) {
-                    todayMap.set(bt, (todayMap.get(bt) || 0) + tokens);
+                const slot = tenMinuteSlot(bt);
+                if (bt >= todayStart && todayMap?.has(slot)) {
+                    todayMap.set(slot, (todayMap.get(slot) || 0) + tokens);
                 }
-                if (bt >= last24hStart && last24hMap?.has(bt)) {
-                    last24hMap.set(bt, (last24hMap.get(bt) || 0) + tokens);
+                if (bt >= last24hStart && last24hMap?.has(slot)) {
+                    last24hMap.set(slot, (last24hMap.get(slot) || 0) + tokens);
                 }
             },
         );
@@ -182,9 +185,7 @@ export class UsageService {
                 const tokensPerSlot = tokens / slots;
                 for (let i = 0; i < slots; i++) {
                     const slot = bt + i * TEN_MIN;
-                    if (weekMap.has(slot)) {
-                        weekMap.set(slot, (weekMap.get(slot) || 0) + tokensPerSlot);
-                    }
+                    weekMap.set(slot, (weekMap.get(slot) || 0) + tokensPerSlot);
                 }
             },
         );
