@@ -8,7 +8,6 @@ import { UsageStatsPeriod } from "../../../shared/modules/usage/usage.interface"
 import { ModelCardGrid } from "./components/ModelCardGrid";
 import { ModelPagination } from "./components/ModelPagination";
 import { ModelFormModal } from "./components/ModelFormModal";
-
 type ModelForm = {
     alias?: string;
     input_price: number;
@@ -129,7 +128,7 @@ export default function ModelPage() {
         <div className="max-w-screen flex flex-col h-screen">
             <Header name={Locale("Menu").Model} />
             <div className="p-8 flex flex-col gap-4 flex-1 overflow-hidden">
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
                     <Button color="primary" onPress={openCreate}>{locale.CreateModel}</Button>
                 </div>
                 <ModelCardGrid

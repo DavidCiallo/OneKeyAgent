@@ -1,5 +1,6 @@
 import { Card, CardBody, CardHeader, Divider, Chip, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
+import { Currency, formatPrice as formatCurrencyPrice } from "../../../methods/currency";
 
 type ModelInfo = {
     id: string;
@@ -7,19 +8,32 @@ type ModelInfo = {
     output_price: number;
 };
 
-export default function ModelsCard({ models }: { models: ModelInfo[] }) {
+export default function ModelsCard({ models, currency, onToggleCurrency }: { models: ModelInfo[]; currency?: Currency; onToggleCurrency?: () => void }) {
     const locale = Locale("ProfilePage");
 
     const sorted = [...models].sort((a, b) => a.id.localeCompare(b.id));
 
     const formatPrice = (dollarsPerMToken: number) => {
-        if (dollarsPerMToken <= 0) return "-";
-        return `$${dollarsPerMToken.toFixed(3)}/M`;
+        return formatCurrencyPrice(dollarsPerMToken, currency || "USD");
     };
 
     return (
         <Card>
-            <CardHeader className="px-6 py-4 font-semibold text-lg">{locale.AvailableModels}</CardHeader>
+            <CardHeader className="px-6 py-4 justify-between">
+                <span className="font-semibold text-lg">{locale.AvailableModels}</span>
+                {onToggleCurrency && (
+                    <button
+                        className="flex items-center gap-1 text-xs text-default-500 bg-default-100 hover:bg-default-200 rounded-md px-2 py-1 transition-colors cursor-pointer"
+                        onClick={onToggleCurrency}
+                    >
+                        <span>{currency === "CNY" ? "¥ CNY" : "$ USD"}</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M7 16V4m0 0L3 8m4-4l4 4" />
+                            <path d="M17 8v12m0 0l4-4m-4 4l-4-4" />
+                        </svg>
+                    </button>
+                )}
+            </CardHeader>
             <Divider />
             <CardBody className="px-6 py-4">
                 <Table removeWrapper aria-label="Models table" className="min-w-full">

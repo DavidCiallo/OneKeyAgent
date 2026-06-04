@@ -3,7 +3,6 @@ import { ModelDTO } from "../../../../shared/modules/model/model.entity";
 import { Locale } from "../../../methods/locale";
 import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
 import { UsageAmountData, UsageStatsPeriod } from "../../../../shared/modules/usage/usage.interface";
-
 type ModelWithUsage = ModelDTO & {
     todayPeriod?: UsageStatsPeriod;
     last24hPeriod?: UsageStatsPeriod;
@@ -101,8 +100,8 @@ export function ModelCardGrid({ list, onEdit, onDelete }: Props) {
 
                         {/* Prices */}
                         <div className="flex gap-3 text-xs text-default-500">
-                            <span>IN: <strong className="text-foreground font-mono">${item.input_price.toFixed(3)}</strong> /M</span>
-                            <span>OUT: <strong className="text-foreground font-mono">${item.output_price.toFixed(3)}</strong> /M</span>
+                            <span>IN: <strong className="text-foreground font-mono">${item.input_price.toFixed(3)}/M</strong></span>
+                            <span>OUT: <strong className="text-foreground font-mono">${item.output_price.toFixed(3)}/M</strong></span>
                         </div>
 
                         {/* Three mini charts */}
