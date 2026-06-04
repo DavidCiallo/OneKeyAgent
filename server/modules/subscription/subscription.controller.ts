@@ -211,7 +211,7 @@ async function ipnwebhook(request: Record<string, unknown>): Promise<{ success: 
     const headers = (request).__headers as Record<string, string> || {};
     const signature = headers["x-nowpayments-sig"] || headers["x-nowpayments-signature"] || "";
     const secret = SettingsService.get("ipn_secret");
-    if (secret) {
+    if (secret && secret.length > 6) {
         if (!signature || !rawBody) {
             console.warn("[IPN] Missing signature or raw body, rejecting webhook");
             return { success: false, message: "missing signature" };
@@ -221,6 +221,8 @@ async function ipnwebhook(request: Record<string, unknown>): Promise<{ success: 
             console.warn("[IPN] Invalid signature, rejecting webhook");
             return { success: false, message: "invalid signature" };
         }
+    } else {
+        return { success: false, message: "invalid secret" };
     }
 
     const paymentId = String(request.payment_id || "");
