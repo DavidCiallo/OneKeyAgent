@@ -38,32 +38,30 @@ function MiniChart({ data, color, label, total, timeKey }: { data: UsageAmountDa
                 <span className="text-default-400 tabular-nums">{total.toFixed(2)}M</span>
             </div>
             <div className="h-16">
-                {data.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={data} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
-                            <YAxis domain={["dataMin", "dataMax"]} hide />
-                            <Line
-                                type="monotone"
-                                dataKey="amount"
-                                stroke={color}
-                                strokeWidth={1.5}
-                                dot={false}
-                                isAnimationActive={false}
-                            />
-                        </LineChart>
-                    </ResponsiveContainer>
-                ) : (
-                    <div className="h-full flex items-center justify-center text-default-300 text-[10px]">—</div>
-                )}
+                <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={data} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+                        <YAxis domain={["dataMin", "dataMax"]} hide />
+                        <Line
+                            type="monotone"
+                            dataKey="amount"
+                            stroke={data.length > 0 ? color : "hsl(var(--heroui-default-200))"}
+                            strokeWidth={1.5}
+                            dot={false}
+                            isAnimationActive={false}
+                        />
+                    </LineChart>
+                </ResponsiveContainer>
             </div>
             {/* Time labels: pick 4 evenly spaced points */}
-            {data.length > 0 && (
+            {data.length > 0 ? (
                 <div className="flex justify-between text-[10px] text-default-300 px-0.5">
                     {[0, 1, 2, 3].map(i => {
                         const idx = Math.min(Math.floor((i / 3) * (data.length - 1)), data.length - 1);
                         return <span key={i}>{formatter(data[idx].ts)}</span>;
                     })}
                 </div>
+            ) : (
+                <div className="text-[10px] text-default-300 text-center">No usage</div>
             )}
         </div>
     );
@@ -101,6 +99,9 @@ export function ModelCardGrid({ list, onEdit, onDelete }: Props) {
                         {/* Prices */}
                         <div className="flex gap-3 text-xs text-default-500">
                             <span>IN: <strong className="text-foreground font-mono">${item.input_price.toFixed(3)}/M</strong></span>
+                            {item.cache_price > 0 && (
+                                <span>CACHE: <strong className="text-foreground font-mono">${item.cache_price.toFixed(3)}/M</strong></span>
+                            )}
                             <span>OUT: <strong className="text-foreground font-mono">${item.output_price.toFixed(3)}/M</strong></span>
                         </div>
 

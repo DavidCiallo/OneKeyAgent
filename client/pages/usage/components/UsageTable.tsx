@@ -31,6 +31,7 @@ export function UsageTable({ list, total, page, onPageChange }: Props) {
                         <TableColumn align="center">{locale.ModelAlias}</TableColumn>
                         <TableColumn align="center">{locale.ProviderName}</TableColumn>
                         <TableColumn align="center">{locale.InputTokens}</TableColumn>
+                        <TableColumn align="center">{locale.CachedTokens || "Cached"}</TableColumn>
                         <TableColumn align="center">{locale.OutputTokens}</TableColumn>
                         <TableColumn align="center">Cost</TableColumn>
                         <TableColumn align="center">{locale.Time}</TableColumn>
@@ -42,6 +43,7 @@ export function UsageTable({ list, total, page, onPageChange }: Props) {
                                 <TableCell className="text-center">{item.model_alias || "—"}</TableCell>
                                 <TableCell className="text-center">{item.providerName || "—"}</TableCell>
                                 <TableCell className="text-center">{item.input_tokens}</TableCell>
+                                <TableCell className="text-center">{item.cached_input_tokens || 0}</TableCell>
                                 <TableCell className="text-center">{item.output_tokens}</TableCell>
                                 <TableCell className="text-center">${item.cost.toFixed(4)}</TableCell>
                                 <TableCell className="text-center">{item.create_time ? new Date(item.create_time).toLocaleString() : "—"}</TableCell>
