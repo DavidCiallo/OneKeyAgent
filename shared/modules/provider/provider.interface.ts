@@ -311,6 +311,49 @@ export class ProviderModelAliasesRequest implements BaseRequest {
     }
 }
 
+export class ProviderBatchUpdateBody {
+    public ids: string[];
+    public proxy_url?: string;
+    public enabled?: number;
+
+    constructor(origin: Partial<ProviderBatchUpdateBody>) {
+        if (!origin.ids || origin.ids.length === 0) throw new Error("ids are required");
+        if (origin.enabled === undefined && origin.proxy_url === undefined) throw new Error("At least one field is required");
+        this.ids = origin.ids;
+        origin.proxy_url !== undefined && (this.proxy_url = origin.proxy_url);
+        origin.enabled !== undefined && (this.enabled = origin.enabled);
+    }
+
+    static self(unsafe: ProviderBatchUpdateBody) {
+        return new ProviderBatchUpdateBody(unsafe);
+    }
+}
+
+export class ProviderBatchUpdateRequest implements BaseRequest {
+    public auth?: string;
+    public body: ProviderBatchUpdateBody;
+
+    constructor(origin: Partial<ProviderBatchUpdateRequest>) {
+        if (!origin.body) throw new Error("body is required");
+        origin.auth && (this.auth = origin.auth);
+        this.body = ProviderBatchUpdateBody.self(origin.body);
+    }
+
+    static self(unsafe: ProviderBatchUpdateRequest) {
+        return new ProviderBatchUpdateRequest(unsafe);
+    }
+}
+
+export class ProviderBatchUpdateResponse implements BaseResponse<null> {
+    public success: boolean;
+    public message: string;
+
+    constructor(origin: ProviderBatchUpdateResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+    }
+}
+
 export class ProviderModelAliasesResponse implements BaseResponse<string[]> {
     public success: boolean;
     public message: string;
