@@ -215,6 +215,7 @@
         "AvailableModels": "Доступные модели",
         "ModelName": "Модель",
         "InputPrice": "Цена входа",
+        "CachePrice": "Цена кэша",
         "OutputPrice": "Цена выхода",
         "TermsLink": "Используя API, вы соглашаетесь с Условиями обслуживания"
     },
