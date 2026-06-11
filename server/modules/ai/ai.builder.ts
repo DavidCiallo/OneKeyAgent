@@ -12,10 +12,10 @@ export function buildRequestConfig(
     base_url: string,
     api_key: string | undefined,
     auth_type: string | undefined,
-    apiType: string | undefined,
+    api_type: string | undefined,
     body: Record<string, any>,
 ): { url: URL; headers: Record<string, string>; requestBody: string } {
-    const isAnthropic = apiType === "anthropic";
+    const isAnthropic = api_type === "anthropic";
     const path = isAnthropic ? "/messages" : "/chat/completions";
     const url = new URL(`${base_url}${path}`);
 
