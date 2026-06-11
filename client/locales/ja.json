@@ -215,6 +215,7 @@
         "AvailableModels": "利用可能なモデル",
         "ModelName": "モデル",
         "InputPrice": "入力価格",
+        "CachePrice": "キャッシュ価格",
         "OutputPrice": "出力価格",
         "TermsLink": "APIを使用することで、利用規約に同意したものとみなされます"
     },

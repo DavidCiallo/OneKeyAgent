@@ -7,6 +7,7 @@ import {
     ProviderDeleteRequest,
     ProviderUpdatePriorityRequest,
     ProviderModelAliasesRequest,
+    ProviderBatchUpdateRequest,
 } from "../../../shared/modules/provider/provider.interface";
 import { providerRoutes } from "../../../shared/modules/provider/provider.router";
 import { requireAdmin } from "../auth/auth.service";
@@ -80,7 +81,19 @@ async function modelaliases(request: ProviderModelAliasesRequest) {
     return aliases;
 }
 
+async function batchupdate(request: ProviderBatchUpdateRequest) {
+    request = ProviderBatchUpdateRequest.self(request);
+    await requireAdmin(request.auth);
+
+    const { ids, enabled, proxy_url } = request.body;
+    const updateData: Record<string, any> = {};
+    if (enabled !== undefined) updateData.enabled = enabled;
+    if (proxy_url !== undefined) updateData.proxy_url = proxy_url;
+    await ProviderService.batchUpdate(ids, updateData);
+    return {};
+}
+
 export const providerMount = {
     routes: providerRoutes,
-    handlers: { list, detail, create, update, updatepriority, modelaliases, delete: del },
+    handlers: { list, detail, create, update, updatepriority, modelaliases, delete: del, batchupdate },
 };

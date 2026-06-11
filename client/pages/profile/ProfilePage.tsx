@@ -16,7 +16,7 @@ export default function ProfilePage() {
     const [account, setAccount] = useState<AccountDTO | null>(null);
     const [balance, setBalance] = useState(0);
     const [weeklyUsage, setWeeklyUsage] = useState(0);
-    const [models, setModels] = useState<{ id: string; input_price: number; output_price: number }[]>([]);
+    const [models, setModels] = useState<{ id: string; input_price: number; cache_price: number; output_price: number }[]>([]);
     const [currency, setCurrency] = useState<Currency>(() => (localStorage.getItem("currency") as Currency) || "USD");
     const [regenerating, setRegenerating] = useState(false);
     const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onClose: onConfirmClose, onOpenChange: onConfirmChange } = useDisclosure();
@@ -33,7 +33,7 @@ export default function ProfilePage() {
     const fetchModels = useCallback(async () => {
         const res = await aiApi.models({});
         if (res.success && res.data) {
-            const allModels = res.data.map((m: any) => ({ id: m.id, input_price: m.input_price, output_price: m.output_price }));
+            const allModels = res.data.map((m: any) => ({ id: m.id, input_price: m.input_price, cache_price: m.cache_price ?? 0, output_price: m.output_price }));
             setModels(allModels);
         }
     }, []);

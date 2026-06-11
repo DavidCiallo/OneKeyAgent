@@ -437,7 +437,7 @@ export class AiService {
 
             return passthrough;
         }
-        throw new Error("All providers failed for streaming");
+        throw new Error("This model reach using limit. Please try again later.");
     }
 
     static async completions(data: Record<string, any>, account_id: string): Promise<CompletionServiceResponse> {

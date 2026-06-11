@@ -216,6 +216,7 @@
         "AvailableModels": "Available Models",
         "ModelName": "Model",
         "InputPrice": "Input Price",
+        "CachePrice": "Cache Price",
         "OutputPrice": "Output Price",
         "TermsLink": "By using the API, you agree to the Terms of Service"
     },

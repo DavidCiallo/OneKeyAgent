@@ -5,6 +5,7 @@ import { Currency, formatPrice as formatCurrencyPrice } from "../../../methods/c
 type ModelInfo = {
     id: string;
     input_price: number;
+    cache_price: number;
     output_price: number;
 };
 
@@ -40,6 +41,7 @@ export default function ModelsCard({ models, currency, onToggleCurrency }: { mod
                     <TableHeader>
                         <TableColumn className="text-xs uppercase tracking-wider text-gray-500">{locale.ModelName}</TableColumn>
                         <TableColumn className="text-xs uppercase tracking-wider text-gray-500">{locale.InputPrice}</TableColumn>
+                        <TableColumn className="text-xs uppercase tracking-wider text-gray-500">{locale.CachePrice}</TableColumn>
                         <TableColumn className="text-xs uppercase tracking-wider text-gray-500">{locale.OutputPrice}</TableColumn>
                     </TableHeader>
                     <TableBody emptyContent="No models available">
@@ -51,6 +53,11 @@ export default function ModelsCard({ models, currency, onToggleCurrency }: { mod
                                 <TableCell>
                                     <Chip size="sm" variant="flat">
                                         {formatPrice(m.input_price)}
+                                    </Chip>
+                                </TableCell>
+                                <TableCell>
+                                    <Chip size="sm" variant="flat">
+                                        {formatPrice(m.cache_price)}
                                     </Chip>
                                 </TableCell>
                                 <TableCell>

@@ -49,6 +49,11 @@ export class ProviderService {
         return Array.from(aliases).sort((a, b) => a.localeCompare(b));
     }
 
+    /** Batch update providers (enable/disable or set proxy_url) */
+    static async batchUpdate(ids: string[], data: Partial<ProviderEntity>): Promise<void> {
+        await Promise.all(ids.map(id => providerRepository.update({ id }, data)));
+    }
+
     /** Increase or decrease a provider's priority */
     static async updatePriority(id: string, delta: number): Promise<void> {
         const p = await providerRepository.findOne({ id });

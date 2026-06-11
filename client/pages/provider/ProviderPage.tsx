@@ -4,10 +4,12 @@ import { ProviderDTO } from "../../../shared/modules/provider/provider.interface
 import { providerApi } from "../../api/instance";
 import { Locale } from "../../methods/locale";
 import { useDisclosure } from "@heroui/react";
+import { Button } from "@heroui/react";
 import { ProviderFilter } from "./components/ProviderFilter";
 import { ProviderTable } from "./components/ProviderTable";
 import { ProviderPagination } from "./components/ProviderPagination";
 import { ProviderFormModal } from "./components/ProviderFormModal";
+import { ProviderBatchModal } from "./components/ProviderBatchModal";
 
 type ProviderForm = {
     model_alias: string;
@@ -34,6 +36,10 @@ export default function ProviderPage() {
     const [formMode, setFormMode] = useState<"create" | "edit">("create");
     const [editId, setEditId] = useState<string>("");
     const [form, setForm] = useState<ProviderForm>({ model_alias: "", priority: 1, name: "", base_url: "", model: "", auth_type: "bearer", api_type: "openai", enabled: 1 });
+
+    // Multi-select state
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const { isOpen: isBatchOpen, onOpen: onBatchOpen, onClose: onBatchClose, onOpenChange: onBatchOpenChange } = useDisclosure();
 
     const fetchList = useCallback(async (p: number) => {
         const filter: Record<string, string | number> = {};
@@ -168,6 +174,51 @@ export default function ProviderPage() {
         }
     };
 
+    // Multi-select handlers
+    const toggleSelect = (id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const toggleSelectAll = () => {
+        setSelectedIds(prev => {
+            const allOnPage = sortedList.map(i => i.id);
+            const allSelected = allOnPage.every(id => prev.has(id));
+            if (allSelected) {
+                const next = new Set(prev);
+                allOnPage.forEach(id => next.delete(id));
+                return next;
+            } else {
+                const next = new Set(prev);
+                allOnPage.forEach(id => next.add(id));
+                return next;
+            }
+        });
+    };
+
+    const clearSelection = () => setSelectedIds(new Set());
+
+    const handleBatchEnable = async (enabled: number) => {
+        const res = await providerApi.batchupdate({ body: { ids: Array.from(selectedIds), enabled } });
+        if (res.success) {
+            clearSelection();
+            fetchList(page);
+        }
+    };
+
+    const handleBatchProxy = async (proxyUrl: string) => {
+        const res = await providerApi.batchupdate({ body: { ids: Array.from(selectedIds), proxy_url: proxyUrl } });
+        if (res.success) {
+            onBatchClose();
+            clearSelection();
+            fetchList(page);
+        }
+    };
+
     return (
         <div className="max-w-screen flex flex-col h-screen">
             <Header name={Locale("Menu").Provider} />
@@ -177,6 +228,11 @@ export default function ProviderPage() {
                     onModelAliasChange={v => { setFilterModelAlias(v); setPage(1); }}
                     onAdd={openCreate}
                     modelAliasOptions={modelAliasOptions}
+                    selectedCount={selectedIds.size}
+                    onBatchEnable={() => handleBatchEnable(1)}
+                    onBatchDisable={() => handleBatchEnable(0)}
+                    onBatchProxy={onBatchOpen}
+                    onClearSelection={clearSelection}
                 />
 
                 <ProviderTable
@@ -186,6 +242,9 @@ export default function ProviderPage() {
                     onDelete={handleDelete}
                     onMoveUp={(item) => handleMoveUp(item.id)}
                     onMoveDown={(item) => handleMoveDown(item.id)}
+                    selectedIds={selectedIds}
+                    onToggleSelect={toggleSelect}
+                    onToggleSelectAll={toggleSelectAll}
                 />
 
                 <ProviderPagination page={page} total={total} onChange={setPage} />
@@ -198,6 +257,12 @@ export default function ProviderPage() {
                 form={form}
                 onFormChange={setForm}
                 onConfirm={handleFormConfirm}
+            />
+
+            <ProviderBatchModal
+                isOpen={isBatchOpen}
+                onOpenChange={onBatchOpenChange}
+                onConfirm={handleBatchProxy}
             />
         </div>
     );

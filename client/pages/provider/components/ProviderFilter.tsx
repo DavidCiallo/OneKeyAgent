@@ -6,9 +6,14 @@ type Props = {
     onModelAliasChange: (v: string) => void;
     onAdd: () => void;
     modelAliasOptions: string[];
+    selectedCount: number;
+    onBatchEnable: () => void;
+    onBatchDisable: () => void;
+    onBatchProxy: () => void;
+    onClearSelection: () => void;
 };
 
-export function ProviderFilter({ filterModelAlias, onModelAliasChange, onAdd, modelAliasOptions }: Props) {
+export function ProviderFilter({ filterModelAlias, onModelAliasChange, onAdd, modelAliasOptions, selectedCount, onBatchEnable, onBatchDisable, onBatchProxy, onClearSelection }: Props) {
     const locale = Locale("ProviderPage");
     const common = Locale("Common");
 
@@ -29,9 +34,27 @@ export function ProviderFilter({ filterModelAlias, onModelAliasChange, onAdd, mo
                     ))}
                 </Select>
             </div>
-            <Button color="primary" size="sm" onPress={onAdd}>
-                {common.ButtonAdd}
-            </Button>
+            {selectedCount > 0 ? (
+                <div className="flex items-center gap-2">
+                    <span className="text-sm text-default-500 tabular-nums">{selectedCount} selected</span>
+                    <Button size="sm" color="success" variant="flat" onPress={onBatchEnable}>
+                        Batch Enable
+                    </Button>
+                    <Button size="sm" color="warning" variant="flat" onPress={onBatchDisable}>
+                        Batch Disable
+                    </Button>
+                    <Button size="sm" color="primary" variant="flat" onPress={onBatchProxy}>
+                        Batch Set Proxy
+                    </Button>
+                    <Button size="sm" variant="flat" onPress={onClearSelection}>
+                        Clear
+                    </Button>
+                </div>
+            ) : (
+                <Button color="primary" size="sm" onPress={onAdd}>
+                    {common.ButtonAdd}
+                </Button>
+            )}
         </div>
     );
 }
