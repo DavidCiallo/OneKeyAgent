@@ -41,12 +41,27 @@ async function deductBalance(account_id: string, cost: number): Promise<void> {
     }
 }
 
+/** Extract cached input tokens from upstream usage (supports multiple vendor formats) */
+function extractCachedTokens(usage: any): number {
+    if (!usage) return 0;
+    // OpenAI format
+    const a = usage?.prompt_tokens_details?.cached_tokens ?? 0;
+    // Alternate format
+    const b = usage?.prompt_cache_hit_tokens ?? 0;
+    // Fallback: if only miss_tokens is provided, compute from total
+    const c = usage?.prompt_cache_miss_tokens != null
+        ? Math.max(0, (usage?.prompt_tokens ?? 0) - usage.prompt_cache_miss_tokens)
+        : 0;
+    return Math.max(a, b, c, 0);
+}
+
 /** Get model prices for an alias */
-async function getModelPrices(alias: string): Promise<{ input_price: number; output_price: number }> {
+async function getModelPrices(alias: string): Promise<{ input_price: number; cache_price: number; output_price: number }> {
     const models = await getAllModels();
     const match = models.find(m => m.alias === alias);
     return {
         input_price: match?.input_price ?? 0,
+        cache_price: match?.cache_price ?? 0,
         output_price: match?.output_price ?? 0,
     };
 }
@@ -246,22 +261,25 @@ export class AiService {
                 continue;
             }
 
-            const { input_price: input_price, output_price: output_price } = await getModelPrices(requestedAlias);
+            const { input_price, cache_price, output_price } = await getModelPrices(requestedAlias);
             const { usage } = rdata;
             // OpenAI format: prompt_tokens/completion_tokens; Anthropic format: input_tokens/output_tokens
             const rawInput = usage?.input_tokens ?? usage?.prompt_tokens ?? 0;
             const rawOutput = usage?.output_tokens ?? usage?.completion_tokens ?? 0;
+            const cachedInput = extractCachedTokens(usage);
             // Deduct balance
-            const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
+            const cost = calculateCost(rawInput, cachedInput, rawOutput, input_price, cache_price, output_price);
             await deductBalance(account_id, cost);
             await logUsage({
                 account_id,
                 model_alias: requestedAlias,
                 provider_id: provider.id,
                 input_tokens: rawInput,
+                cached_input_tokens: cachedInput,
                 output_tokens: rawOutput,
-                input_price: input_price,
-                output_price: output_price,
+                input_price,
+                cache_price,
+                output_price,
             });
             await AccountService.updateBalance(account_id, -cost);
             rdata.model = requestedAlias;
@@ -361,18 +379,21 @@ export class AiService {
                 if (costDeducted) return;
                 costDeducted = true;
                 try {
-                    const { input_price, output_price } = await getModelPrices(requestedAlias);
+                    const { input_price, cache_price, output_price } = await getModelPrices(requestedAlias);
                     const rawInput = usageData?.input_tokens ?? usageData?.prompt_tokens ?? 0;
                     const rawOutput = usageData?.output_tokens ?? usageData?.completion_tokens ?? Math.max(1, Math.round(estimatedOutputChars / 4));
-                    const cost = calculateCost(rawInput, rawOutput, input_price, output_price);
+                    const cachedInput = extractCachedTokens(usageData);
+                    const cost = calculateCost(rawInput, cachedInput, rawOutput, input_price, cache_price, output_price);
                     await deductBalance(account_id, cost);
                     await logUsage({
                         account_id,
                         model_alias: requestedAlias,
                         provider_id: provider.id,
                         input_tokens: rawInput,
+                        cached_input_tokens: cachedInput,
                         output_tokens: rawOutput,
                         input_price,
+                        cache_price,
                         output_price,
                     });
                     await AccountService.updateBalance(account_id, -cost);
@@ -416,7 +437,7 @@ export class AiService {
 
             return passthrough;
         }
-        throw new Error("All providers failed for streaming");
+        throw new Error("This model reach using limit. Please try again later.");
     }
 
     static async completions(data: Record<string, any>, account_id: string): Promise<CompletionServiceResponse> {
@@ -435,11 +456,11 @@ export class AiService {
         const seen = new Set<string>();
         const data = [];
         for (const m of models) {
-            const { alias: name, create_time: created, input_price, output_price } = m;
+            const { alias: name, create_time: created, input_price, cache_price, output_price } = m;
             if (!name || seen.has(name)) continue;
             if (allowed !== null && !allowed.includes(name)) continue;
             seen.add(name);
-            data.push({ id: name, object: "model", created, owned_by: "onekey", input_price, output_price });
+            data.push({ id: name, object: "model", created, owned_by: "onekey", input_price, cache_price, output_price });
         }
         return { data };
     }

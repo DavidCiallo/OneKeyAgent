@@ -57,6 +57,7 @@ export class UsageDTO {
     public provider_id?: string;
     public providerName?: string;
     public input_tokens: number;
+    public cached_input_tokens: number;
     public output_tokens: number;
     public cost: number;
     public create_time: number;
@@ -69,6 +70,7 @@ export class UsageDTO {
         this.provider_id = origin.provider_id;
         this.providerName = origin.providerName;
         this.input_tokens = origin.input_tokens;
+        this.cached_input_tokens = origin.cached_input_tokens ?? 0;
         this.output_tokens = origin.output_tokens;
         this.cost = origin.cost ?? 0;
         this.create_time = origin.create_time;
@@ -126,13 +128,17 @@ export class UsageListResponse implements BaseResponse<UsageDTO> {
 export interface ProviderUsage {
     providerName: string;
     input_tokens: number;
+    cached_input_tokens: number;
     output_tokens: number;
+    cost: number;
 }
 
 export interface ModelUsage {
     model_alias: string;
     input_tokens: number;
+    cached_input_tokens: number;
     output_tokens: number;
+    cost: number;
 }
 
 export interface UserSession {
@@ -141,6 +147,7 @@ export interface UserSession {
     model_aliases: string[];
     requestCount: number;
     input_tokens: number;
+    cached_input_tokens: number;
     output_tokens: number;
     cost: number;
     providerUsage: ProviderUsage[];
@@ -162,6 +169,8 @@ export class UsageSessionsRequest implements BaseRequest {
     public gapMinutes?: number;
     public since?: number;
     public account_ids?: string[];
+    public model_aliases?: string[];
+    public provider_ids?: string[];
 
     constructor(origin: Partial<UsageSessionsRequest>) {
         if (false) throw new Error("Unexpected error");
@@ -169,6 +178,8 @@ export class UsageSessionsRequest implements BaseRequest {
         origin.gapMinutes && (this.gapMinutes = origin.gapMinutes);
         origin.since && (this.since = origin.since);
         origin.account_ids && (this.account_ids = origin.account_ids);
+        origin.model_aliases && (this.model_aliases = origin.model_aliases);
+        origin.provider_ids && (this.provider_ids = origin.provider_ids);
     }
     static self(unsafe: UsageSessionsRequest) {
         return new UsageSessionsRequest(unsafe);
@@ -177,6 +188,9 @@ export class UsageSessionsRequest implements BaseRequest {
 
 export interface UsageSessionTotals {
     totalTokens: number;
+    totalInputTokens: number;
+    totalCachedInputTokens: number;
+    totalOutputTokens: number;
     totalCost: number;
     totalRequests: number;
 }

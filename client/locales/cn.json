@@ -217,6 +217,7 @@
         "AvailableModels": "可用模型",
         "ModelName": "模型",
         "InputPrice": "输入价格",
+        "CachePrice": "缓存价格",
         "OutputPrice": "输出价格",
         "TermsLink": "调用时默认您已查看并同意服务条款"
     },

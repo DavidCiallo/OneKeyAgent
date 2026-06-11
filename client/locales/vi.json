@@ -212,6 +212,7 @@
         "AvailableModels": "Mô hình khả dụng",
         "ModelName": "Mô hình",
         "InputPrice": "Giá đầu vào",
+        "CachePrice": "Giá bộ nhớ đệm",
         "OutputPrice": "Giá đầu ra",
         "TermsLink": "Bằng cách sử dụng API, bạn đồng ý với Điều khoản dịch vụ"
     },

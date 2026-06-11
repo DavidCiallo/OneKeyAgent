@@ -212,6 +212,7 @@
         "AvailableModels": "โมเดลที่พร้อมใช้งาน",
         "ModelName": "โมเดล",
         "InputPrice": "ราคาขาเข้า",
+        "CachePrice": "ราคาแคช",
         "OutputPrice": "ราคาขาออก",
         "TermsLink": "การใช้ API แสดงว่าคุณยอมรับข้อกำหนดในการให้บริการ"
     },

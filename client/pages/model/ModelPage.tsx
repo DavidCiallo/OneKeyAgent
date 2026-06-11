@@ -8,10 +8,10 @@ import { UsageStatsPeriod } from "../../../shared/modules/usage/usage.interface"
 import { ModelCardGrid } from "./components/ModelCardGrid";
 import { ModelPagination } from "./components/ModelPagination";
 import { ModelFormModal } from "./components/ModelFormModal";
-
 type ModelForm = {
     alias?: string;
     input_price: number;
+    cache_price: number;
     output_price: number;
     is_public?: number;
 };
@@ -30,7 +30,7 @@ export default function ModelPage() {
     const { isOpen: isFormOpen, onOpen: onFormOpen, onClose: onFormClose, onOpenChange: onFormOpenChange } = useDisclosure();
     const [formMode, setFormMode] = useState<"create" | "edit">("create");
     const [editId, setEditId] = useState<string>("");
-    const [form, setForm] = useState<ModelForm>({ input_price: 0, output_price: 0 });
+    const [form, setForm] = useState<ModelForm>({ input_price: 0, cache_price: 0, output_price: 0 });
 
 
     const fetchList = useCallback(async (p: number) => {
@@ -70,7 +70,7 @@ export default function ModelPage() {
 
     const openCreate = () => {
         setFormMode("create");
-        setForm({ alias: "", input_price: 0, output_price: 0, is_public: 0 });
+        setForm({ alias: "", input_price: 0, cache_price: 0, output_price: 0, is_public: 0 });
         onFormOpen();
     };
 
@@ -80,6 +80,7 @@ export default function ModelPage() {
         setForm({
             alias: item.alias || "",
             input_price: item.input_price,
+            cache_price: item.cache_price,
             output_price: item.output_price,
             is_public: item.is_public,
         });
@@ -92,6 +93,7 @@ export default function ModelPage() {
                 model: {
                     alias: form.alias || "",
                     input_price: form.input_price,
+                    cache_price: form.cache_price,
                     output_price: form.output_price,
                     is_public: form.is_public ?? 0,
                 },
@@ -107,6 +109,7 @@ export default function ModelPage() {
                 model: {
                     alias: form.alias || undefined,
                     input_price: form.input_price,
+                    cache_price: form.cache_price,
                     output_price: form.output_price,
                     is_public: form.is_public,
                 },
@@ -129,7 +132,7 @@ export default function ModelPage() {
         <div className="max-w-screen flex flex-col h-screen">
             <Header name={Locale("Menu").Model} />
             <div className="p-8 flex flex-col gap-4 flex-1 overflow-hidden">
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
                     <Button color="primary" onPress={openCreate}>{locale.CreateModel}</Button>
                 </div>
                 <ModelCardGrid

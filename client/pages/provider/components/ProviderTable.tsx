@@ -1,4 +1,4 @@
-import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Button, Chip } from "@heroui/react";
+import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Button, Chip, Checkbox } from "@heroui/react";
 import { ProviderDTO } from "../../../../shared/modules/provider/provider.interface";
 import { Locale } from "../../../methods/locale";
 
@@ -9,14 +9,25 @@ type Props = {
     onDelete: (id: string) => void;
     onMoveUp: (item: ProviderDTO) => void;
     onMoveDown: (item: ProviderDTO) => void;
+    selectedIds: Set<string>;
+    onToggleSelect: (id: string) => void;
+    onToggleSelectAll: () => void;
 };
 
-export function ProviderTable({ list, onEdit, onCopy, onDelete, onMoveUp, onMoveDown }: Props) {
+export function ProviderTable({ list, onEdit, onCopy, onDelete, onMoveUp, onMoveDown, selectedIds, onToggleSelect, onToggleSelectAll }: Props) {
     const locale = Locale("ProviderPage");
+    const allSelected = list.length > 0 && list.every(item => selectedIds.has(item.id));
 
     return (
         <Table aria-label="Provider list" className="flex-1 overflow-auto">
             <TableHeader>
+                <TableColumn align="center" className="w-10">
+                    <Checkbox
+                        isSelected={allSelected}
+                        onChange={onToggleSelectAll}
+                        aria-label="Select all"
+                    />
+                </TableColumn>
                 <TableColumn align="center">{locale.ModelAlias}</TableColumn>
                 <TableColumn align="center">{locale.Priority}</TableColumn>
                 <TableColumn>{locale.Name}</TableColumn>
@@ -30,9 +41,16 @@ export function ProviderTable({ list, onEdit, onCopy, onDelete, onMoveUp, onMove
                 <TableColumn>{locale.Actions}</TableColumn>
             </TableHeader>
             <TableBody emptyContent={locale.NoData}>
-                {list.map((item, i) => {
+                {list.map((item) => {
                     return (
                         <TableRow key={item.id}>
+                            <TableCell>
+                                <Checkbox
+                                    isSelected={selectedIds.has(item.id)}
+                                    onChange={() => onToggleSelect(item.id)}
+                                    aria-label={`Select ${item.model_alias}`}
+                                />
+                            </TableCell>
                             <TableCell>{item.model_alias}</TableCell>
                             <TableCell>{item.priority}</TableCell>
                             <TableCell className="max-w-xs truncate">{item.name}</TableCell>
@@ -79,13 +97,13 @@ export function ProviderTable({ list, onEdit, onCopy, onDelete, onMoveUp, onMove
                                             </svg>
                                         </button>
                                     </div>
-                                    <Button size="sm" variant="flat" onPress={() => onCopy(item)}>
+                                    <Button size="sm" variant="flat" className="min-w-0 px-2" onPress={() => onCopy(item)}>
                                         {locale.Copy}
                                     </Button>
-                                    <Button size="sm" variant="flat" onPress={() => onEdit(item)}>
+                                    <Button size="sm" variant="flat" className="min-w-0 px-2" onPress={() => onEdit(item)}>
                                         {locale.Edit}
                                     </Button>
-                                    <Button size="sm" variant="flat" color="danger" onPress={() => onDelete(item.id)}>
+                                    <Button size="sm" variant="flat" color="danger" className="min-w-0 px-2" onPress={() => onDelete(item.id)}>
                                         {locale.Delete}
                                     </Button>
                                 </div>
