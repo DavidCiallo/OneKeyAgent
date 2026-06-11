@@ -2,7 +2,7 @@ import Repository from "../../lib/repository";
 import { AccountEntity } from "../../../shared/modules/account/account.entity";
 import { ModelEntity } from "../../../shared/modules/model/model.entity";
 import { UsageBucketEntity } from "../../../shared/modules/usage/usage_bucket.entity";
-import { UsageStatsPeriod, UsageStatsResult, UsageAmountData, UserSession, UserSessionGroup, ProviderUsage, ModelUsage } from "../../../shared/modules/usage/usage.interface";
+import { UsageStatsPeriod, UsageStatsResult, UsageAmountData, UserSession, UserSessionGroup, ProviderUsage, ModelUsage, UsageSessionTotals } from "../../../shared/modules/usage/usage.interface";
 
 import { ProviderEntity } from "../../../shared/modules/provider/provider.entity";
 
@@ -240,13 +240,15 @@ export class UsageService {
         return `${MM}/${DD} ${hh}:${mm}-${ehh}:${emm}`;
     }
 
-    static async getUserSessions(gapMinutes?: number, since?: number, account_ids?: string[], isAdmin?: boolean):
-    Promise<{ groups: UserSessionGroup[]; totals: { totalTokens: number; totalCost: number; totalRequests: number }; recentSessions: (UserSession & { account_id: string })[] }> {
+    static async getUserSessions(gapMinutes?: number, since?: number, account_ids?: string[], isAdmin?: boolean, model_aliases?: string[], provider_ids?: string[]):
+    Promise<{ groups: UserSessionGroup[]; totals: UsageSessionTotals; recentSessions: (UserSession & { account_id: string })[] }> {
         const now = Date.now();
         const effectiveSince = since ?? now - 7 * DAY;
         const gapMs = (gapMinutes || 30) * 60 * 1000;
         const granularity = UsageService.selectGranularity(gapMinutes || 30, effectiveSince);
         const accountSet = account_ids && account_ids.length > 0 ? new Set(account_ids) : null;
+        const modelSet = model_aliases && model_aliases.length > 0 ? new Set(model_aliases) : null;
+        const providerSet = provider_ids && provider_ids.length > 0 ? new Set(provider_ids) : null;
         const ONE_MIN_MS = 60_000;
         // 1m recent sessions: at most 1 day back, capped to 20 rows
         const since1m = Math.max(effectiveSince, now - DAY);
@@ -271,6 +273,8 @@ export class UsageService {
             (bucket: any) => {
                 const aid = bucket.account_id;
                 if (accountSet && !accountSet.has(aid)) return;
+                if (modelSet && !modelSet.has(bucket.model_alias)) return;
+                if (providerSet && !providerSet.has(bucket.provider_id)) return;
 
                 const wStart = this.windowStart(bucket.bucket_time, gapMs);
                 const wStart1m = this.windowStart(bucket.bucket_time, ONE_MIN_MS);
@@ -296,21 +300,23 @@ export class UsageService {
 
                 const pkey = bucket.provider_id || "unknown";
                 if (!acc.providerMap.has(pkey)) {
-                    acc.providerMap.set(pkey, { providerName: pkey, input_tokens: 0, cached_input_tokens: 0, output_tokens: 0 });
+                    acc.providerMap.set(pkey, { providerName: pkey, input_tokens: 0, cached_input_tokens: 0, output_tokens: 0, cost: 0 });
                 }
                 const p = acc.providerMap.get(pkey)!;
                 p.input_tokens += bucket.input_tokens || 0;
                 p.cached_input_tokens += bucket.cached_input_tokens || 0;
                 p.output_tokens += bucket.output_tokens || 0;
+                p.cost += bucket.cost || 0;
 
                 const mkey = bucket.model_alias || "default";
                 if (!acc.modelMap.has(mkey)) {
-                    acc.modelMap.set(mkey, { model_alias: mkey, input_tokens: 0, cached_input_tokens: 0, output_tokens: 0 });
+                    acc.modelMap.set(mkey, { model_alias: mkey, input_tokens: 0, cached_input_tokens: 0, output_tokens: 0, cost: 0 });
                 }
                 const m = acc.modelMap.get(mkey)!;
                 m.input_tokens += bucket.input_tokens || 0;
                 m.cached_input_tokens += bucket.cached_input_tokens || 0;
                 m.output_tokens += bucket.output_tokens || 0;
+                m.cost += bucket.cost || 0;
 
                 // --- 1m window accumulator (only for last 20 minutes) ---
                 if (bucket.bucket_time >= since1m) {
@@ -333,11 +339,11 @@ export class UsageService {
         );
 
         if (rowCount === 0) {
-            return { groups: [], totals: { totalTokens: 0, totalCost: 0, totalRequests: 0 }, recentSessions: [] };
+            return { groups: [], totals: { totalTokens: 0, totalInputTokens: 0, totalCachedInputTokens: 0, totalOutputTokens: 0, totalCost: 0, totalRequests: 0 }, recentSessions: [] };
         }
 
         // Build sessions from window accumulators
-        let totalTokens = 0, totalCost = 0, totalRequests = 0;
+        let totalTokens = 0, totalInputTokens = 0, totalCachedInputTokens = 0, totalOutputTokens = 0, totalCost = 0, totalRequests = 0;
         const groups: UserSessionGroup[] = [];
         const recentSessionsFlat: (UserSession & { account_id: string })[] = [];
 
@@ -357,6 +363,9 @@ export class UsageService {
                     windowLabel: this.formatWindowLabel(wStart, gapMs),
                 });
                 totalTokens += acc.input_tokens + acc.output_tokens;
+                totalInputTokens += acc.input_tokens;
+                totalCachedInputTokens += acc.cached_input_tokens;
+                totalOutputTokens += acc.output_tokens;
                 totalCost += acc.cost;
                 totalRequests += acc.requestCount;
             }
@@ -417,7 +426,7 @@ export class UsageService {
                     .map(s => ({
                         ...s,
                         providerUsage: account_ids && account_ids.length > 0 && !isAdmin
-                            ? s.modelUsage.map(mu => ({ providerName: mu.model_alias, input_tokens: mu.input_tokens, cached_input_tokens: mu.cached_input_tokens, output_tokens: mu.output_tokens }))
+                            ? s.modelUsage.map(mu => ({ providerName: mu.model_alias, input_tokens: mu.input_tokens, cached_input_tokens: mu.cached_input_tokens, output_tokens: mu.output_tokens, cost: mu.cost }))
                             : s.providerUsage
                                 .filter(pu => activeProviderIds.has(pu.providerName))
                                 .map(pu => ({ ...pu, providerName: providerNameMap.get(pu.providerName) || pu.providerName })),
@@ -431,6 +440,6 @@ export class UsageService {
         recentSessionsFlat.sort((a, b) => b.startTime - a.startTime);
         const topRecent = recentSessionsFlat.slice(0, 20);
 
-        return { groups: filtered, totals: { totalTokens, totalCost, totalRequests }, recentSessions: topRecent };
+        return { groups: filtered, totals: { totalTokens, totalInputTokens, totalCachedInputTokens, totalOutputTokens, totalCost, totalRequests }, recentSessions: topRecent };
     }
 }

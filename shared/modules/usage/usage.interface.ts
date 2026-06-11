@@ -130,6 +130,7 @@ export interface ProviderUsage {
     input_tokens: number;
     cached_input_tokens: number;
     output_tokens: number;
+    cost: number;
 }
 
 export interface ModelUsage {
@@ -137,6 +138,7 @@ export interface ModelUsage {
     input_tokens: number;
     cached_input_tokens: number;
     output_tokens: number;
+    cost: number;
 }
 
 export interface UserSession {
@@ -167,6 +169,8 @@ export class UsageSessionsRequest implements BaseRequest {
     public gapMinutes?: number;
     public since?: number;
     public account_ids?: string[];
+    public model_aliases?: string[];
+    public provider_ids?: string[];
 
     constructor(origin: Partial<UsageSessionsRequest>) {
         if (false) throw new Error("Unexpected error");
@@ -174,6 +178,8 @@ export class UsageSessionsRequest implements BaseRequest {
         origin.gapMinutes && (this.gapMinutes = origin.gapMinutes);
         origin.since && (this.since = origin.since);
         origin.account_ids && (this.account_ids = origin.account_ids);
+        origin.model_aliases && (this.model_aliases = origin.model_aliases);
+        origin.provider_ids && (this.provider_ids = origin.provider_ids);
     }
     static self(unsafe: UsageSessionsRequest) {
         return new UsageSessionsRequest(unsafe);
@@ -182,6 +188,9 @@ export class UsageSessionsRequest implements BaseRequest {
 
 export interface UsageSessionTotals {
     totalTokens: number;
+    totalInputTokens: number;
+    totalCachedInputTokens: number;
+    totalOutputTokens: number;
     totalCost: number;
     totalRequests: number;
 }

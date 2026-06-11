@@ -92,7 +92,7 @@ async function sessions(request: UsageSessionsRequest) {
     const account = await resolveAccount(auth);
     const effectiveAccountIds = account.is_admin ? request.account_ids : [account.id];
 
-    const { groups, totals, recentSessions: rawSessions } = await UsageService.getUserSessions(request.gapMinutes, request.since, effectiveAccountIds, account.is_admin ? true : false);
+    const { groups, totals, recentSessions: rawSessions } = await UsageService.getUserSessions(request.gapMinutes, request.since, effectiveAccountIds, account.is_admin ? true : false, request.model_aliases, request.provider_ids);
 
     const allGroupIds = [...new Set([...groups.map(g => g.account_id), ...rawSessions.map(s => s.account_id)])];
     const accounts = await Promise.all(
