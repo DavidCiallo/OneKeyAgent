@@ -74,9 +74,9 @@ async function tryProvider(
     proxy_url: string | undefined,
     body: Record<string, any>,
     auth_type?: string,
-    apiType?: string,
+    api_type?: string,
 ): Promise<any> {
-    const { url, headers, requestBody: postBody } = buildRequestConfig(base_url, api_key, auth_type, apiType, body);
+    const { url, headers, requestBody: postBody } = buildRequestConfig(base_url, api_key, auth_type, api_type, body);
     const agent = proxy_url ? new HttpsProxyAgent(proxy_url) : undefined;
 
     return new Promise((resolve) => {
@@ -99,7 +99,7 @@ async function tryProvider(
                 }
                 try {
                     const parsed = JSON.parse(data);
-                    if (apiType === "anthropic") {
+                    if (api_type === "anthropic") {
                         resolve(anthropicToOpenAI(parsed, model));
                     } else {
                         resolve(parsed);
@@ -125,9 +125,9 @@ async function tryProviderStream(
     proxy_url: string | undefined,
     body: Record<string, any>,
     auth_type?: string,
-    apiType?: string,
+    api_type?: string,
 ): Promise<{ stream: ReadableStream<Uint8Array> | null; reasoningContent: string }> {
-    const { url, headers, requestBody: postBody } = buildRequestConfig(base_url, api_key, auth_type, apiType, body);
+    const { url, headers, requestBody: postBody } = buildRequestConfig(base_url, api_key, auth_type, api_type, body);
     const agent = proxy_url ? new HttpsProxyAgent(proxy_url) : undefined;
 
     return new Promise((resolve) => {
@@ -197,7 +197,7 @@ async function tryProviderStream(
             });
 
             resolve({
-                stream: apiType === "anthropic" ? antStreamToOpenAI(rawStream) : rawStream,
+                stream: api_type === "anthropic" ? antStreamToOpenAI(rawStream) : rawStream,
                 reasoningContent: localReasoning,
             });
         });

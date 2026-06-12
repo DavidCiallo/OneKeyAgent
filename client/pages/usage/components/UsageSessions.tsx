@@ -14,6 +14,7 @@ type Props = {
     isAdmin?: boolean;
     groupBy: "provider" | "model";
     valueType: "tokens" | "cost";
+    since?: number;
 };
 
 function getActiveKeys(
@@ -57,16 +58,17 @@ function buildChartData(
     groupBy: "provider" | "model",
     valueType: "tokens" | "cost",
     gapMs: number,
+    since?: number,
 ): Record<string, number | string>[] {
-    // Index sessions by startTime for fast lookup
     const sessionMap = new Map<number, UserSessionGroup["sessions"][number]>();
     for (const s of sessions) sessionMap.set(s.startTime, s);
 
-    if (sessions.length === 0) return [];
+    const now = Date.now();
+    const minTime = since ? Math.floor(since / gapMs) * gapMs : (sessions.length > 0 ? sessions[0].startTime : 0);
+    const maxTime = since ? now : (sessions.length > 0 ? sessions[sessions.length - 1].startTime : 0);
 
-    // Generate full time slots from min to max startTime
-    const minTime = sessions[0].startTime;
-    const maxTime = sessions[sessions.length - 1].startTime;
+    if (minTime === 0) return [];
+
     const rows: Record<string, number | string>[] = [];
 
     for (let t = minTime; t <= maxTime; t += gapMs) {
@@ -99,7 +101,7 @@ function buildChartData(
     return rows;
 }
 
-export function UsageSessions({ groups, totals, recentSessions, gapMinutes, isAdmin, groupBy, valueType }: Props) {
+export function UsageSessions({ groups, totals, recentSessions, gapMinutes, isAdmin, groupBy, valueType, since }: Props) {
     const showDate = (gapMinutes ?? 60) >= 60;
 
     const activeKeys = useMemo(() => getActiveKeys(groups, groupBy, valueType), [groups, groupBy, valueType]);
@@ -165,10 +167,10 @@ export function UsageSessions({ groups, totals, recentSessions, gapMinutes, isAd
     const gapMs = (gapMinutes ?? 60) * 60 * 1000;
 
     const chartData = useMemo(() => {
-        return buildChartData(chartSessions, activeKeys, showDate, groupBy, valueType, gapMs);
-    }, [chartSessions, activeKeys, showDate, groupBy, valueType, gapMs]);
+        return buildChartData(chartSessions, activeKeys, showDate, groupBy, valueType, gapMs, since);
+    }, [chartSessions, activeKeys, showDate, groupBy, valueType, gapMs, since]);
 
-    if (groups.length === 0) {
+    if (groups.length === 0 && !since) {
         return <div className="text-center text-default-400 py-12">No data</div>;
     }
 

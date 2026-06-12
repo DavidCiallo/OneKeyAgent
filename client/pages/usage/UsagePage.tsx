@@ -312,7 +312,7 @@ export default function UsagePage() {
                                 </Button>
                             </ButtonGroup>
                         </div>
-                        <UsageSessions groups={groups} totals={totals} recentSessions={recentSessions} gapMinutes={gapMinutes} isAdmin={admin} groupBy={groupBy} valueType={valueType} />
+                        <UsageSessions groups={groups} totals={totals} recentSessions={recentSessions} gapMinutes={gapMinutes} isAdmin={admin} groupBy={groupBy} valueType={valueType} since={computeSince(timePreset)} />
                     </div>
                 )}
             </div>
