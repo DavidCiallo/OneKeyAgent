@@ -11,6 +11,7 @@ type ProviderForm = {
     auth_type: string;
     api_type: string;
     proxy_url?: string;
+    supports_thinking: number;
     enabled: number;
 };
 
@@ -94,6 +95,13 @@ export function ProviderFormModal({ isOpen, onOpenChange, mode, form, onFormChan
                             value={form.proxy_url || ""}
                             onChange={e => onFormChange({ ...form, proxy_url: e.target.value })}
                         />
+                        <div className="flex flex-row items-center gap-2">
+                            <span className="text-sm">{locale.SupportsThinking}</span>
+                            <Switch
+                                isSelected={form.supports_thinking === 1}
+                                onValueChange={v => onFormChange({ ...form, supports_thinking: v ? 1 : 0 })}
+                            />
+                        </div>
                         <div className="flex flex-row items-center gap-2">
                             <span className="text-sm">{locale.Enabled}</span>
                             <Switch
