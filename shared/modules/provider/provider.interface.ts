@@ -12,6 +12,7 @@ export class ProviderDTO {
     public auth_type?: string;
     public api_type?: string;
     public proxy_url?: string;
+    public supports_thinking?: number;
     public enabled: number;
     public create_time: number;
     public update_time: number | null;
@@ -28,6 +29,7 @@ export class ProviderDTO {
         this.auth_type = origin.auth_type;
         this.api_type = origin.api_type;
         this.proxy_url = origin.proxy_url;
+        this.supports_thinking = origin.supports_thinking;
         this.enabled = origin.enabled;
         this.create_time = origin.create_time;
         this.update_time = origin.update_time;
@@ -45,9 +47,10 @@ export class ProviderCreateBody {
     public auth_type?: string;
     public api_type?: string;
     public proxy_url?: string;
+    public supports_thinking?: number;
     public enabled?: number;
 
-    constructor(origin: Pick<ProviderEntity, "model_alias" | "base_url" | "model" | "priority" | "name"> & Partial<Pick<ProviderEntity, "api_key" | "auth_type" | "api_type" | "proxy_url" | "enabled">>) {
+    constructor(origin: Pick<ProviderEntity, "model_alias" | "base_url" | "model" | "priority" | "name"> & Partial<Pick<ProviderEntity, "api_key" | "auth_type" | "api_type" | "proxy_url" | "supports_thinking" | "enabled">>) {
         if (!origin.model_alias || !origin.base_url || !origin.model || origin.priority === undefined) {
             throw new Error("model_alias, base_url, model and priority are required");
         }
@@ -60,6 +63,7 @@ export class ProviderCreateBody {
         this.auth_type = origin.auth_type;
         this.api_type = origin.api_type;
         this.proxy_url = origin.proxy_url;
+        this.supports_thinking = origin.supports_thinking;
         this.enabled = origin.enabled ?? 1;
     }
 
@@ -78,10 +82,11 @@ export class ProviderUpdateBody {
     public auth_type?: string;
     public api_type?: string;
     public proxy_url?: string;
+    public supports_thinking?: number;
     public enabled?: number;
 
     constructor(origin: Partial<ProviderEntity> = {}) {
-        if (!origin.model_alias && origin.priority === undefined && !origin.base_url && !origin.model && !origin.api_key && origin.api_key === undefined && !origin.auth_type && !origin.api_type && !origin.proxy_url && origin.enabled === undefined) {
+        if (!origin.model_alias && origin.priority === undefined && !origin.base_url && !origin.model && !origin.api_key && origin.api_key === undefined && !origin.auth_type && !origin.api_type && !origin.proxy_url && origin.supports_thinking === undefined && origin.enabled === undefined) {
             throw new Error("At least one field is required");
         }
         origin.model_alias && (this.model_alias = origin.model_alias);
@@ -93,6 +98,7 @@ export class ProviderUpdateBody {
         origin.auth_type && (this.auth_type = origin.auth_type);
         origin.api_type && (this.api_type = origin.api_type);
         origin.proxy_url !== undefined && (this.proxy_url = origin.proxy_url);
+        origin.supports_thinking !== undefined && (this.supports_thinking = origin.supports_thinking);
         origin.enabled !== undefined && (this.enabled = origin.enabled);
     }
 
@@ -314,13 +320,15 @@ export class ProviderModelAliasesRequest implements BaseRequest {
 export class ProviderBatchUpdateBody {
     public ids: string[];
     public proxy_url?: string;
+    public supports_thinking?: number;
     public enabled?: number;
 
     constructor(origin: Partial<ProviderBatchUpdateBody>) {
         if (!origin.ids || origin.ids.length === 0) throw new Error("ids are required");
-        if (origin.enabled === undefined && origin.proxy_url === undefined) throw new Error("At least one field is required");
+        if (origin.enabled === undefined && origin.proxy_url === undefined && origin.supports_thinking === undefined) throw new Error("At least one field is required");
         this.ids = origin.ids;
         origin.proxy_url !== undefined && (this.proxy_url = origin.proxy_url);
+        origin.supports_thinking !== undefined && (this.supports_thinking = origin.supports_thinking);
         origin.enabled !== undefined && (this.enabled = origin.enabled);
     }
 

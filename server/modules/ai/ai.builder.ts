@@ -55,15 +55,25 @@ export function calculateCost(
     return Math.round(cost * 1_000_000) / 1_000_000; // 6 decimal precision
 }
 
-/** Determine thinking/reasoning config from model alias suffix */
-export function getThinkingConfig(alias: string): { thinking: { type: string }; reasoning_effort?: string } {
+/** Determine thinking/reasoning config from model alias suffix and api type */
+export function getThinkingConfig(alias: string, api_type?: string): { thinking?: { type: string; budget_tokens?: number }; reasoning_effort?: string } {
     const match = alias.match(/^(.*)-think-(low|medium|high|max)$/);
-    if (match) {
-        return {
-            thinking: { type: "enabled" },
-            reasoning_effort: match[2] as "low" | "medium" | "high" | "max",
+    if (!match) return {};
+
+    const level = match[2] as "low" | "medium" | "high" | "max";
+
+    if (api_type === "anthropic") {
+        const budgetMap: Record<string, number> = {
+            low: 2048,
+            medium: 8192,
+            high: 16384,
+            max: 32768,
         };
-    }else{
-        return { thinking: { type: "disabled" } };
+        return {
+            thinking: { type: "enabled", budget_tokens: budgetMap[level] || 8192 },
+        };
     }
+
+    // OpenAI-compatible: use reasoning_effort only
+    return { reasoning_effort: level };
 }

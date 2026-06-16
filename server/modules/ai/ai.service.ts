@@ -253,7 +253,9 @@ export class AiService {
                 stream: false,
                 model: provider.model,
             };
-            Object.assign(requestBody, getThinkingConfig(requestedAlias));
+            if (provider.supports_thinking) {
+                Object.assign(requestBody, getThinkingConfig(requestedAlias, provider.api_type));
+            }
 
             const rdata = await tryProvider(provider.base_url, provider.model, provider.api_key, provider.proxy_url, requestBody, provider.auth_type, provider.api_type);
             if (!rdata) {
@@ -300,13 +302,16 @@ export class AiService {
         const sessionKey = `${account_id}::${Buffer.from(JSON.stringify(firstUserMsg)).toString("base64url").slice(0, 16)}`;
 
 
-        for (const provider of [...providers, ...providers]) {
+        for (const provider of [...providers]) {
             const requestBody: Record<string, any> = { ...data, stream: true, model: provider.model };
-            const thinkConfig = getThinkingConfig(requestedAlias);
-            Object.assign(requestBody, thinkConfig);
+            const thinkConfig = provider.supports_thinking ? getThinkingConfig(requestedAlias, provider.api_type) : {};
+            const thinkingEnabled = !!(thinkConfig.thinking?.type === "enabled" || thinkConfig.reasoning_effort);
+            if (thinkingEnabled) {
+                Object.assign(requestBody, thinkConfig);
+            }
 
             // Inject reasoning_content into all assistant messages (thinking mode requires this field)
-            if (thinkConfig.thinking.type === "enabled") {
+            if (thinkingEnabled) {
                 const savedRecords = await reasoningRepo.find({ session_key: sessionKey });
                 const saved = new Map<string, string>();
                 for (const r of savedRecords) {
@@ -337,7 +342,7 @@ export class AiService {
             }
 
             // Save reasoning content keyed by tool_call id
-            if (thinkConfig.thinking.type === "enabled" && result.reasoningContent) {
+            if (thinkingEnabled && result.reasoningContent) {
                 const msgs = data.messages;
                 let tcId: string | null = null;
                 for (let i = msgs.length - 1; i >= 0; i--) {
