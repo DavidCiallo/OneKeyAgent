@@ -53,6 +53,7 @@
         "AuthType": "認証タイプ",
         "ApiType": "APIタイプ",
         "SupportsThinking": "思考モード対応",
+        "SupportsReasoningEffort": "推論強度対応",
         "BatchThinkingOn": "一括思考ON",
         "BatchThinkingOff": "一括思考OFF",
         "Enabled": "有効",

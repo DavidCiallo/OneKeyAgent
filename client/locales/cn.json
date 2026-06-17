@@ -56,6 +56,7 @@
         "AuthType": "认证类型",
         "ApiType": "接口协议",
         "SupportsThinking": "支持思考模式",
+        "SupportsReasoningEffort": "支持推理强度",
         "BatchThinkingOn": "批量开启思考",
         "BatchThinkingOff": "批量关闭思考",
         "Enabled": "启用",

@@ -53,6 +53,7 @@
         "AuthType": "Auth Type",
         "ApiType": "API Type",
         "SupportsThinking": "Supports Thinking",
+        "SupportsReasoningEffort": "Supports Effort",
         "BatchThinkingOn": "Batch Thinking On",
         "BatchThinkingOff": "Batch Thinking Off",
         "Enabled": "Enabled",

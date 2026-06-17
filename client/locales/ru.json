@@ -53,6 +53,7 @@
         "AuthType": "Тип аутентификации",
         "ApiType": "Тип API",
         "SupportsThinking": "Поддержка мышления",
+        "SupportsReasoningEffort": "Поддержка усилия",
         "BatchThinkingOn": "Мышление Вкл",
         "BatchThinkingOff": "Мышление Выкл",
         "Enabled": "Включено",

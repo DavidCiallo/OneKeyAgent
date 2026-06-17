@@ -53,6 +53,7 @@
         "AuthType": "Tipo de autenticación",
         "ApiType": "Tipo de API",
         "SupportsThinking": "Soporta Pensamiento",
+        "SupportsReasoningEffort": "Soporta Esfuerzo",
         "BatchThinkingOn": "Pensamiento Lote On",
         "BatchThinkingOff": "Pensamiento Lote Off",
         "Enabled": "Habilitado",

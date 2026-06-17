@@ -50,6 +50,7 @@
         "AuthType": "ประเภทการยืนยันตัวตน",
         "ApiType": "ประเภท API",
         "SupportsThinking": "รองรับโหมดคิด",
+        "SupportsReasoningEffort": "รองรับระดับความพยายาม",
         "BatchThinkingOn": "เปิดคิดแบบกลุ่ม",
         "BatchThinkingOff": "ปิดคิดแบบกลุ่ม",
         "Enabled": "เปิดใช้งาน",
