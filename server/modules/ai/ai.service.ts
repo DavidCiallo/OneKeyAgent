@@ -254,7 +254,7 @@ export class AiService {
                 model: provider.model,
             };
             if (provider.supports_thinking) {
-                Object.assign(requestBody, getThinkingConfig(requestedAlias, provider.api_type));
+                Object.assign(requestBody, getThinkingConfig(requestedAlias, provider.api_type, provider.supports_reasoning_effort));
             }
 
             const rdata = await tryProvider(provider.base_url, provider.model, provider.api_key, provider.proxy_url, requestBody, provider.auth_type, provider.api_type);
@@ -304,7 +304,7 @@ export class AiService {
 
         for (const provider of [...providers]) {
             const requestBody: Record<string, any> = { ...data, stream: true, model: provider.model };
-            const thinkConfig = provider.supports_thinking ? getThinkingConfig(requestedAlias, provider.api_type) : {};
+            const thinkConfig = provider.supports_thinking ? getThinkingConfig(requestedAlias, provider.api_type, provider.supports_reasoning_effort) : {};
             const thinkingEnabled = !!(thinkConfig.thinking?.type === "enabled" || thinkConfig.reasoning_effort);
             if (thinkingEnabled) {
                 Object.assign(requestBody, thinkConfig);

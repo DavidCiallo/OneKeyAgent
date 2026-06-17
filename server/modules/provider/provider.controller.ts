@@ -85,10 +85,12 @@ async function batchupdate(request: ProviderBatchUpdateRequest) {
     request = ProviderBatchUpdateRequest.self(request);
     await requireAdmin(request.auth);
 
-    const { ids, enabled, proxy_url } = request.body;
+    const { ids, enabled, proxy_url, supports_thinking, supports_reasoning_effort } = request.body;
     const updateData: Record<string, any> = {};
     if (enabled !== undefined) updateData.enabled = enabled;
     if (proxy_url !== undefined) updateData.proxy_url = proxy_url;
+    if (supports_thinking !== undefined) updateData.supports_thinking = supports_thinking;
+    if (supports_reasoning_effort !== undefined) updateData.supports_reasoning_effort = supports_reasoning_effort;
     await ProviderService.batchUpdate(ids, updateData);
     return {};
 }
