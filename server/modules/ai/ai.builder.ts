@@ -56,7 +56,7 @@ export function calculateCost(
 }
 
 /** Determine thinking/reasoning config from model alias suffix and api type */
-export function getThinkingConfig(alias: string, api_type?: string): { thinking?: { type: string; budget_tokens?: number }; reasoning_effort?: string } {
+export function getThinkingConfig(alias: string, api_type?: string, supports_reasoning_effort?: number): { thinking?: { type: string; budget_tokens?: number }; reasoning_effort?: string } {
     const match = alias.match(/^(.*)-think-(low|medium|high|max)$/);
     if (!match) return {};
 
@@ -74,6 +74,12 @@ export function getThinkingConfig(alias: string, api_type?: string): { thinking?
         };
     }
 
-    // OpenAI-compatible: use reasoning_effort only
-    return { reasoning_effort: level };
+    // OpenAI-compatible: always send thinking, conditionally add reasoning_effort
+    const result: { thinking: { type: string }; reasoning_effort?: string } = {
+        thinking: { type: "enabled" },
+    };
+    if (supports_reasoning_effort) {
+        result.reasoning_effort = level;
+    }
+    return result;
 }
