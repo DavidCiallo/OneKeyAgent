@@ -247,14 +247,39 @@ export class AiService {
         const providers = await ProviderService.getProvidersByAlias(requestedAlias);
         if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
 
+        const firstUserMsg = data.messages.find((m: any) => m.role === "user")?.content ?? "";
+        const sessionKey = `${account_id}::${Buffer.from(JSON.stringify(firstUserMsg)).toString("base64url").slice(0, 16)}`;
+
         for (const provider of providers) {
             const requestBody: Record<string, any> = {
                 ...data,
                 stream: false,
                 model: provider.model,
             };
-            if (provider.supports_thinking) {
-                Object.assign(requestBody, getThinkingConfig(requestedAlias, provider.api_type, provider.supports_reasoning_effort));
+            const thinkConfig = provider.supports_thinking ? getThinkingConfig(requestedAlias, provider.api_type, provider.supports_reasoning_effort) : {};
+            const thinkingEnabled = !!(thinkConfig.thinking?.type === "enabled" || thinkConfig.reasoning_effort);
+            if (thinkingEnabled) {
+                Object.assign(requestBody, thinkConfig);
+
+                const savedRecords = await reasoningRepo.find({ session_key: sessionKey });
+                const saved = new Map<string, string>();
+                for (const r of savedRecords) {
+                    saved.set(r.tool_call_id, r.reasoning_content);
+                }
+                for (const msg of requestBody.messages) {
+                    if (msg.role === "assistant") {
+                        let rc = "";
+                        if (msg.tool_calls && Array.isArray(msg.tool_calls)) {
+                            for (const tc of msg.tool_calls) {
+                                if (tc.id && saved.has(tc.id)) {
+                                    rc = saved.get(tc.id)!;
+                                    break;
+                                }
+                            }
+                        }
+                        msg.reasoning_content = rc;
+                    }
+                }
             }
 
             const rdata = await tryProvider(provider.base_url, provider.model, provider.api_key, provider.proxy_url, requestBody, provider.auth_type, provider.api_type);
