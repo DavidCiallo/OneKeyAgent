@@ -9,11 +9,13 @@ type Props = {
     selectedCount: number;
     onBatchEnable: () => void;
     onBatchDisable: () => void;
+    onBatchThinkingOn: () => void;
+    onBatchThinkingOff: () => void;
     onBatchProxy: () => void;
     onClearSelection: () => void;
 };
 
-export function ProviderFilter({ filterModelAlias, onModelAliasChange, onAdd, modelAliasOptions, selectedCount, onBatchEnable, onBatchDisable, onBatchProxy, onClearSelection }: Props) {
+export function ProviderFilter({ filterModelAlias, onModelAliasChange, onAdd, modelAliasOptions, selectedCount, onBatchEnable, onBatchDisable, onBatchThinkingOn, onBatchThinkingOff, onBatchProxy, onClearSelection }: Props) {
     const locale = Locale("ProviderPage");
     const common = Locale("Common");
 
@@ -28,7 +30,7 @@ export function ProviderFilter({ filterModelAlias, onModelAliasChange, onAdd, mo
                     className="w-60"
                     size="sm"
                 >
-                    <SelectItem key="">不筛选</SelectItem>
+                    <SelectItem key="">{locale.NoFilter}</SelectItem>
                     {modelAliasOptions.map((alias) => (
                         <SelectItem key={alias}>{alias}</SelectItem>
                     ))}
@@ -36,18 +38,24 @@ export function ProviderFilter({ filterModelAlias, onModelAliasChange, onAdd, mo
             </div>
             {selectedCount > 0 ? (
                 <div className="flex items-center gap-2">
-                    <span className="text-sm text-default-500 tabular-nums">{selectedCount} selected</span>
+                    <span className="text-sm text-default-500 tabular-nums">{selectedCount} {locale.Selected}</span>
                     <Button size="sm" color="success" variant="flat" onPress={onBatchEnable}>
-                        Batch Enable
+                        {locale.BatchEnable}
                     </Button>
                     <Button size="sm" color="warning" variant="flat" onPress={onBatchDisable}>
-                        Batch Disable
+                        {locale.BatchDisable}
+                    </Button>
+                    <Button size="sm" color="secondary" variant="flat" onPress={onBatchThinkingOn}>
+                        {locale.BatchThinkingOn}
+                    </Button>
+                    <Button size="sm" color="secondary" variant="flat" onPress={onBatchThinkingOff}>
+                        {locale.BatchThinkingOff}
                     </Button>
                     <Button size="sm" color="primary" variant="flat" onPress={onBatchProxy}>
-                        Batch Set Proxy
+                        {locale.BatchSetProxy}
                     </Button>
                     <Button size="sm" variant="flat" onPress={onClearSelection}>
-                        Clear
+                        {locale.Clear}
                     </Button>
                 </div>
             ) : (

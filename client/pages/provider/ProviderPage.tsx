@@ -21,6 +21,8 @@ type ProviderForm = {
     auth_type: string;
     api_type: string;
     proxy_url?: string;
+    supports_thinking: number;
+    supports_reasoning_effort: number;
     enabled: number;
 };
 
@@ -35,7 +37,7 @@ export default function ProviderPage() {
     const { isOpen: isFormOpen, onOpen: onFormOpen, onClose: onFormClose, onOpenChange: onFormOpenChange } = useDisclosure();
     const [formMode, setFormMode] = useState<"create" | "edit">("create");
     const [editId, setEditId] = useState<string>("");
-    const [form, setForm] = useState<ProviderForm>({ model_alias: "", priority: 1, name: "", base_url: "", model: "", auth_type: "bearer", api_type: "openai", enabled: 1 });
+    const [form, setForm] = useState<ProviderForm>({ model_alias: "", priority: 1, name: "", base_url: "", model: "", auth_type: "bearer", api_type: "openai", supports_thinking: 0, supports_reasoning_effort: 0, enabled: 1 });
 
     // Multi-select state
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -81,7 +83,7 @@ export default function ProviderPage() {
 
     const openCreate = () => {
         setFormMode("create");
-        setForm({ model_alias: "", priority: 1, name: "", base_url: "", model: "", auth_type: "bearer", api_type: "openai", enabled: 1 });
+        setForm({ model_alias: "", priority: 1, name: "", base_url: "", model: "", auth_type: "bearer", api_type: "openai", supports_thinking: 0, supports_reasoning_effort: 0, enabled: 1 });
         onFormOpen();
     };
 
@@ -97,6 +99,8 @@ export default function ProviderPage() {
                 auth_type: item.auth_type || undefined,
                 api_type: item.api_type || undefined,
                 proxy_url: item.proxy_url || undefined,
+                supports_thinking: item.supports_thinking ?? 0,
+                supports_reasoning_effort: item.supports_reasoning_effort ?? 0,
                 enabled: item.enabled,
             },
         });
@@ -118,6 +122,8 @@ export default function ProviderPage() {
             auth_type: item.auth_type || "bearer",
             api_type: item.api_type || "openai",
             proxy_url: item.proxy_url || "",
+            supports_thinking: item.supports_thinking ?? 0,
+            supports_reasoning_effort: item.supports_reasoning_effort ?? 0,
             enabled: item.enabled,
         });
         onFormOpen();
@@ -136,6 +142,8 @@ export default function ProviderPage() {
                     auth_type: form.auth_type,
                     api_type: form.api_type,
                     proxy_url: form.proxy_url || undefined,
+                    supports_thinking: form.supports_thinking,
+                    supports_reasoning_effort: form.supports_reasoning_effort,
                     enabled: form.enabled,
                 },
             });
@@ -157,6 +165,8 @@ export default function ProviderPage() {
                     auth_type: form.auth_type,
                     api_type: form.api_type,
                     proxy_url: form.proxy_url !== undefined ? form.proxy_url : undefined,
+                    supports_thinking: form.supports_thinking,
+                    supports_reasoning_effort: form.supports_reasoning_effort,
                     enabled: form.enabled !== undefined ? form.enabled : undefined,
                 },
             });
@@ -219,6 +229,14 @@ export default function ProviderPage() {
         }
     };
 
+    const handleBatchThinking = async (supports_thinking: number) => {
+        const res = await providerApi.batchupdate({ body: { ids: Array.from(selectedIds), supports_thinking } });
+        if (res.success) {
+            clearSelection();
+            fetchList(page);
+        }
+    };
+
     return (
         <div className="max-w-screen flex flex-col h-screen">
             <Header name={Locale("Menu").Provider} />
@@ -231,6 +249,8 @@ export default function ProviderPage() {
                     selectedCount={selectedIds.size}
                     onBatchEnable={() => handleBatchEnable(1)}
                     onBatchDisable={() => handleBatchEnable(0)}
+                    onBatchThinkingOn={() => handleBatchThinking(1)}
+                    onBatchThinkingOff={() => handleBatchThinking(0)}
                     onBatchProxy={onBatchOpen}
                     onClearSelection={clearSelection}
                 />

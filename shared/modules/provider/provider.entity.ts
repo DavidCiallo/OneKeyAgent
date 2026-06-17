@@ -11,6 +11,8 @@ export interface ProviderEntity extends BaseEntity {
     auth_type?: string;
     api_type?: string;
     proxy_url?: string;
+    supports_thinking?: number;
+    supports_reasoning_effort?: number;
     enabled: number;
     create_time: number;
     update_time: number;

@@ -12,10 +12,10 @@ export function buildRequestConfig(
     base_url: string,
     api_key: string | undefined,
     auth_type: string | undefined,
-    apiType: string | undefined,
+    api_type: string | undefined,
     body: Record<string, any>,
 ): { url: URL; headers: Record<string, string>; requestBody: string } {
-    const isAnthropic = apiType === "anthropic";
+    const isAnthropic = api_type === "anthropic";
     const path = isAnthropic ? "/messages" : "/chat/completions";
     const url = new URL(`${base_url}${path}`);
 
@@ -55,15 +55,31 @@ export function calculateCost(
     return Math.round(cost * 1_000_000) / 1_000_000; // 6 decimal precision
 }
 
-/** Determine thinking/reasoning config from model alias suffix */
-export function getThinkingConfig(alias: string): { thinking: { type: string }; reasoning_effort?: string } {
+/** Determine thinking/reasoning config from model alias suffix and api type */
+export function getThinkingConfig(alias: string, api_type?: string, supports_reasoning_effort?: number): { thinking?: { type: string; budget_tokens?: number }; reasoning_effort?: string } {
     const match = alias.match(/^(.*)-think-(low|medium|high|max)$/);
-    if (match) {
-        return {
-            thinking: { type: "enabled" },
-            reasoning_effort: match[2] as "low" | "medium" | "high" | "max",
+    if (!match) return {};
+
+    const level = match[2] as "low" | "medium" | "high" | "max";
+
+    if (api_type === "anthropic") {
+        const budgetMap: Record<string, number> = {
+            low: 2048,
+            medium: 8192,
+            high: 16384,
+            max: 32768,
         };
-    }else{
-        return { thinking: { type: "disabled" } };
+        return {
+            thinking: { type: "enabled", budget_tokens: budgetMap[level] || 8192 },
+        };
     }
+
+    // OpenAI-compatible: always send thinking, conditionally add reasoning_effort
+    const result: { thinking: { type: string }; reasoning_effort?: string } = {
+        thinking: { type: "enabled" },
+    };
+    if (supports_reasoning_effort) {
+        result.reasoning_effort = level;
+    }
+    return result;
 }

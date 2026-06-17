@@ -74,9 +74,9 @@ async function tryProvider(
     proxy_url: string | undefined,
     body: Record<string, any>,
     auth_type?: string,
-    apiType?: string,
+    api_type?: string,
 ): Promise<any> {
-    const { url, headers, requestBody: postBody } = buildRequestConfig(base_url, api_key, auth_type, apiType, body);
+    const { url, headers, requestBody: postBody } = buildRequestConfig(base_url, api_key, auth_type, api_type, body);
     const agent = proxy_url ? new HttpsProxyAgent(proxy_url) : undefined;
 
     return new Promise((resolve) => {
@@ -99,7 +99,7 @@ async function tryProvider(
                 }
                 try {
                     const parsed = JSON.parse(data);
-                    if (apiType === "anthropic") {
+                    if (api_type === "anthropic") {
                         resolve(anthropicToOpenAI(parsed, model));
                     } else {
                         resolve(parsed);
@@ -125,9 +125,9 @@ async function tryProviderStream(
     proxy_url: string | undefined,
     body: Record<string, any>,
     auth_type?: string,
-    apiType?: string,
+    api_type?: string,
 ): Promise<{ stream: ReadableStream<Uint8Array> | null; reasoningContent: string }> {
-    const { url, headers, requestBody: postBody } = buildRequestConfig(base_url, api_key, auth_type, apiType, body);
+    const { url, headers, requestBody: postBody } = buildRequestConfig(base_url, api_key, auth_type, api_type, body);
     const agent = proxy_url ? new HttpsProxyAgent(proxy_url) : undefined;
 
     return new Promise((resolve) => {
@@ -197,7 +197,7 @@ async function tryProviderStream(
             });
 
             resolve({
-                stream: apiType === "anthropic" ? antStreamToOpenAI(rawStream) : rawStream,
+                stream: api_type === "anthropic" ? antStreamToOpenAI(rawStream) : rawStream,
                 reasoningContent: localReasoning,
             });
         });
@@ -247,13 +247,40 @@ export class AiService {
         const providers = await ProviderService.getProvidersByAlias(requestedAlias);
         if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
 
+        const firstUserMsg = data.messages.find((m: any) => m.role === "user")?.content ?? "";
+        const sessionKey = `${account_id}::${Buffer.from(JSON.stringify(firstUserMsg)).toString("base64url").slice(0, 16)}`;
+
         for (const provider of providers) {
             const requestBody: Record<string, any> = {
                 ...data,
                 stream: false,
                 model: provider.model,
             };
-            Object.assign(requestBody, getThinkingConfig(requestedAlias));
+            const thinkConfig = provider.supports_thinking ? getThinkingConfig(requestedAlias, provider.api_type, provider.supports_reasoning_effort) : {};
+            const thinkingEnabled = !!(thinkConfig.thinking?.type === "enabled" || thinkConfig.reasoning_effort);
+            if (thinkingEnabled) {
+                Object.assign(requestBody, thinkConfig);
+
+                const savedRecords = await reasoningRepo.find({ session_key: sessionKey });
+                const saved = new Map<string, string>();
+                for (const r of savedRecords) {
+                    saved.set(r.tool_call_id, r.reasoning_content);
+                }
+                for (const msg of requestBody.messages) {
+                    if (msg.role === "assistant") {
+                        let rc = "";
+                        if (msg.tool_calls && Array.isArray(msg.tool_calls)) {
+                            for (const tc of msg.tool_calls) {
+                                if (tc.id && saved.has(tc.id)) {
+                                    rc = saved.get(tc.id)!;
+                                    break;
+                                }
+                            }
+                        }
+                        msg.reasoning_content = rc;
+                    }
+                }
+            }
 
             const rdata = await tryProvider(provider.base_url, provider.model, provider.api_key, provider.proxy_url, requestBody, provider.auth_type, provider.api_type);
             if (!rdata) {
@@ -300,13 +327,16 @@ export class AiService {
         const sessionKey = `${account_id}::${Buffer.from(JSON.stringify(firstUserMsg)).toString("base64url").slice(0, 16)}`;
 
 
-        for (const provider of [...providers, ...providers]) {
+        for (const provider of [...providers]) {
             const requestBody: Record<string, any> = { ...data, stream: true, model: provider.model };
-            const thinkConfig = getThinkingConfig(requestedAlias);
-            Object.assign(requestBody, thinkConfig);
+            const thinkConfig = provider.supports_thinking ? getThinkingConfig(requestedAlias, provider.api_type, provider.supports_reasoning_effort) : {};
+            const thinkingEnabled = !!(thinkConfig.thinking?.type === "enabled" || thinkConfig.reasoning_effort);
+            if (thinkingEnabled) {
+                Object.assign(requestBody, thinkConfig);
+            }
 
             // Inject reasoning_content into all assistant messages (thinking mode requires this field)
-            if (thinkConfig.thinking.type === "enabled") {
+            if (thinkingEnabled) {
                 const savedRecords = await reasoningRepo.find({ session_key: sessionKey });
                 const saved = new Map<string, string>();
                 for (const r of savedRecords) {
@@ -337,7 +367,7 @@ export class AiService {
             }
 
             // Save reasoning content keyed by tool_call id
-            if (thinkConfig.thinking.type === "enabled" && result.reasoningContent) {
+            if (thinkingEnabled && result.reasoningContent) {
                 const msgs = data.messages;
                 let tcId: string | null = null;
                 for (let i = msgs.length - 1; i >= 0; i--) {

@@ -64,6 +64,10 @@ export function toAnthropicBody(body: Record<string, any>): Record<string, any> 
         result.system = systemMsg.map((m: any) => ({ type: "text", text: m.content }));
     }
 
+    if (body.thinking) {
+        result.thinking = body.thinking;
+    }
+
     return result;
 }
 
