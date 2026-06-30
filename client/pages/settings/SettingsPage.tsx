@@ -14,6 +14,8 @@ const FIELD_LABELS: Record<string, string> = {
     email_from: "Email From",
     allowed_register_domains: "Allowed Register Domains",
     client_url: "Client URL",
+    enable_recharge: "Enable Recharge",
+    daily_register_limit: "Daily Registration Limit",
 };
 
 export default function SettingsPage() {

@@ -17,6 +17,13 @@ const SETTING_KEYS: Record<string, string> = {
     "email_from": "EMAIL_FROM",
     "allowed_register_domains": "ALLOWED_REGISTER_DOMAINS",
     "client_url": "CLIENT_URL",
+    "enable_recharge": "ENABLE_RECHARGE",
+    "daily_register_limit": "DAILY_REGISTER_LIMIT",
+};
+
+const SETTING_DEFAULTS: Record<string, string> = {
+    "enable_recharge": "true",
+    "daily_register_limit": "5",
 };
 
 export class SettingsService {
@@ -38,16 +45,18 @@ export class SettingsService {
         }
     }
 
-    /** Synchronous get from memory cache */
+    /** Synchronous get from memory cache, with default fallback */
     static get(key: string): string {
-        return cache.get(key) || "";
+        const val = cache.get(key);
+        return val !== undefined ? val : (SETTING_DEFAULTS[key] || "");
     }
 
     /** Get all known settings (for admin list API) */
     static getAll(): Record<string, string> {
         const result: Record<string, string> = {};
         for (const key of Object.keys(SETTING_KEYS)) {
-            result[key] = cache.get(key) || "";
+            const val = cache.get(key);
+            result[key] = val !== undefined ? val : (SETTING_DEFAULTS[key] || "");
         }
         return result;
     }

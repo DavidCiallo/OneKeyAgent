@@ -44,7 +44,8 @@ async function login(request: LoginRequest) {
 async function config(_request: AuthConfigRequest) {
     const domains = SettingsService.get("allowed_register_domains");
     const allowed_domains = domains ? domains.split(",").map(d => d.trim()).filter(Boolean) : [];
-    return { allowed_domains };
+    const enable_recharge = SettingsService.get("enable_recharge") !== "false";
+    return { allowed_domains, enable_recharge };
 }
 
 async function register(request: RegisterRequest) {
