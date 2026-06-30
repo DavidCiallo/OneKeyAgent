@@ -109,7 +109,7 @@ async function tryProvider(
                 }
             });
         });
-        req.on("error", (e) => {
+        req.on("error", () => {
             resolve(null);
         });
         req.on("timeout", () => { req.destroy(); resolve(null); });

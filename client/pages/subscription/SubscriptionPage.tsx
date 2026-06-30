@@ -27,7 +27,7 @@ export default function SubscriptionPage() {
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
     const [refreshing, setRefreshing] = useState(false);
-    const [enableRecharge, setEnableRecharge] = useState(true);
+    const [enableRecharge, setEnableRecharge] = useState(false);
 
     const fetchProfile = useCallback(async () => {
         const res = await accountApi.profile({});
