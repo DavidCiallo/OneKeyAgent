@@ -1,6 +1,6 @@
 import { Header } from "../../components/header/Header";
 import { useEffect, useState, useCallback } from "react";
-import { accountApi, subscriptionApi } from "../../api/instance";
+import { accountApi, subscriptionApi, authApi } from "../../api/instance";
 import { Locale } from "../../methods/locale";
 import CurrentPlanCard from "./components/CurrentPlanCard";
 import PlanSelector from "./components/PlanSelector";
@@ -27,6 +27,7 @@ export default function SubscriptionPage() {
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
     const [refreshing, setRefreshing] = useState(false);
+    const [enableRecharge, setEnableRecharge] = useState(true);
 
     const fetchProfile = useCallback(async () => {
         const res = await accountApi.profile({});
@@ -41,6 +42,14 @@ export default function SubscriptionPage() {
             setRecords(res.data.list || []);
             setTotal(res.data.total || 0);
         }
+    }, []);
+
+    useEffect(() => {
+        authApi.config({}).then(res => {
+            if (res.success && res.data) {
+                setEnableRecharge(res.data.enable_recharge !== false);
+            }
+        });
     }, []);
 
     useEffect(() => {
@@ -63,7 +72,7 @@ export default function SubscriptionPage() {
                     <CurrentPlanCard tokens={account?.balance || 0} />
 
                     <PlanSelector onGiftCardActivated={handleRefresh}>
-                        <TopupPack onSuccess={handleRefresh} />
+                        {enableRecharge && <TopupPack onSuccess={handleRefresh} />}
                     </PlanSelector>
 
                     <Statement records={records} total={total} page={page} onPageChange={setPage} onRefresh={handleRefresh} refreshing={refreshing} />

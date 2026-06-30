@@ -120,6 +120,18 @@ export async function completeRegistration(token: string): Promise<{ account?: A
     // Double-check account doesn't already exist
     const exist = await accountRepository.findIgnoreDelete({ email });
     if (exist) return null;
+
+    // Daily registration limit check
+    const limitStr = SettingsService.get("daily_register_limit");
+    const limit = parseInt(limitStr, 10);
+    if (limit > 0) {
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        const todayAccounts = await accountRepository.find({}, { since: startOfDay.getTime() });
+        if (todayAccounts.length >= limit) {
+            throw "Daily registration limit reached, please try again tomorrow";
+        }
+    }
     const password = hashGenerate(plainPassword);
     const api_key = generateApiKey();
     const account = await accountRepository.insert({ name, email, password, api_key, is_admin: 0 });
