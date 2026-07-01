@@ -231,10 +231,10 @@
         "TermsLink": "By using the API, you agree to the Terms of Service"
     },
 
-    "SubscriptionPage": {
+    "TopupPage": {
         "CurrentPlan": "Current Balance",
         "Balance": "Balance",
-        "AvailablePlans": "Available Plans",
+        "PrepaidTopup": "Prepaid Top-up",
         "GiftCard": "Gift Card",
         "GiftCardDesc": "Use a gift card to top up your balance",
         "Activate": "Activate",

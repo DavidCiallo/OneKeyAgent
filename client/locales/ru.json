@@ -230,10 +230,10 @@
         "TermsLink": "Используя API, вы соглашаетесь с Условиями обслуживания"
     },
 
-    "SubscriptionPage": {
+    "TopupPage": {
         "CurrentPlan": "Текущий баланс",
         "Balance": "Баланс",
-        "AvailablePlans": "Доступные тарифы",
+        "PrepaidTopup": "Предоплата",
         "GiftCard": "Подарочная карта",
         "GiftCardDesc": "Используйте подарочную карту для пополнения баланса",
         "Activate": "Активировать",

@@ -17,7 +17,7 @@ export default function PaymentModal({
     onProceedToPay: (payCurrency: string) => void;
     paying: boolean;
 }) {
-    const locale = Locale("SubscriptionPage");
+    const locale = Locale("TopupPage");
     const [selectedCurrency, setSelectedCurrency] = useState<string>(PAYMENT_CURRENCIES[0].pay_currency);
 
     const formatPrice = (dollars: number) => "$" + dollars.toFixed(2);
