@@ -37,7 +37,7 @@ function getTypeChip(type: string, locale: any): { color: "success" | "primary" 
 }
 
 export default function Statement({ records, total, page, onPageChange, onRefresh, refreshing }: { records: StatementRecord[]; total: number; page: number; onPageChange: (p: number) => void; onRefresh?: () => void; refreshing?: boolean }) {
-    const locale = Locale("SubscriptionPage");
+    const locale = Locale("TopupPage");
 
     return (
         <Card>

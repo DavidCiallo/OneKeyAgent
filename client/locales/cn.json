@@ -232,10 +232,10 @@
         "TermsLink": "调用时默认您已查看并同意服务条款"
     },
 
-    "SubscriptionPage": {
+    "TopupPage": {
         "CurrentPlan": "当前余额",
         "Balance": "余额",
-        "AvailablePlans": "可选套餐",
+        "PrepaidTopup": "预付充值",
         "GiftCard": "礼品卡",
         "GiftCardDesc": "使用礼品卡充值余额",
         "Activate": "激活",

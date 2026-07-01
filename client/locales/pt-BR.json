@@ -230,10 +230,10 @@
         "TermsLink": "Ao usar a API, você concorda com os Termos de Serviço"
     },
 
-    "SubscriptionPage": {
+    "TopupPage": {
         "CurrentPlan": "Saldo atual",
         "Balance": "Saldo",
-        "AvailablePlans": "Planos disponíveis",
+        "PrepaidTopup": "Recarga pré-paga",
         "GiftCard": "Cartão-presente",
         "GiftCardDesc": "Use um cartão-presente para recarregar saldo",
         "Activate": "Ativar",

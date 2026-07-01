@@ -230,10 +230,10 @@
         "TermsLink": "APIを使用することで、利用規約に同意したものとみなされます"
     },
 
-    "SubscriptionPage": {
+    "TopupPage": {
         "CurrentPlan": "現在の残高",
         "Balance": "残高",
-        "AvailablePlans": "利用可能なプラン",
+        "PrepaidTopup": "プリペイドチャージ",
         "GiftCard": "ギフトカード",
         "GiftCardDesc": "ギフトカードで残高をチャージ",
         "Activate": "有効化",

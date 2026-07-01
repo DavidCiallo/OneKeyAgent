@@ -227,10 +227,10 @@
         "TermsLink": "Bằng cách sử dụng API, bạn đồng ý với Điều khoản dịch vụ"
     },
 
-    "SubscriptionPage": {
+    "TopupPage": {
         "CurrentPlan": "Số dư hiện tại",
         "Balance": "Số dư",
-        "AvailablePlans": "Các gói khả dụng",
+        "PrepaidTopup": "Nạp tiền trả trước",
         "GiftCard": "Thẻ quà tặng",
         "GiftCardDesc": "Sử dụng thẻ quà tặng để nạp số dư",
         "Activate": "Kích hoạt",

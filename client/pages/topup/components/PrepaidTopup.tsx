@@ -2,13 +2,13 @@ import { Card, CardBody, CardHeader, Divider, Button, useDisclosure } from "@her
 import { Locale } from "../../../methods/locale";
 import GiftCardModal from "./GiftCardModal";
 
-interface PlanSelectorProps {
+interface PrepaidTopupProps {
     onGiftCardActivated?: () => void;
     children?: React.ReactNode;
 }
 
-export default function PlanSelector({ onGiftCardActivated, children }: PlanSelectorProps) {
-    const t = Locale("SubscriptionPage");
+export default function PrepaidTopup({ onGiftCardActivated, children }: PrepaidTopupProps) {
+    const t = Locale("TopupPage");
     const giftCardModal = useDisclosure();
 
     const handleGiftCardActivated = () => {
@@ -18,7 +18,7 @@ export default function PlanSelector({ onGiftCardActivated, children }: PlanSele
     return (
         <>
             <Card>
-                <CardHeader className="px-6 py-4 font-semibold text-lg">{t.AvailablePlans}</CardHeader>
+                <CardHeader className="px-6 py-4 font-semibold text-lg">{t.PrepaidTopup}</CardHeader>
                 <Divider />
                 <CardBody className="px-6 py-4 space-y-4">
                     {/* Recharge / Top-Up section */}

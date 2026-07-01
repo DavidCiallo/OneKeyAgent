@@ -12,7 +12,7 @@ export default function GiftCardModal({
     onOpenChange: () => void;
     onSuccess: () => void;
 }) {
-    const t = Locale("SubscriptionPage");
+    const t = Locale("TopupPage");
     const common = Locale("Common");
     const [code, setCode] = useState("");
     const [activating, setActivating] = useState(false);

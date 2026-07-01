@@ -13,7 +13,7 @@ import AccountPage from "./pages/account/AccountPage";
 import ProfilePage from "./pages/profile/ProfilePage";
 import TermsPage from "./pages/terms/TermsPage";
 import NoContentPage from "./pages/nocontent/NoContentPage";
-import SubscriptionPage from "./pages/subscription/SubscriptionPage";
+import TopupPage from "./pages/topup/TopupPage";
 import SettingsPage from "./pages/settings/SettingsPage";
 import { authApi } from "./api/instance";
 import { AuthProvider, useAuth } from "./methods/auth-context";
@@ -85,7 +85,7 @@ const AppRoutes = () => {
                 <Route path="/usage" element={<ProtectedRoute name="usage"><UsagePage /></ProtectedRoute>} />
                 <Route path="/account" element={<ProtectedRoute name="account"><AccountPage /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute name="profile"><ProfilePage /></ProtectedRoute>} />
-                <Route path="/subscription" element={<ProtectedRoute name="subscription"><SubscriptionPage /></ProtectedRoute>} />
+                <Route path="/subscription" element={<ProtectedRoute name="subscription"><TopupPage /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute name="settings"><SettingsPage /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<Navigate to="/home" replace />} />

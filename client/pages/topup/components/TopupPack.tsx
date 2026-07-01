@@ -11,7 +11,7 @@ interface TopupPackProps {
 const PRESET_AMOUNTS = [50, 100, 500, 1000]; // USD
 
 export default function TopupPack({ onSuccess }: TopupPackProps) {
-    const locale = Locale("SubscriptionPage");
+    const locale = Locale("TopupPage");
 
     const [selectedAmount, setSelectedAmount] = useState<number>(PRESET_AMOUNTS[0]);
     const [customAmount, setCustomAmount] = useState("");

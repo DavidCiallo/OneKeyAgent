@@ -2,7 +2,7 @@ import { Card, CardBody, CardHeader, Divider } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
 
 export default function CurrentPlanCard({ tokens }: { tokens: number }) {
-    const locale = Locale("SubscriptionPage");
+    const locale = Locale("TopupPage");
 
     const formatBalance = (dollars: number) => {
         return "$" + dollars.toFixed(2);

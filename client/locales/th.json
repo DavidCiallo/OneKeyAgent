@@ -227,10 +227,10 @@
         "TermsLink": "การใช้ API แสดงว่าคุณยอมรับข้อกำหนดในการให้บริการ"
     },
 
-    "SubscriptionPage": {
+    "TopupPage": {
         "CurrentPlan": "ยอดคงเหลือปัจจุบัน",
         "Balance": "ยอดคงเหลือ",
-        "AvailablePlans": "แพ็กเกจที่พร้อมใช้",
+        "PrepaidTopup": "เติมเงินล่วงหน้า",
         "GiftCard": "บัตรของขวัญ",
         "GiftCardDesc": "ใช้บัตรของขวัญเพื่อเติมยอดคงเหลือ",
         "Activate": "เปิดใช้งาน",

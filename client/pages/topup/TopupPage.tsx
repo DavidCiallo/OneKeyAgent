@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { accountApi, subscriptionApi, authApi } from "../../api/instance";
 import { Locale } from "../../methods/locale";
 import CurrentPlanCard from "./components/CurrentPlanCard";
-import PlanSelector from "./components/PlanSelector";
+import PrepaidTopup from "./components/PrepaidTopup";
 import Statement from "./components/Statement";
 import TopupPack from "./components/TopupPack";
 
@@ -15,7 +15,7 @@ interface StatementRecord {
     create_time: number;
 }
 
-export default function SubscriptionPage() {
+export default function TopupPage() {
     const menuLocale = Locale("Menu");
 
     const [account, setAccount] = useState<{
@@ -71,9 +71,9 @@ export default function SubscriptionPage() {
                 <div className="max-w-3xl mx-auto space-y-6">
                     <CurrentPlanCard tokens={account?.balance || 0} />
 
-                    <PlanSelector onGiftCardActivated={handleRefresh}>
+                    <PrepaidTopup onGiftCardActivated={handleRefresh}>
                         {enableRecharge && <TopupPack onSuccess={handleRefresh} />}
-                    </PlanSelector>
+                    </PrepaidTopup>
 
                     <Statement records={records} total={total} page={page} onPageChange={setPage} onRefresh={handleRefresh} refreshing={refreshing} />
                 </div>
