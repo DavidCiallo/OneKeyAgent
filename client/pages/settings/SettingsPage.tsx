@@ -16,6 +16,7 @@ const FIELD_LABELS: Record<string, string> = {
     client_url: "Client URL",
     enable_recharge: "Enable Recharge",
     daily_register_limit: "Daily Registration Limit",
+    fallback_model_alias: "Fallback Model Alias",
 };
 
 export default function SettingsPage() {

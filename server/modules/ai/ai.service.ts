@@ -8,6 +8,7 @@ import { AccountService } from "../account/account.service";
 import { AccountRoleService } from "../role/role.service";
 import { anthropicToOpenAI, antMessagesToOpenAI, openAIToAntMessages, openAIToAntStream, antStreamToOpenAI } from "./ai.trans";
 import Repository from "../../lib/repository";
+import { SettingsService } from "../settings/settings.service";
 import { buildRequestConfig, calculateCost, getThinkingConfig } from "./ai.builder";
 import { SessionReasoningEntity } from "../../../shared/modules/session/session_reasoning.entity";
 
@@ -247,6 +248,13 @@ export class AiService {
         const providers = await ProviderService.getProvidersByAlias(requestedAlias);
         if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
 
+        // Append fallback model's providers at the end
+        const fallbackAlias = SettingsService.get("fallback_model_alias");
+        if (fallbackAlias && fallbackAlias !== requestedAlias) {
+            const fallbackProviders = await ProviderService.getProvidersByAlias(fallbackAlias);
+            providers.push(...fallbackProviders);
+        }
+
         const firstUserMsg = data.messages.find((m: any) => m.role === "user")?.content ?? "";
         const sessionKey = `${account_id}::${Buffer.from(JSON.stringify(firstUserMsg)).toString("base64url").slice(0, 16)}`;
 
@@ -322,6 +330,13 @@ export class AiService {
 
         const providers = await ProviderService.getProvidersByAlias(requestedAlias);
         if (providers.length === 0) throw new Error(`No providers found for alias: ${requestedAlias}`);
+
+        // Append fallback model's providers at the end
+        const fallbackAlias = SettingsService.get("fallback_model_alias");
+        if (fallbackAlias && fallbackAlias !== requestedAlias) {
+            const fallbackProviders = await ProviderService.getProvidersByAlias(fallbackAlias);
+            providers.push(...fallbackProviders);
+        }
 
         const firstUserMsg = data.messages.find((m: any) => m.role === "user")?.content ?? "";
         const sessionKey = `${account_id}::${Buffer.from(JSON.stringify(firstUserMsg)).toString("base64url").slice(0, 16)}`;
@@ -467,7 +482,7 @@ export class AiService {
 
             return passthrough;
         }
-        throw new Error("This model reach using limit. Please try again later.");
+        throw new Error("All providers failed");
     }
 
     static async completions(data: Record<string, any>, account_id: string): Promise<CompletionServiceResponse> {

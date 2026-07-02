@@ -19,11 +19,13 @@ const SETTING_KEYS: Record<string, string> = {
     "client_url": "CLIENT_URL",
     "enable_recharge": "ENABLE_RECHARGE",
     "daily_register_limit": "DAILY_REGISTER_LIMIT",
+    "fallback_model_alias": "FALLBACK_MODEL_ALIAS",
 };
 
 const SETTING_DEFAULTS: Record<string, string> = {
     "enable_recharge": "true",
     "daily_register_limit": "5",
+    "fallback_model_alias": "",
 };
 
 export class SettingsService {
