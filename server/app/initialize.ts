@@ -9,6 +9,8 @@ export async function initialize() {
     // Load settings from DB into memory cache
     await SettingsService.loadFromDb();
 
+    // --- Admin account creation ---
+
     if (process.env.ADMIN_NAME && process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {
         const { ADMIN_NAME, ADMIN_EMAIL, ADMIN_PASSWORD } = process.env;
         const exist = await AccountService.findByEmail(ADMIN_EMAIL);
