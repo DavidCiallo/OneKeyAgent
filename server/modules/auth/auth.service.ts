@@ -3,9 +3,10 @@ import { AccountEntity } from "../../../shared/modules/account/account.entity";
 import Repository from "../../lib/repository";
 import { generateApiKey } from "../ai/ai.auth";
 import { RoleService, AccountRoleService } from "../role/role.service";
-import { sendEmail, buildVerificationEmail } from "../email/email.service";
 import { AccountService } from "../account/account.service";
 import { SettingsService } from "../settings/settings.service";
+import { Email } from "../../lib/plugins/email";
+import { buildVerificationEmail } from "../../lib/plugins/email/resend";
 
 const ALL_MENUS = ["profile", "model", "usage", "account"];
 const accountRepository: Repository<AccountEntity> = Repository.instance("Account");
@@ -95,7 +96,7 @@ export async function preRegisterUser(name: string, email: string, password: str
     const payload = [name, email, password].join("|-|");
     const verificationToken = aesEncrypt(payload);
     const verifyUrl = `${SettingsService.get("client_url")}/verify?token=${encodeURIComponent(verificationToken)}`;
-    const emailSent = await sendEmail({
+    const emailSent = await Email.instance().send({
         to: email,
         ...buildVerificationEmail(verifyUrl),
     });
