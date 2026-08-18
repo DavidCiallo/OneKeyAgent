@@ -6,11 +6,31 @@ import { getAllModels, logUsage } from "./ai.session";
 import { ProviderService } from "../provider/provider.service";
 import { AccountService } from "../account/account.service";
 import { AccountRoleService } from "../role/role.service";
-import { anthropicToOpenAI, antMessagesToOpenAI, openAIToAntMessages, openAIToAntStream, antStreamToOpenAI } from "./ai.trans";
+import { anthropicToOpenAI, antMessagesToOpenAI, openAIToAntMessages, openAIToAntStream, antStreamToOpenAI, geminiToOpenAI, geminiStreamToOpenAI } from "./ai.trans";
 import Repository from "../../lib/repository";
 import { SettingsService } from "../settings/settings.service";
-import { buildRequestConfig, calculateCost, getThinkingConfig } from "./ai.builder";
-import { SessionReasoningEntity } from "../../../shared/modules/session/session_reasoning.entity";
+import { buildRequestConfig, calculateCost } from "./ai.builder";
+
+/** In-memory LRU reasoning cache (replaces JSONL for thinking replay) */
+const REASONING_CACHE_TTL = 24 * 3600_000; // 24 hours
+const reasoningCache = new Map<string, { reasoning: string; ts: number }>();
+function reasoningCacheGet(key: string): string | undefined {
+    const entry = reasoningCache.get(key);
+    if (!entry) return undefined;
+    if (Date.now() - entry.ts > REASONING_CACHE_TTL) {
+        reasoningCache.delete(key);
+        return undefined;
+    }
+    return entry.reasoning;
+}
+function reasoningCacheSet(key: string, reasoning: string): void {
+    reasoningCache.set(key, { reasoning, ts: Date.now() });
+    // Keep cache bounded — evict oldest if >1000 entries
+    if (reasoningCache.size > 1000) {
+        const oldest = reasoningCache.entries().next();
+        if (oldest.value) reasoningCache.delete(oldest.value[0]);
+    }
+}
 
 const WEEKLY_LIMIT = 100; // $100 per week
 
@@ -76,8 +96,9 @@ async function tryProvider(
     body: Record<string, any>,
     auth_type?: string,
     api_type?: string,
+    enable_search?: number,
 ): Promise<any> {
-    const { url, headers, requestBody: postBody } = buildRequestConfig(base_url, api_key, auth_type, api_type, body);
+    const { url, headers, requestBody: postBody } = buildRequestConfig(base_url, api_key, auth_type, api_type, body, enable_search);
     const agent = proxy_url ? new HttpsProxyAgent(proxy_url) : undefined;
 
     return new Promise((resolve) => {
@@ -102,6 +123,8 @@ async function tryProvider(
                     const parsed = JSON.parse(data);
                     if (api_type === "anthropic") {
                         resolve(anthropicToOpenAI(parsed, model));
+                    } else if (api_type === "gemini") {
+                        resolve(geminiToOpenAI(parsed, model));
                     } else {
                         resolve(parsed);
                     }
@@ -127,8 +150,10 @@ async function tryProviderStream(
     body: Record<string, any>,
     auth_type?: string,
     api_type?: string,
+    enable_search?: number,
+    captureReasoning?: boolean,
 ): Promise<{ stream: ReadableStream<Uint8Array> | null; reasoningContent: string }> {
-    const { url, headers, requestBody: postBody } = buildRequestConfig(base_url, api_key, auth_type, api_type, body);
+    const { url, headers, requestBody: postBody } = buildRequestConfig(base_url, api_key, auth_type, api_type, body, enable_search, true);
     const agent = proxy_url ? new HttpsProxyAgent(proxy_url) : undefined;
 
     return new Promise((resolve) => {
@@ -169,18 +194,20 @@ async function tryProviderStream(
                             return;
                         }
 
-                        // Parse chunk to extract reasoning_content (server-side logging only)
-                        const text = chunk.toString();
-                        const lines = text.split("\n");
-                        for (const line of lines) {
-                            if (line.startsWith("data: ") && !line.startsWith("data: [DONE]")) {
-                                try {
-                                    const data = JSON.parse(line.slice(6));
-                                    const delta = data.choices?.[0]?.delta;
-                                    if (delta?.reasoning_content) {
-                                        localReasoning += delta.reasoning_content;
-                                    }
-                                } catch { }
+                        // Only parse reasoning_content if caller needs it for replay
+                        if (captureReasoning) {
+                            const text = chunk.toString();
+                            const lines = text.split("\n");
+                            for (const line of lines) {
+                                if (line.startsWith("data: ") && !line.startsWith("data: [DONE]")) {
+                                    try {
+                                        const data = JSON.parse(line.slice(6));
+                                        const delta = data.choices?.[0]?.delta;
+                                        if (delta?.reasoning_content) {
+                                            localReasoning += delta.reasoning_content;
+                                        }
+                                    } catch { }
+                                }
                             }
                         }
                     });
@@ -198,7 +225,9 @@ async function tryProviderStream(
             });
 
             resolve({
-                stream: api_type === "anthropic" ? antStreamToOpenAI(rawStream) : rawStream,
+                stream: api_type === "anthropic" ? antStreamToOpenAI(rawStream)
+                    : api_type === "gemini" ? geminiStreamToOpenAI(rawStream, body.model || "")
+                    : rawStream,
                 reasoningContent: localReasoning,
             });
         });
@@ -237,8 +266,6 @@ async function requireModelAccess(account_id: string, alias: string): Promise<vo
     }
 }
 
-const reasoningRepo = Repository.instance<SessionReasoningEntity>("session_reasoning");
-
 export class AiService {
     static async chatCompletions(data: Record<string, any>, account_id: string): Promise<CompletionServiceResponse> {
         const requestedAlias = data.model;
@@ -264,24 +291,23 @@ export class AiService {
                 stream: false,
                 model: provider.model,
             };
-            const thinkConfig = provider.supports_thinking ? getThinkingConfig(requestedAlias, provider.api_type, provider.supports_reasoning_effort) : {};
-            const thinkingEnabled = !!(thinkConfig.thinking?.type === "enabled" || thinkConfig.reasoning_effort);
-            if (thinkingEnabled) {
-                Object.assign(requestBody, thinkConfig);
+            // Thinking is purely user-driven: `reasoning_effort` (OpenAI/DeepSeek) or
+            // `thinking` (Anthropic) — protocol converters translate per api_type.
+            const thinkingEnabled = !!(requestBody.reasoning_effort || requestBody.thinking?.type === "enabled");
 
-                const savedRecords = await reasoningRepo.find({ session_key: sessionKey });
-                const saved = new Map<string, string>();
-                for (const r of savedRecords) {
-                    saved.set(r.tool_call_id, r.reasoning_content);
-                }
+            // Replay previous reasoning only when the provider explicitly opts in
+            const replayReasoning = provider.replay_reasoning === 1;
+            if (replayReasoning && thinkingEnabled) {
                 for (const msg of requestBody.messages) {
                     if (msg.role === "assistant") {
+                        // User already provided reasoning — don't overwrite
+                        if (msg.reasoning_content) continue;
                         let rc = "";
                         if (msg.tool_calls && Array.isArray(msg.tool_calls)) {
                             for (const tc of msg.tool_calls) {
-                                if (tc.id && saved.has(tc.id)) {
-                                    rc = saved.get(tc.id)!;
-                                    break;
+                                if (tc.id) {
+                                    const cached = reasoningCacheGet(`${sessionKey}::${tc.id}`);
+                                    if (cached) { rc = cached; break; }
                                 }
                             }
                         }
@@ -290,7 +316,7 @@ export class AiService {
                 }
             }
 
-            const rdata = await tryProvider(provider.base_url, provider.model, provider.api_key, provider.proxy_url, requestBody, provider.auth_type, provider.api_type);
+            const rdata = await tryProvider(provider.base_url, provider.model, provider.api_key, provider.proxy_url, requestBody, provider.auth_type, provider.api_type, provider.enable_search);
             if (!rdata) {
                 await new Promise((r) => setTimeout(r, 500));
                 continue;
@@ -344,27 +370,22 @@ export class AiService {
 
         for (const provider of [...providers]) {
             const requestBody: Record<string, any> = { ...data, stream: true, model: provider.model };
-            const thinkConfig = provider.supports_thinking ? getThinkingConfig(requestedAlias, provider.api_type, provider.supports_reasoning_effort) : {};
-            const thinkingEnabled = !!(thinkConfig.thinking?.type === "enabled" || thinkConfig.reasoning_effort);
-            if (thinkingEnabled) {
-                Object.assign(requestBody, thinkConfig);
-            }
+            // Thinking is purely user-driven — converters translate per api_type
+            const thinkingEnabled = !!(requestBody.reasoning_effort || requestBody.thinking?.type === "enabled");
 
-            // Inject reasoning_content into all assistant messages (thinking mode requires this field)
-            if (thinkingEnabled) {
-                const savedRecords = await reasoningRepo.find({ session_key: sessionKey });
-                const saved = new Map<string, string>();
-                for (const r of savedRecords) {
-                    saved.set(r.tool_call_id, r.reasoning_content);
-                }
+            // Replay previous reasoning only when the provider explicitly opts in
+            const replayReasoning = provider.replay_reasoning === 1;
+            if (replayReasoning && thinkingEnabled) {
                 for (const msg of requestBody.messages) {
                     if (msg.role === "assistant") {
+                        // User already provided reasoning — don't overwrite
+                        if (msg.reasoning_content) continue;
                         let rc = "";
                         if (msg.tool_calls && Array.isArray(msg.tool_calls)) {
                             for (const tc of msg.tool_calls) {
-                                if (tc.id && saved.has(tc.id)) {
-                                    rc = saved.get(tc.id)!;
-                                    break;
+                                if (tc.id) {
+                                    const cached = reasoningCacheGet(`${sessionKey}::${tc.id}`);
+                                    if (cached) { rc = cached; break; }
                                 }
                             }
                         }
@@ -374,15 +395,15 @@ export class AiService {
             }
 
             const { base_url, api_key, proxy_url, auth_type, api_type } = provider;
-            const result = await tryProviderStream(base_url, api_key, proxy_url, requestBody, auth_type, api_type);
+            const result = await tryProviderStream(base_url, api_key, proxy_url, requestBody, auth_type, api_type, provider.enable_search, replayReasoning && thinkingEnabled);
 
             if (!result?.stream) {
                 await new Promise((r) => setTimeout(r, 500));
                 continue;
             }
 
-            // Save reasoning content keyed by tool_call id
-            if (thinkingEnabled && result.reasoningContent) {
+            // Save reasoning content in-memory keyed by tool_call id (only for replay-enabled providers)
+            if (replayReasoning && thinkingEnabled && result.reasoningContent) {
                 const msgs = data.messages;
                 let tcId: string | null = null;
                 for (let i = msgs.length - 1; i >= 0; i--) {
@@ -398,17 +419,7 @@ export class AiService {
                     }
                 }
                 if (tcId) {
-                    // Piggyback cleanup: delete reasoning records older than 14 days
-                    const first = await reasoningRepo.findOne({});
-                    if (first && first.create_time && Date.now() - first.create_time > 14 * 86400000) {
-                        await reasoningRepo.hardDelete({ id: first.id });
-                    }
-
-                    await reasoningRepo.insert({
-                        session_key: sessionKey,
-                        tool_call_id: tcId,
-                        reasoning_content: result.reasoningContent,
-                    });
+                    reasoningCacheSet(`${sessionKey}::${tcId}`, result.reasoningContent);
                 }
             }
 

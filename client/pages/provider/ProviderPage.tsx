@@ -4,7 +4,6 @@ import { ProviderDTO } from "../../../shared/modules/provider/provider.interface
 import { providerApi } from "../../api/instance";
 import { Locale } from "../../methods/locale";
 import { useDisclosure } from "@heroui/react";
-import { Button } from "@heroui/react";
 import { ProviderFilter } from "./components/ProviderFilter";
 import { ProviderTable } from "./components/ProviderTable";
 import { ProviderPagination } from "./components/ProviderPagination";
@@ -23,6 +22,8 @@ type ProviderForm = {
     proxy_url?: string;
     supports_thinking: number;
     supports_reasoning_effort: number;
+    replay_reasoning: number;
+    enable_search: number;
     enabled: number;
 };
 
@@ -37,7 +38,7 @@ export default function ProviderPage() {
     const { isOpen: isFormOpen, onOpen: onFormOpen, onClose: onFormClose, onOpenChange: onFormOpenChange } = useDisclosure();
     const [formMode, setFormMode] = useState<"create" | "edit">("create");
     const [editId, setEditId] = useState<string>("");
-    const [form, setForm] = useState<ProviderForm>({ model_alias: "", priority: 1, name: "", base_url: "", model: "", auth_type: "bearer", api_type: "openai", supports_thinking: 0, supports_reasoning_effort: 0, enabled: 1 });
+    const [form, setForm] = useState<ProviderForm>({ model_alias: "", priority: 1, name: "", base_url: "", model: "", auth_type: "bearer", api_type: "openai", supports_thinking: 0, supports_reasoning_effort: 0, replay_reasoning: 0, enable_search: 0, enabled: 1 });
 
     // Multi-select state
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -83,7 +84,7 @@ export default function ProviderPage() {
 
     const openCreate = () => {
         setFormMode("create");
-        setForm({ model_alias: "", priority: 1, name: "", base_url: "", model: "", auth_type: "bearer", api_type: "openai", supports_thinking: 0, supports_reasoning_effort: 0, enabled: 1 });
+        setForm({ model_alias: "", priority: 1, name: "", base_url: "", model: "", auth_type: "bearer", api_type: "openai", supports_thinking: 0, supports_reasoning_effort: 0, replay_reasoning: 0, enable_search: 0, enabled: 1 });
         onFormOpen();
     };
 
@@ -101,6 +102,8 @@ export default function ProviderPage() {
                 proxy_url: item.proxy_url || undefined,
                 supports_thinking: item.supports_thinking ?? 0,
                 supports_reasoning_effort: item.supports_reasoning_effort ?? 0,
+                replay_reasoning: item.replay_reasoning ?? 0,
+                enable_search: item.enable_search ?? 0,
                 enabled: item.enabled,
             },
         });
@@ -124,6 +127,8 @@ export default function ProviderPage() {
             proxy_url: item.proxy_url || "",
             supports_thinking: item.supports_thinking ?? 0,
             supports_reasoning_effort: item.supports_reasoning_effort ?? 0,
+            replay_reasoning: item.replay_reasoning ?? 0,
+            enable_search: item.enable_search ?? 0,
             enabled: item.enabled,
         });
         onFormOpen();
@@ -144,6 +149,8 @@ export default function ProviderPage() {
                     proxy_url: form.proxy_url || undefined,
                     supports_thinking: form.supports_thinking,
                     supports_reasoning_effort: form.supports_reasoning_effort,
+                    replay_reasoning: form.replay_reasoning,
+                    enable_search: form.enable_search,
                     enabled: form.enabled,
                 },
             });
@@ -167,6 +174,8 @@ export default function ProviderPage() {
                     proxy_url: form.proxy_url !== undefined ? form.proxy_url : undefined,
                     supports_thinking: form.supports_thinking,
                     supports_reasoning_effort: form.supports_reasoning_effort,
+                    replay_reasoning: form.replay_reasoning !== undefined ? form.replay_reasoning : undefined,
+                    enable_search: form.enable_search !== undefined ? form.enable_search : undefined,
                     enabled: form.enabled !== undefined ? form.enabled : undefined,
                 },
             });

@@ -14,6 +14,8 @@ export class ProviderDTO {
     public proxy_url?: string;
     public supports_thinking?: number;
     public supports_reasoning_effort?: number;
+    public replay_reasoning?: number;
+    public enable_search?: number;
     public enabled: number;
     public create_time: number;
     public update_time: number | null;
@@ -32,6 +34,8 @@ export class ProviderDTO {
         this.proxy_url = origin.proxy_url;
         this.supports_thinking = origin.supports_thinking;
         this.supports_reasoning_effort = origin.supports_reasoning_effort;
+        this.replay_reasoning = origin.replay_reasoning;
+        this.enable_search = origin.enable_search;
         this.enabled = origin.enabled;
         this.create_time = origin.create_time;
         this.update_time = origin.update_time;
@@ -51,9 +55,11 @@ export class ProviderCreateBody {
     public proxy_url?: string;
     public supports_thinking?: number;
     public supports_reasoning_effort?: number;
+    public replay_reasoning?: number;
+    public enable_search?: number;
     public enabled?: number;
 
-    constructor(origin: Pick<ProviderEntity, "model_alias" | "base_url" | "model" | "priority" | "name"> & Partial<Pick<ProviderEntity, "api_key" | "auth_type" | "api_type" | "proxy_url" | "supports_thinking" | "supports_reasoning_effort" | "enabled">>) {
+    constructor(origin: Pick<ProviderEntity, "model_alias" | "base_url" | "model" | "priority" | "name"> & Partial<Pick<ProviderEntity, "api_key" | "auth_type" | "api_type" | "proxy_url" | "supports_thinking" | "supports_reasoning_effort" | "replay_reasoning" | "enable_search" | "enabled">>) {
         if (!origin.model_alias || !origin.base_url || !origin.model || origin.priority === undefined) {
             throw new Error("model_alias, base_url, model and priority are required");
         }
@@ -68,6 +74,8 @@ export class ProviderCreateBody {
         this.proxy_url = origin.proxy_url;
         this.supports_thinking = origin.supports_thinking;
         this.supports_reasoning_effort = origin.supports_reasoning_effort;
+        this.replay_reasoning = origin.replay_reasoning;
+        this.enable_search = origin.enable_search;
         this.enabled = origin.enabled ?? 1;
     }
 
@@ -88,10 +96,12 @@ export class ProviderUpdateBody {
     public proxy_url?: string;
     public supports_thinking?: number;
     public supports_reasoning_effort?: number;
+    public replay_reasoning?: number;
+    public enable_search?: number;
     public enabled?: number;
 
     constructor(origin: Partial<ProviderEntity> = {}) {
-        if (!origin.model_alias && origin.priority === undefined && !origin.base_url && !origin.model && !origin.api_key && origin.api_key === undefined && !origin.auth_type && !origin.api_type && !origin.proxy_url && origin.supports_thinking === undefined && origin.supports_reasoning_effort === undefined && origin.enabled === undefined) {
+        if (!origin.model_alias && origin.priority === undefined && !origin.base_url && !origin.model && !origin.api_key && origin.api_key === undefined && !origin.auth_type && !origin.api_type && !origin.proxy_url && origin.supports_thinking === undefined && origin.supports_reasoning_effort === undefined && origin.replay_reasoning === undefined && origin.enable_search === undefined && origin.enabled === undefined) {
             throw new Error("At least one field is required");
         }
         origin.model_alias && (this.model_alias = origin.model_alias);
@@ -105,6 +115,8 @@ export class ProviderUpdateBody {
         origin.proxy_url !== undefined && (this.proxy_url = origin.proxy_url);
         origin.supports_thinking !== undefined && (this.supports_thinking = origin.supports_thinking);
         origin.supports_reasoning_effort !== undefined && (this.supports_reasoning_effort = origin.supports_reasoning_effort);
+        origin.replay_reasoning !== undefined && (this.replay_reasoning = origin.replay_reasoning);
+        origin.enable_search !== undefined && (this.enable_search = origin.enable_search);
         origin.enabled !== undefined && (this.enabled = origin.enabled);
     }
 

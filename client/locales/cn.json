@@ -57,6 +57,8 @@
         "ApiType": "接口协议",
         "SupportsThinking": "思考模式",
         "SupportsReasoningEffort": "推理强度",
+        "ReplayReasoning": "重放思维",
+        "Search": "联网搜索",
         "BatchThinkingOn": "批量开启思考",
         "BatchThinkingOff": "批量关闭思考",
         "Enabled": "启用",

@@ -39,6 +39,8 @@ export function ProviderTable({ list, onEdit, onCopy, onDelete, onMoveUp, onMove
                 <TableColumn align="center">{locale.ProxyURL}</TableColumn>
                 <TableColumn align="center">{locale.SupportsThinking}</TableColumn>
                 <TableColumn align="center">{locale.SupportsReasoningEffort}</TableColumn>
+                <TableColumn align="center">{locale.ReplayReasoning}</TableColumn>
+                <TableColumn align="center">{locale.Search}</TableColumn>
                 <TableColumn align="center">{locale.Enabled}</TableColumn>
                 <TableColumn>{locale.Actions}</TableColumn>
             </TableHeader>
@@ -82,6 +84,16 @@ export function ProviderTable({ list, onEdit, onCopy, onDelete, onMoveUp, onMove
                             <TableCell>
                                 <Chip color={item.supports_reasoning_effort ? "secondary" : "default"} size="sm" variant="flat">
                                     {item.supports_reasoning_effort ? locale.Yes : locale.No}
+                                </Chip>
+                            </TableCell>
+                            <TableCell>
+                                <Chip color={item.replay_reasoning ? "secondary" : "default"} size="sm" variant="flat">
+                                    {item.replay_reasoning ? locale.Yes : locale.No}
+                                </Chip>
+                            </TableCell>
+                            <TableCell>
+                                <Chip color={item.enable_search ? "secondary" : "default"} size="sm" variant="flat">
+                                    {item.enable_search ? locale.Yes : locale.No}
                                 </Chip>
                             </TableCell>
                             <TableCell>

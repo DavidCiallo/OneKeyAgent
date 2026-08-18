@@ -1,5 +1,5 @@
 /**
- * AI protocol conversion utilities: OpenAI ↔ Anthropic format interchange
+ * AI protocol conversion utilities: OpenAI ↔ Anthropic / Gemini format interchange
  */
 
 /** Convert OpenAI-format chat body to Anthropic format (for upstream Anthropic provider) */
@@ -66,6 +66,20 @@ export function toAnthropicBody(body: Record<string, any>): Record<string, any> 
 
     if (body.thinking) {
         result.thinking = body.thinking;
+    } else if (body.reasoning_effort) {
+        // OpenAI-style reasoning_effort → Anthropic extended thinking with a budget
+        const budgetMap: Record<string, number> = {
+            low: 2048,
+            medium: 8192,
+            high: 16384,
+            max: 32768,
+        };
+        const budget = typeof body.reasoning_effort === "number"
+            ? body.reasoning_effort
+            : budgetMap[body.reasoning_effort];
+        if (budget) {
+            result.thinking = { type: "enabled", budget_tokens: budget };
+        }
     }
 
     return result;
@@ -281,8 +295,6 @@ export function openAIToAntStream(upstream: ReadableStream<Uint8Array>): Readabl
             // 0 = text block, 1+ = tool_use blocks
             let textBlockIndex = 0;          // which block index for text
             let textBlockStarted = false;
-            let hasTextContent = false;
-            let hasToolCalls = false;
             const toolBlockIndices = new Map<number, number>(); // OpenAI tool index → Anthropic block index
             let finished = false;
 
@@ -349,7 +361,6 @@ export function openAIToAntStream(upstream: ReadableStream<Uint8Array>): Readabl
 
                             // Text content handling
                             if (content) {
-                                hasTextContent = true;
                                 if (!textBlockStarted) {
                                     await emitContentBlockStart(textBlockIndex, { type: "text", text: content });
                                     textBlockStarted = true;
@@ -360,7 +371,6 @@ export function openAIToAntStream(upstream: ReadableStream<Uint8Array>): Readabl
 
                             // Tool calls handling
                             if (toolCalls && Array.isArray(toolCalls)) {
-                                hasToolCalls = true;
                                 for (const tc of toolCalls) {
                                     const openaiIdx = tc.index;
                                     let antBlockIdx = toolBlockIndices.get(openaiIdx);
@@ -630,6 +640,464 @@ export function antStreamToOpenAI(upstream: ReadableStream<Uint8Array>): Readabl
             await writer.close();
         } catch {
             writer.close();
+        }
+    })();
+
+    return ts.readable;
+}
+
+/* ========================================================================
+ * Gemini (Google Generative Language API) interchange
+ * ===================================================================== */
+
+/**
+ * Convert OpenAI-format chat body to Gemini generateContent body.
+ * Handles system prompt, function calling (Google FunctionDeclaration) and
+ * googleSearch grounding tool passthrough.
+ */
+export function toGeminiBody(
+    body: Record<string, any>,
+    enable_search?: number,
+): Record<string, any> {
+    const messages = body.messages || [];
+    const systemMsgs = messages.filter((m: any) => m.role === "system");
+    const parts: Array<Record<string, any>> = [];
+    // OpenAI tool_call id → function name (needed to emit Gemini functionResponse)
+    const functionNameById = new Map<string, string>();
+
+    // system → systemInstruction (suffix), or inline to contents? Gemini supports
+    // systemInstruction separately; the role "system" in contents is invalid.
+    for (const m of messages) {
+        if (m.role === "system") continue;
+
+        // Stash tool_call id → function name mapping for later tool results
+        if (m.role === "assistant" && Array.isArray(m.tool_calls)) {
+            for (const tc of m.tool_calls) {
+                if (tc.id && tc.function?.name) {
+                    functionNameById.set(tc.id, tc.function.name);
+                }
+            }
+        }
+
+        // Consecutive user turns must be merged (Gemini contents must alternate)
+        if (m.role === "tool") {
+            // OpenAI tool result → functionResponse part
+            const last = parts[parts.length - 1];
+            const fnName = m.name || (m.tool_call_id ? functionNameById.get(m.tool_call_id) || `call_${m.tool_call_id}` : undefined) || "unknown";
+            const resp = {
+                name: fnName,
+                response: {
+                    content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+                },
+            };
+            // Gemini requires functionResponse part in a "user" turn
+            if (last && last.role === "model") {
+                parts.push({ role: "user", parts: [{ functionResponse: resp }] });
+            } else {
+                if (last) {
+                    last.parts = last.parts || [];
+                    last.parts.push({ functionResponse: resp });
+                } else {
+                    parts.push({ role: "user", parts: [{ functionResponse: resp }] });
+                }
+            }
+            continue;
+        }
+
+        const role = m.role === "assistant" ? "model" : "user";
+        const contentParts: Array<Record<string, any>> = [];
+
+        // Text content
+        if (m.content) {
+            contentParts.push({ text: typeof m.content === "string" ? m.content : JSON.stringify(m.content) });
+        }
+
+        // OpenAI tool_calls → Gemini functionCall parts (in a "model" turn)
+        if (role === "model" && m.tool_calls && Array.isArray(m.tool_calls)) {
+            for (const tc of m.tool_calls) {
+                contentParts.push({
+                    functionCall: {
+                        name: tc.function?.name || "",
+                        args: typeof tc.function?.arguments === "string"
+                            ? safeJsonParse(tc.function.arguments)
+                            : (tc.function?.arguments || {}),
+                    },
+                });
+            }
+        }
+
+        // reasoning_content passthrough (not part of Gemini protocol, but keep
+        // text content together); Gemini ignores unknown fields but we keep only text.
+        // (thought content from previous turns is intentionally dropped)
+
+        if (contentParts.length === 0) continue;
+
+        // Merge with previous turn of same role
+        const last = parts[parts.length - 1];
+        if (last && last.role === role) {
+            last.parts = (last.parts || []).concat(contentParts);
+        } else {
+            parts.push({ role, parts: contentParts });
+        }
+    }
+
+    const result: Record<string, any> = {
+        contents: parts,
+    };
+
+    if (systemMsgs.length > 0) {
+        result.systemInstruction = {
+            parts: systemMsgs.map((m: any) => ({ text: m.content })),
+        };
+    }
+
+    // OpenAI tools → Gemini functionDeclarations (must be wrapped)
+    if (body.tools && Array.isArray(body.tools)) {
+        const functions: Array<Record<string, any>> = [];
+        const otherTools: Array<Record<string, any>> = [];
+        for (const t of body.tools) {
+            if (t.type === "function" && t.function) {
+                functions.push({
+                    name: t.function.name,
+                    description: t.function.description || "",
+                    parameters: t.function.parameters || (t.function.input_schema ? t.function.input_schema : {}),
+                });
+            } else {
+                // Already Gemini-style tool entry (googleSearch etc.)
+                otherTools.push(t);
+            }
+        }
+        result.tools = [];
+        if (functions.length > 0) result.tools.push({ functionDeclarations: functions });
+        result.tools.push(...otherTools);
+    }
+
+    // Google search grounding tool (enable_search flag on provider)
+    if (enable_search) {
+        const tools = result.tools || [];
+        tools.push({ googleSearch: {} });
+        result.tools = tools;
+    }
+
+    // Generation config
+    const genConfig: Record<string, any> = {};
+    if (body.temperature !== undefined) genConfig.temperature = body.temperature;
+    if (body.max_tokens !== undefined) genConfig.maxOutputTokens = body.max_tokens;
+    if (body.top_p !== undefined) genConfig.topP = body.top_p;
+    if (body.stop && Array.isArray(body.stop) && body.stop.length) genConfig.stopSequences = body.stop;
+    if (Object.keys(genConfig).length > 0) result.generationConfig = genConfig;
+
+    // Thinking: OpenAI-style reasoning_effort or Anthropic-style thinking →
+    // Gemini thinkingConfig (if the model supports it)
+    const thinkingBudget = body.thinking?.budget_tokens ?? body.thinking?.thinkingBudget;
+    const effortBudgetMap: Record<string, number> = {
+        low: 1024,
+        medium: 4096,
+        high: 8192,
+        max: 16384,
+    };
+    const effortBudget = typeof body.reasoning_effort === "number"
+        ? body.reasoning_effort
+        : effortBudgetMap[body.reasoning_effort];
+    const budget = thinkingBudget || effortBudget;
+    if (body.thinking?.type === "enabled" || body.reasoning_effort) {
+        const tc = result.generationConfig?.thinkingConfig || {};
+        tc.includeThoughts = true;
+        if (budget) tc.thinkingBudget = budget;
+        result.generationConfig = result.generationConfig || {};
+        result.generationConfig.thinkingConfig = tc;
+    }
+
+    return result;
+}
+
+/** Safe JSON.parse that returns fallback on failure */
+function safeJsonParse(s: string): any {
+    try {
+        return JSON.parse(s);
+    } catch {
+        return {};
+    }
+}
+
+/** Extract pure text content from a Gemini content/parts array */
+function geminiTextFromParts(parts: Array<Record<string, any>>): string {
+    return (parts || [])
+        .filter((p: any) => p?.text)
+        .map((p: any) => p.text)
+        .join("");
+}
+
+/** Extract tool calls from Gemini candidate content parts (functionCall blocks) */
+function geminiToolCalls(parts: Array<Record<string, any>>): Array<Record<string, any>> {
+    const calls: Array<Record<string, any>> = [];
+    (parts || []).forEach((p: any, idx: number) => {
+        if (p?.functionCall) {
+            calls.push({
+                id: `call_${idx}`,
+                type: "function",
+                function: {
+                    name: p.functionCall.name || "",
+                    arguments: JSON.stringify(p.functionCall.args || {}),
+                },
+            });
+        }
+    });
+    return calls;
+}
+
+/** Extract thinking text from Gemini candidate parts (thought=true) */
+function geminiThoughtText(parts: Array<Record<string, any>>): string {
+    return (parts || [])
+        .filter((p: any) => p?.thought === true && p?.text)
+        .map((p: any) => p.text)
+        .join("");
+}
+
+/** Extract grounding citations from a Gemini candidate (groundingMetadata) */
+function geminiGrounding(candidate: any): Array<Record<string, any>> {
+    const meta = candidate?.groundingMetadata;
+    if (!meta) return [];
+    const citations: Array<Record<string, any>> = [];
+    const chunks = meta.groundingChunks || [];
+    for (let i = 0; i < chunks.length; i++) {
+        const web = chunks[i]?.web;
+        if (web?.uri) {
+            citations.push({ index: i, uri: web.uri, title: web.title || "" });
+        }
+    }
+    // fallback: groundingSupports provides indices into groundingChunks
+    if (citations.length === 0 && meta.groundingSupports && Array.isArray(meta.groundingSupports)) {
+        for (const sup of meta.groundingSupports) {
+            const seg = sup?.segment || {};
+            const idxs = (sup.groundingChunkIndices || []).filter((idx: number) => idx < chunks.length);
+            for (const idx of idxs) {
+                const web = chunks[idx]?.web;
+                if (web?.uri) citations.push({ index: idx, uri: web.uri, title: web.title || "", segment: seg.text || "" });
+            }
+        }
+    }
+    return citations;
+}
+
+/**
+ * Convert a Gemini non-stream generateContent response to OpenAI chat.completion format.
+ * - content parts [] → choices[].message.content
+ * - thought parts → message.reasoning_content
+ * - functionCall parts → choices[].message.tool_calls
+ * - groundingMetadata → message.metadata.grounding (citations)
+ */
+export function geminiToOpenAI(data: any, model: string): any {
+    const candidate = data?.candidates?.[0] || {};
+    const parts = candidate?.content?.parts || [];
+
+    const textContent = geminiTextFromParts(parts);
+    const toolCalls = geminiToolCalls(parts);
+    const thinking = geminiThoughtText(parts);
+    const grounding = geminiGrounding(candidate);
+
+    const message: Record<string, any> = { role: "assistant", content: textContent || null };
+    if (toolCalls.length > 0) message.tool_calls = toolCalls;
+    if (thinking) message.reasoning_content = thinking;
+    if (grounding.length > 0) {
+        message.metadata = { grounding: { citations: grounding } };
+    }
+
+    const usage = data?.usageMetadata;
+    return {
+        id: data?.id || `chatcmpl-${crypto.randomUUID()}`,
+        model,
+        object: "chat.completion",
+        choices: [{
+            index: 0,
+            message,
+            finish_reason: candidate?.finishReason === "STOP" ? "stop"
+                : candidate?.finishReason === "TOOL_CALL" || candidate?.finishReason === "FUNCTION_CALL" ? "tool_calls"
+                : candidate?.finishReason?.toLowerCase?.() || "stop",
+        }],
+        usage: usage ? {
+            prompt_tokens: usage.promptTokenCount ?? 0,
+            completion_tokens: usage.candidatesTokenCount ?? 0,
+            total_tokens: (usage.promptTokenCount ?? 0) + (usage.candidatesTokenCount ?? 0),
+            prompt_tokens_details: {
+                cached_tokens: usage.cachedContentTokenCount ?? 0,
+            },
+        } : undefined,
+    };
+}
+
+/**
+ * Convert a Gemini streamGenerateContent SSE stream (alt=sse) to OpenAI SSE
+ * chat.completion.chunk stream. Each Gemini SSE payload is a full candidate
+ * snapshot, so we emit deltas by diffing consecutive text parts.
+ *
+ * Handles:
+ *  - text parts → choices[].delta.content
+ *  - thought=true parts → choices[].delta.reasoning_content
+ *  - functionCall parts → choices[].delta.tool_calls (aggregated via fragments)
+ *  - usageMetadata (last chunk) → top-level usage
+ *  - finishReason STOP → finish_reason stop, then [DONE]
+ */
+export function geminiStreamToOpenAI(upstream: ReadableStream<Uint8Array>, model: string): ReadableStream<Uint8Array> {
+    const ts = new TransformStream<Uint8Array, Uint8Array>();
+    const writer = ts.writable.getWriter();
+    const decoder = new TextDecoder();
+    const encoder = new TextEncoder();
+
+    (async () => {
+        try {
+            const reader = upstream.getReader();
+            let buffer = "";
+            let prevText = "";
+            let prevThought = "";
+            let prevToolSignatures = new Set<string>();   // "name:argsLen" seen so far
+            let sentRole = false;
+            let finished = false;
+            let finalUsage: any = null;
+
+            function emit(chunk: Record<string, any>) {
+                const payload = JSON.stringify(chunk);
+                writer.write(encoder.encode(`data: ${payload}\n\n`));
+            }
+
+            function emitFinish(reason: string) {
+                if (finished) return;
+                finished = true;
+                emit({
+                    id: crypto.randomUUID(),
+                    object: "chat.completion.chunk",
+                    created: Math.floor(Date.now() / 1000),
+                    model,
+                    choices: [{ index: 0, delta: {}, finish_reason: reason }],
+                });
+                if (finalUsage) {
+                    emit({
+                        id: crypto.randomUUID(),
+                        object: "chat.completion.chunk",
+                        created: Math.floor(Date.now() / 1000),
+                        model,
+                        choices: [],
+                        usage: {
+                            prompt_tokens: finalUsage.promptTokenCount ?? 0,
+                            completion_tokens: finalUsage.candidatesTokenCount ?? 0,
+                            total_tokens: (finalUsage.promptTokenCount ?? 0) + (finalUsage.candidatesTokenCount ?? 0),
+                            prompt_tokens_details: { cached_tokens: finalUsage.cachedContentTokenCount ?? 0 },
+                        },
+                    });
+                }
+                writer.write(encoder.encode("data: [DONE]\n\n"));
+            }
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split("\n");
+                buffer = lines.pop() || "";
+
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!trimmed.startsWith("data:")) continue;
+                    const payload = trimmed.slice(5).trim();
+                    if (!payload || payload === "[DONE]") continue;
+
+                    try {
+                        const data = JSON.parse(payload);
+                        if (data.usageMetadata) finalUsage = data.usageMetadata;
+
+                        const cand = data.candidates?.[0];
+                        if (!cand) continue;
+
+                        const parts = cand.content?.parts || [];
+                        const text = parts.filter((p: any) => p?.text && p?.thought !== true).map((p: any) => p.text).join("");
+                        const thought = parts.filter((p: any) => p?.thought === true && p?.text).map((p: any) => p.text).join("");
+                        const toolCalls: Array<any> = [];
+                        parts.forEach((p: any, idx: number) => {
+                            if (p?.functionCall) {
+                                toolCalls.push({
+                                    index: idx,
+                                    id: `call_${idx}`,
+                                    type: "function",
+                                    function: {
+                                        name: p.functionCall.name || "",
+                                        arguments: JSON.stringify(p.functionCall.args || {}),
+                                    },
+                                });
+                            }
+                        });
+
+                        const delta: Record<string, any> = {};
+                        if (!sentRole) {
+                            delta.role = "assistant";
+                            sentRole = true;
+                        }
+
+                        // Text delta (diff against previous snapshot)
+                        if (text.length > prevText.length) {
+                            delta.content = text.slice(prevText.length);
+                        } else if (text.length < prevText.length) {
+                            // Reset (new candidate snapshot) — emit full text
+                            delta.content = text;
+                        }
+                        prevText = text;
+
+                        // Thought delta
+                        if (thought.length > prevThought.length) {
+                            delta.reasoning_content = thought.slice(prevThought.length);
+                        } else if (thought.length < prevThought.length) {
+                            delta.reasoning_content = thought;
+                        }
+                        prevThought = thought;
+
+                        // Tool calls: emit any newly-seen functionCall (by name+args signature)
+                        if (toolCalls.length > 0) {
+                            const newCalls: Array<any> = [];
+                            for (const c of toolCalls) {
+                                const sig = `${c.function.name}:${c.function.arguments.length}`;
+                                if (!prevToolSignatures.has(sig)) {
+                                    prevToolSignatures.add(sig);
+                                    newCalls.push(c);
+                                }
+                            }
+                            if (newCalls.length > 0) delta.tool_calls = newCalls;
+                        }
+                        prevToolSignatures = new Set(
+                            [...prevToolSignatures].filter(sig => toolCalls.some((c: any) => `${c.function.name}:${c.function.arguments.length}` === sig)),
+                        );
+
+                        // Grounding citations on the last chunk with metadata
+                        if (cand.groundingMetadata) {
+                            const grounding = geminiGrounding(cand);
+                            if (grounding.length > 0) {
+                                delta.metadata = { grounding: { citations: grounding } };
+                            }
+                        }
+
+                        const hasContent = delta.content !== undefined || delta.reasoning_content !== undefined || delta.tool_calls !== undefined;
+                        if (hasContent) {
+                            emit({
+                                id: crypto.randomUUID(),
+                                object: "chat.completion.chunk",
+                                created: Math.floor(Date.now() / 1000),
+                                model,
+                                choices: [{ index: 0, delta, finish_reason: null }],
+                            });
+                        }
+
+                        if (cand.finishReason) {
+                            const reason = cand.finishReason === "STOP" ? "stop"
+                                : cand.finishReason === "TOOL_CALL" || cand.finishReason === "FUNCTION_CALL" ? "tool_calls"
+                                : cand.finishReason?.toLowerCase?.() || "stop";
+                            emitFinish(reason);
+                        }
+                    } catch { }
+                }
+            }
+
+            if (!finished) emitFinish("stop");
+            await writer.close();
+        } catch {
+            try { await writer.close(); } catch { }
         }
     })();
 
