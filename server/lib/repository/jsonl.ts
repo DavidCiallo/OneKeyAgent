@@ -105,7 +105,7 @@ function matches(row: Record<string, any>, where: Record<string, any>): boolean 
                 if (op === "$gt")  { if (!(rowVal > opVal)) return false; }
                 if (op === "$gte") { if (!(rowVal >= opVal)) return false; }
                 if (op === "$lt")  { if (!(rowVal < opVal)) return false; }
-                if (op === "$lte") { if (!(rowVal >= opVal)) return false; }
+                if (op === "$lte") { if (!(rowVal <= opVal)) return false; }
                 if (op === "$in")  { if (!Array.isArray(opVal) || !opVal.includes(rowVal)) return false; }
             }
         } else {
