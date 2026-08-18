@@ -1,4 +1,4 @@
-import { toAnthropicBody } from "./ai.trans";
+import { toAnthropicBody, toGeminiBody } from "./ai.trans";
 
 /** Build Authorization header value based on auth type */
 export function buildAuthHeader(api_key: string | undefined, auth_type?: string): string {
@@ -14,14 +14,42 @@ export function buildRequestConfig(
     auth_type: string | undefined,
     api_type: string | undefined,
     body: Record<string, any>,
+    enable_search?: number,
+    stream?: boolean,
 ): { url: URL; headers: Record<string, string>; requestBody: string } {
     const isAnthropic = api_type === "anthropic";
-    const path = isAnthropic ? "/messages" : "/chat/completions";
+    const isGemini = api_type === "gemini";
+
+    let path = "/chat/completions";
+    if (isAnthropic) path = "/messages";
+    if (isGemini) {
+        const action = stream ? "streamGenerateContent" : "generateContent";
+        path = `/models/${encodeURIComponent(body.model || "gemini-2.5-flash")}:${action}${stream ? "?alt=sse" : ""}`;
+    }
+
     const url = new URL(`${base_url}${path}`);
 
-    const postBody = isAnthropic
-        ? JSON.stringify(toAnthropicBody(body))
-        : JSON.stringify(body);
+    let postBody: string;
+    if (isAnthropic) {
+        postBody = JSON.stringify(toAnthropicBody(body));
+    } else if (isGemini) {
+        postBody = JSON.stringify(toGeminiBody(body, enable_search));
+    } else {
+        // OpenAI-compatible: normalize thinking intent to the standard `reasoning_effort`.
+        // Anthropic-style `thinking:{type:"enabled"}` gets translated — budget_tokens
+        // maps to a medium/high effort level so the intent isn't silently dropped.
+        const cleanBody = { ...body };
+        if (cleanBody.thinking?.type === "enabled" && !cleanBody.reasoning_effort) {
+            const budget = cleanBody.thinking.budget_tokens;
+            if (typeof budget === "number") {
+                cleanBody.reasoning_effort = budget >= 16384 ? "high" : budget >= 8192 ? "medium" : "low";
+            } else {
+                cleanBody.reasoning_effort = "high";
+            }
+        }
+        delete cleanBody.thinking;
+        postBody = JSON.stringify(cleanBody);
+    }
 
     const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -31,6 +59,8 @@ export function buildRequestConfig(
     if (isAnthropic) {
         headers["x-api-key"] = api_key || "";
         headers["anthropic-version"] = "2023-06-01";
+    } else if (isGemini) {
+        headers["x-goog-api-key"] = api_key || "";
     } else {
         headers["Authorization"] = buildAuthHeader(api_key, auth_type);
     }
@@ -53,33 +83,4 @@ export function calculateCost(
     const nonCached = Math.max(0, input_tokens - cached_input_tokens);
     const cost = (cached_input_tokens * effectiveCachePrice + nonCached * input_price + output_tokens * output_price) / 1_000_000;
     return Math.round(cost * 1_000_000) / 1_000_000; // 6 decimal precision
-}
-
-/** Determine thinking/reasoning config from model alias suffix and api type */
-export function getThinkingConfig(alias: string, api_type?: string, supports_reasoning_effort?: number): { thinking?: { type: string; budget_tokens?: number }; reasoning_effort?: string } {
-    const match = alias.match(/^(.*)-think-(low|medium|high|max)$/);
-    if (!match) return {};
-
-    const level = match[2] as "low" | "medium" | "high" | "max";
-
-    if (api_type === "anthropic") {
-        const budgetMap: Record<string, number> = {
-            low: 2048,
-            medium: 8192,
-            high: 16384,
-            max: 32768,
-        };
-        return {
-            thinking: { type: "enabled", budget_tokens: budgetMap[level] || 8192 },
-        };
-    }
-
-    // OpenAI-compatible: always send thinking, conditionally add reasoning_effort
-    const result: { thinking: { type: string }; reasoning_effort?: string } = {
-        thinking: { type: "enabled" },
-    };
-    if (supports_reasoning_effort) {
-        result.reasoning_effort = level;
-    }
-    return result;
 }

@@ -13,6 +13,8 @@ type ProviderForm = {
     proxy_url?: string;
     supports_thinking: number;
     supports_reasoning_effort: number;
+    replay_reasoning: number;
+    enable_search: number;
     enabled: number;
 };
 
@@ -90,7 +92,15 @@ export function ProviderFormModal({ isOpen, onOpenChange, mode, form, onFormChan
                         >
                             <SelectItem key="openai">OpenAI</SelectItem>
                             <SelectItem key="anthropic">Anthropic</SelectItem>
+                            <SelectItem key="gemini">Gemini</SelectItem>
                         </Select>
+                        <div className="flex flex-row items-center gap-2">
+                            <span className="text-sm">{locale.Search}</span>
+                            <Switch
+                                isSelected={form.enable_search === 1}
+                                onValueChange={v => onFormChange({ ...form, enable_search: v ? 1 : 0 })}
+                            />
+                        </div>
                         <Input
                             label={locale.ProxyURL}
                             value={form.proxy_url || ""}
@@ -108,6 +118,13 @@ export function ProviderFormModal({ isOpen, onOpenChange, mode, form, onFormChan
                             <Switch
                                 isSelected={form.supports_reasoning_effort === 1}
                                 onValueChange={v => onFormChange({ ...form, supports_reasoning_effort: v ? 1 : 0 })}
+                            />
+                        </div>
+                        <div className="flex flex-row items-center gap-2">
+                            <span className="text-sm">{locale.ReplayReasoning}</span>
+                            <Switch
+                                isSelected={form.replay_reasoning === 1}
+                                onValueChange={v => onFormChange({ ...form, replay_reasoning: v ? 1 : 0 })}
                             />
                         </div>
                         <div className="flex flex-row items-center gap-2">

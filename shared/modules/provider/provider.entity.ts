@@ -13,6 +13,8 @@ export interface ProviderEntity extends BaseEntity {
     proxy_url?: string;
     supports_thinking?: number;
     supports_reasoning_effort?: number;
+    replay_reasoning?: number;
+    enable_search?: number;
     enabled: number;
     create_time: number;
     update_time: number;

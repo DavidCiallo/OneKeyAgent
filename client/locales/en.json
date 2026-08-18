@@ -54,6 +54,8 @@
         "ApiType": "API Type",
         "SupportsThinking": "Thinking",
         "SupportsReasoningEffort": "Effort",
+        "ReplayReasoning": "Replay",
+        "Search": "Search",
         "BatchThinkingOn": "Batch Thinking On",
         "BatchThinkingOff": "Batch Thinking Off",
         "Enabled": "Enabled",
