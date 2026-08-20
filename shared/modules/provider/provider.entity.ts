@@ -15,6 +15,7 @@ export interface ProviderEntity extends BaseEntity {
     supports_reasoning_effort?: number;
     replay_reasoning?: number;
     enable_search?: number;
+    extra_json?: string;
     enabled: number;
     create_time: number;
     update_time: number;

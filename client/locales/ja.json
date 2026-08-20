@@ -50,6 +50,7 @@
         "Model": "モデル",
         "ApiKey": "ApiKey",
         "ProxyURL": "プロキシURL",
+        "ExtraJson": "追加パラメータ (JSON)",
         "AuthType": "認証タイプ",
         "ApiType": "APIタイプ",
         "SupportsThinking": "思考",
