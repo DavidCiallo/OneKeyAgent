@@ -32,6 +32,20 @@ function reasoningCacheSet(key: string, reasoning: string): void {
     }
 }
 
+/** Merge provider-level extra_json (string) into requestBody as shallow overrides */
+function mergeExtraJson(body: Record<string, any>, extra_json?: string): Record<string, any> {
+    if (!extra_json) return body;
+    try {
+        const extra = JSON.parse(extra_json);
+        if (extra && typeof extra === "object" && !Array.isArray(extra)) {
+            Object.assign(body, extra);
+        }
+    } catch {
+        // Invalid JSON — ignore silently, request proceeds unchanged
+    }
+    return body;
+}
+
 const WEEKLY_LIMIT = 100; // $100 per week
 
 /** Get total weekly spending for an account (uses pre-aggregated usage_bucket) */
@@ -291,6 +305,8 @@ export class AiService {
                 stream: false,
                 model: provider.model,
             };
+            // Shallow-merge provider-level extra_json overrides (OpenRouter-style params etc.)
+            mergeExtraJson(requestBody, provider.extra_json);
             // Thinking is purely user-driven: `reasoning_effort` (OpenAI/DeepSeek) or
             // `thinking` (Anthropic) — protocol converters translate per api_type.
             const thinkingEnabled = !!(requestBody.reasoning_effort || requestBody.thinking?.type === "enabled");
@@ -370,6 +386,8 @@ export class AiService {
 
         for (const provider of [...providers]) {
             const requestBody: Record<string, any> = { ...data, stream: true, model: provider.model };
+            // Shallow-merge provider-level extra_json overrides (OpenRouter-style params etc.)
+            mergeExtraJson(requestBody, provider.extra_json);
             // Thinking is purely user-driven — converters translate per api_type
             const thinkingEnabled = !!(requestBody.reasoning_effort || requestBody.thinking?.type === "enabled");
 

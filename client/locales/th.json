@@ -47,6 +47,7 @@
         "Model": "โมเดล",
         "ApiKey": "ApiKey",
         "ProxyURL": "Proxy URL",
+        "ExtraJson": "พารามิเตอร์เพิ่มเติม (JSON)",
         "AuthType": "ประเภทการยืนยันตัวตน",
         "ApiType": "ประเภท API",
         "SupportsThinking": "โหมดคิด",

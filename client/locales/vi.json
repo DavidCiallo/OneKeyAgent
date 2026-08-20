@@ -47,6 +47,7 @@
         "Model": "Mô hình",
         "ApiKey": "ApiKey",
         "ProxyURL": "Proxy URL",
+        "ExtraJson": "Tham số bổ sung (JSON)",
         "AuthType": "Loại xác thực",
         "ApiType": "Loại API",
         "SupportsThinking": "Suy nghĩ",

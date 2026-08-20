@@ -53,6 +53,7 @@
         "Model": "模型",
         "ApiKey": "ApiKey",
         "ProxyURL": "代理URL",
+        "ExtraJson": "附加参数 (JSON)",
         "AuthType": "认证类型",
         "ApiType": "接口协议",
         "SupportsThinking": "思考模式",

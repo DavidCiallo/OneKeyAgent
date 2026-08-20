@@ -1,4 +1,4 @@
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Select, SelectItem, Switch } from "@heroui/react";
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Textarea, Select, SelectItem, Switch } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
 
 type ProviderForm = {
@@ -11,6 +11,7 @@ type ProviderForm = {
     auth_type: string;
     api_type: string;
     proxy_url?: string;
+    extra_json?: string;
     supports_thinking: number;
     supports_reasoning_effort: number;
     replay_reasoning: number;
@@ -94,46 +95,59 @@ export function ProviderFormModal({ isOpen, onOpenChange, mode, form, onFormChan
                             <SelectItem key="anthropic">Anthropic</SelectItem>
                             <SelectItem key="gemini">Gemini</SelectItem>
                         </Select>
-                        <div className="flex flex-row items-center gap-2">
-                            <span className="text-sm">{locale.Search}</span>
-                            <Switch
-                                isSelected={form.enable_search === 1}
-                                onValueChange={v => onFormChange({ ...form, enable_search: v ? 1 : 0 })}
-                            />
+                        <div className="flex flex-row items-center gap-4 flex-wrap">
+                            <div className="flex flex-row items-center gap-1.5">
+                                <span className="text-sm whitespace-nowrap">{locale.Search}</span>
+                                <Switch
+                                    size="sm"
+                                    isSelected={form.enable_search === 1}
+                                    onValueChange={v => onFormChange({ ...form, enable_search: v ? 1 : 0 })}
+                                />
+                            </div>
+                            <div className="flex flex-row items-center gap-1.5">
+                                <span className="text-sm whitespace-nowrap">{locale.SupportsThinking}</span>
+                                <Switch
+                                    size="sm"
+                                    isSelected={form.supports_thinking === 1}
+                                    onValueChange={v => onFormChange({ ...form, supports_thinking: v ? 1 : 0 })}
+                                />
+                            </div>
+                            <div className="flex flex-row items-center gap-1.5">
+                                <span className="text-sm whitespace-nowrap">{locale.SupportsReasoningEffort}</span>
+                                <Switch
+                                    size="sm"
+                                    isSelected={form.supports_reasoning_effort === 1}
+                                    onValueChange={v => onFormChange({ ...form, supports_reasoning_effort: v ? 1 : 0 })}
+                                />
+                            </div>
+                            <div className="flex flex-row items-center gap-1.5">
+                                <span className="text-sm whitespace-nowrap">{locale.ReplayReasoning}</span>
+                                <Switch
+                                    size="sm"
+                                    isSelected={form.replay_reasoning === 1}
+                                    onValueChange={v => onFormChange({ ...form, replay_reasoning: v ? 1 : 0 })}
+                                />
+                            </div>
+                            <div className="flex flex-row items-center gap-1.5">
+                                <span className="text-sm whitespace-nowrap">{locale.Enabled}</span>
+                                <Switch
+                                    size="sm"
+                                    isSelected={form.enabled === 1}
+                                    onValueChange={v => onFormChange({ ...form, enabled: v ? 1 : 0 })}
+                                />
+                            </div>
                         </div>
                         <Input
                             label={locale.ProxyURL}
                             value={form.proxy_url || ""}
                             onChange={e => onFormChange({ ...form, proxy_url: e.target.value })}
                         />
-                        <div className="flex flex-row items-center gap-2">
-                            <span className="text-sm">{locale.SupportsThinking}</span>
-                            <Switch
-                                isSelected={form.supports_thinking === 1}
-                                onValueChange={v => onFormChange({ ...form, supports_thinking: v ? 1 : 0 })}
-                            />
-                        </div>
-                        <div className="flex flex-row items-center gap-2">
-                            <span className="text-sm">{locale.SupportsReasoningEffort}</span>
-                            <Switch
-                                isSelected={form.supports_reasoning_effort === 1}
-                                onValueChange={v => onFormChange({ ...form, supports_reasoning_effort: v ? 1 : 0 })}
-                            />
-                        </div>
-                        <div className="flex flex-row items-center gap-2">
-                            <span className="text-sm">{locale.ReplayReasoning}</span>
-                            <Switch
-                                isSelected={form.replay_reasoning === 1}
-                                onValueChange={v => onFormChange({ ...form, replay_reasoning: v ? 1 : 0 })}
-                            />
-                        </div>
-                        <div className="flex flex-row items-center gap-2">
-                            <span className="text-sm">{locale.Enabled}</span>
-                            <Switch
-                                isSelected={form.enabled === 1}
-                                onValueChange={v => onFormChange({ ...form, enabled: v ? 1 : 0 })}
-                            />
-                        </div>
+                        <Textarea
+                            label={locale.ExtraJson}
+                            placeholder={'{"provider":{"order":["OpenAI","Anthropic"]},"route":"fallback"}'}
+                            value={form.extra_json || ""}
+                            onChange={e => onFormChange({ ...form, extra_json: e.target.value })}
+                        />
                     </div>
                 </ModalBody>
                 <ModalFooter>

@@ -50,6 +50,7 @@
         "Model": "Model",
         "ApiKey": "ApiKey",
         "ProxyURL": "Proxy URL",
+        "ExtraJson": "Extra JSON (overrides)",
         "AuthType": "Auth Type",
         "ApiType": "API Type",
         "SupportsThinking": "Thinking",

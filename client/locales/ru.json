@@ -50,6 +50,7 @@
         "Model": "Модель",
         "ApiKey": "ApiKey",
         "ProxyURL": "URL прокси",
+        "ExtraJson": "Доп. параметры (JSON)",
         "AuthType": "Тип аутентификации",
         "ApiType": "Тип API",
         "SupportsThinking": "Мышление",
