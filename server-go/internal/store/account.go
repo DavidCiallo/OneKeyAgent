@@ -181,7 +181,6 @@ var updatable = map[string][]string{
 	"role":     {"name", "type"},
 	"settings": {"key", "value"},
 	"gift_card": {"code", "token_amount", "status", "redeemed_by", "redeemed_at"},
-	"task":     {"account_id", "task_text", "folder", "status"},
 	"account_role": {"account_id", "role_id"},
 	"usage_bucket": {"account_id", "model_alias", "provider_id", "bucket_time", "granularity", "input_tokens", "cached_input_tokens", "output_tokens", "cost", "request_count"},
 	"transaction": {"account_id", "txid", "amount", "confirmations", "status", "payment_id", "type"},

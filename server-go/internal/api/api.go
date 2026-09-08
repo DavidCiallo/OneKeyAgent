@@ -88,13 +88,6 @@ func (a *App) Routes() *http.ServeMux {
 		{"/api/usage/stats", a.wrap(a.usageStats)},
 		{"/api/usage/sessions", a.wrap(a.usageSessions)},
 		{"/api/usage/stats/batch", a.wrap(a.usageStatsBatch)},
-		// task
-		{"/api/task/poll", a.wrap(a.taskPoll)},
-		{"/api/task/receive", a.wrap(a.taskReceive)},
-		{"/api/task/complete", a.wrap(a.taskComplete)},
-		{"/api/task/message", a.wrap(a.taskMessage)},
-		// telegram
-		{"/api/tg/webhook", a.wrap(a.tgWebhook)},
 		// subscription
 		{"/api/subscription/records", a.wrap(a.subscriptionRecords)},
 		{"/api/subscription/createtopup", a.wrap(a.subscriptionCreateTopup)},

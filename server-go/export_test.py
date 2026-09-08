@@ -25,7 +25,7 @@ B = f"http://127.0.0.1:{PORT}"
 ADMIN_EMAIL, ADMIN_PASSWORD = "admin@test.local", "admin-pass-123"
 
 COLLECTION_KEYS = ["accounts", "models", "providers", "roles", "account_roles",
-                   "transactions", "tasks", "usage_buckets", "gift_cards", "settings", "session_reasonings"]
+                   "transactions", "usage_buckets", "gift_cards", "settings", "session_reasonings"]
 
 fails = []
 def check(name, cond, detail=""):
@@ -78,13 +78,13 @@ def main():
 
         # export includes soft-deleted rows (TS findAllIgnoreDelete semantics)
         con2 = sqlite3.connect(DB)
-        con2.execute("UPDATE task SET delete_time = 1234567890 WHERE id = (SELECT id FROM task LIMIT 1)")
+        con2.execute('UPDATE "transaction" SET delete_time = 1234567890 WHERE id = (SELECT id FROM "transaction" LIMIT 1)')
         con2.commit()
-        total_tasks = con2.execute("SELECT COUNT(*) FROM task").fetchone()[0]
-        alive_tasks = con2.execute("SELECT COUNT(*) FROM task WHERE delete_time IS NULL").fetchone()[0]
+        total_tx = con2.execute('SELECT COUNT(*) FROM "transaction"').fetchone()[0]
+        alive_tx = con2.execute('SELECT COUNT(*) FROM "transaction" WHERE delete_time IS NULL').fetchone()[0]
         con2.close()
-        check("export includes soft-deleted rows", total_tasks > alive_tasks and len(data["tasks"]) == total_tasks,
-              f"total={total_tasks} alive={alive_tasks} exported={len(data['tasks'])}")
+        check("export includes soft-deleted rows", total_tx > alive_tx and len(data["transactions"]) == total_tx,
+              f"total={total_tx} alive={alive_tx} exported={len(data['transactions'])}")
 
         first = {k: digest(v) for k, v in data.items()}
         counts = {k: len(v) for k, v in data.items()}

@@ -47,7 +47,6 @@ func main() {
 		{"usage_bucket.jsonl", "usage_bucket"},
 		{"gift_card.jsonl", "gift_card"},
 		{"transaction.jsonl", "transaction"},
-		{"task.jsonl", "task"},
 		{"session_reasoning.jsonl", "session_reasoning"},
 	}
 

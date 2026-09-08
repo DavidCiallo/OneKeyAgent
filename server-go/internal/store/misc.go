@@ -9,67 +9,6 @@ import (
 	"onekey/server/internal/cryptox"
 )
 
-// ─────────────────────────── Task ───────────────────────────
-
-const taskCols = "id,account_id,task_text,folder,status,create_time,update_time,delete_time"
-
-type Task struct {
-	ID         string  `json:"id"`
-	AccountID  string  `json:"account_id"`
-	TaskText   string  `json:"task_text"`
-	Folder     *string `json:"folder"`
-	Status     string  `json:"status"`
-	CreateTime int64   `json:"create_time"`
-	UpdateTime *int64  `json:"update_time"`
-	DeleteTime *int64  `json:"delete_time"`
-}
-
-func scanTask(row interface{ Scan(...any) error }) (*Task, error) {
-	t := &Task{}
-	err := row.Scan(&t.ID, &t.AccountID, &t.TaskText, &t.Folder, &t.Status, &t.CreateTime, &t.UpdateTime, &t.DeleteTime)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	return t, nil
-}
-
-func (t *Task) DTO() map[string]any {
-	return map[string]any{
-		"id": t.ID, "account_id": t.AccountID, "task_text": t.TaskText, "folder": t.Folder,
-		"status": t.Status, "create_time": t.CreateTime, "update_time": t.UpdateTime, "delete_time": t.DeleteTime,
-	}
-}
-
-func TaskFindFirst(db *sql.DB, accountID, status string) (*Task, error) {
-	return scanTask(db.QueryRow(
-		"SELECT "+taskCols+" FROM task WHERE account_id = ? AND status = ? AND delete_time IS NULL ORDER BY rowid ASC LIMIT 1",
-		accountID, status))
-}
-
-func TaskFindOne(db *sql.DB, id string) (*Task, error) {
-	return scanTask(db.QueryRow("SELECT "+taskCols+" FROM task WHERE id = ? AND delete_time IS NULL", id))
-}
-
-func TaskAllByAccount(db *sql.DB, accountID string) ([]*Task, error) {
-	rows, err := db.Query("SELECT "+taskCols+" FROM task WHERE account_id = ? AND delete_time IS NULL", accountID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []*Task
-	for rows.Next() {
-		t, err := scanTask(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, t)
-	}
-	return out, rows.Err()
-}
-
 // ─────────────────────────── Transaction ───────────────────────────
 
 const txCols = "id,account_id,txid,amount,confirmations,status,payment_id,type,create_time,update_time,delete_time"

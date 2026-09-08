@@ -138,17 +138,6 @@ var Schema = []string{
 	`CREATE INDEX IF NOT EXISTS idx_tx_status ON "transaction"(status)`,
 	`CREATE INDEX IF NOT EXISTS idx_tx_account ON "transaction"(account_id)`,
 	`CREATE INDEX IF NOT EXISTS idx_tx_txid ON "transaction"(txid)`,
-	`CREATE TABLE IF NOT EXISTS task (
-		id TEXT PRIMARY KEY,
-		account_id TEXT NOT NULL DEFAULT '',
-		task_text TEXT NOT NULL DEFAULT '',
-		folder TEXT,
-		status TEXT NOT NULL DEFAULT 'pending',
-		create_time INTEGER NOT NULL DEFAULT 0,
-		update_time INTEGER,
-		delete_time INTEGER
-	)`,
-	`CREATE INDEX IF NOT EXISTS idx_task_account_status ON task(account_id, status)`,
 	`CREATE TABLE IF NOT EXISTS session_reasoning (
 		id TEXT PRIMARY KEY,
 		session_key TEXT NOT NULL DEFAULT '',

@@ -49,8 +49,8 @@ SECRET=xxx SERVER_PORT=3300 SQLITE_PATH=data/onekey.db STATIC_DIR=../dist ./bin/
 ./bin/onekey-migrate.exe -data ../data -db data/onekey.db
 ```
 
-读取 TS 版遗留的 `data/*.jsonl` 全部 11 个集合（account/model/provider/role/
-account_role/settings/usage_bucket/gift_card/transaction/task/session_reasoning），
+读取 TS 版遗留的 `data/*.jsonl` 的 10 个集合（account/model/provider/role/
+account_role/settings/usage_bucket/gift_card/transaction/session_reasoning），
 保留原 id 与时间戳。TS 版可随时切回；JSONL 文件只读不动。
 
 ## Docker 部署

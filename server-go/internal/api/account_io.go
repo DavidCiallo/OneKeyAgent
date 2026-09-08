@@ -11,7 +11,7 @@ import (
 // exportTables mirrors account.controller.ts exportData.
 var exportTables = []string{
 	"account", "model", "provider", "role", "account_role",
-	"task", "gift_card", "settings", "session_reasoning",
+	"gift_card", "settings", "session_reasoning",
 }
 
 var importOrder = []struct {
@@ -23,7 +23,6 @@ var importOrder = []struct {
 	{"account_role", "account_roles"},
 	{"model", "models"},
 	{"provider", "providers"},
-	{"task", "tasks"},
 	{"usage_bucket", "usage_buckets"},
 	{"transaction", "transactions"},
 	{"gift_card", "gift_cards"},
@@ -83,8 +82,6 @@ func exportKey(table string) string {
 		return "roles"
 	case "account_role":
 		return "account_roles"
-	case "task":
-		return "tasks"
 	case "gift_card":
 		return "gift_cards"
 	case "settings":
