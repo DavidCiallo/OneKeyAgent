@@ -1,12 +1,31 @@
+# OneKeyAgent — Go 版服务端部署
+#   docker compose up -d --build
+#
+# 首次启动自动把 data/*.jsonl 迁移为 data/onekey.db（已有 SQLite 则跳过）。
+# 回滚 TS 版：git checkout HEAD~1 -- docker-compose.yml 后重新 up 即可。
+
 services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: server-go/Dockerfile
     ports:
-      - "${SERVER_PORT}:${SERVER_PORT}"
+      - "${SERVER_PORT:-3300}:${SERVER_PORT:-3300}"
     volumes:
       - ./data:/app/data
     env_file:
       - .env
+    environment:
+      # 容器内与端口映射保持一致（.env 未设置时默认 3300）
+      - SERVER_PORT=${SERVER_PORT:-3300}
+      - SQLITE_PATH=/app/data/onekey.db
+      - STATIC_DIR=/app/dist
+      # 每日签到/按天统计的“本地零点”取决于 TZ；与旧 TS 容器一致默认 UTC
+      # - TZ=Asia/Shanghai
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$$SERVER_PORT/api/auth/config >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
