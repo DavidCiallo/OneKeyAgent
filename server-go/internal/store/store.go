@@ -56,6 +56,7 @@ var Schema = []string{
 		supports_reasoning_effort INTEGER,
 		replay_reasoning INTEGER,
 		enable_search INTEGER,
+		extra_json TEXT,
 		enabled INTEGER NOT NULL DEFAULT 1,
 		create_time INTEGER NOT NULL DEFAULT 0,
 		update_time INTEGER,
@@ -160,9 +161,34 @@ func Open(path string) (*sql.DB, error) {
 			return nil, fmt.Errorf("schema: %w", err)
 		}
 	}
+	ensureProviderExtraJSON(db)
+
 	db.SetMaxOpenConns(8)
 	db.SetMaxIdleConns(8)
 	return db, nil
+}
+
+// ensureProviderExtraJSON — in-place column migration for databases created
+// before the extra_json feature (CREATE TABLE IF NOT EXISTS won't add it).
+func ensureProviderExtraJSON(db *sql.DB) {
+	rows, err := db.Query("PRAGMA table_info(provider)")
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	found := false
+	for rows.Next() {
+		var cid, notNull, pk int
+		var name, typ string
+		var dflt any
+		if rows.Scan(&cid, &name, &typ, &notNull, &dflt, &pk) == nil && name == "extra_json" {
+			found = true
+		}
+	}
+	rows.Close()
+	if !found {
+		_, _ = db.Exec("ALTER TABLE provider ADD COLUMN extra_json TEXT")
+	}
 }
 
 func Now() int64 { return time.Now().UnixMilli() }

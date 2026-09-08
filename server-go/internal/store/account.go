@@ -172,7 +172,7 @@ func AccountAddBalance(db *sql.DB, id string, delta float64) error {
 var updatable = map[string][]string{
 	"account":  {"name", "email", "password", "api_key", "is_admin", "tg_chat_id", "last_daily_time", "balance"},
 	"model":    {"alias", "input_price", "cache_price", "output_price", "is_public"},
-	"provider": {"model_alias", "priority", "name", "base_url", "model", "api_key", "auth_type", "api_type", "proxy_url", "supports_thinking", "supports_reasoning_effort", "replay_reasoning", "enable_search", "enabled"},
+	"provider": {"model_alias", "priority", "name", "base_url", "model", "api_key", "auth_type", "api_type", "proxy_url", "supports_thinking", "supports_reasoning_effort", "replay_reasoning", "enable_search", "extra_json", "enabled"},
 	"role":     {"name", "type"},
 	"settings": {"key", "value"},
 	"gift_card": {"code", "token_amount", "status", "redeemed_by", "redeemed_at"},

@@ -33,11 +33,14 @@ def sse_chunks():
            "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
            "usage": {"prompt_tokens": 100, "completion_tokens": 40, "total_tokens": 140}}
 
+LAST_BODY = {}
+
 class MockHandler(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
         body = json.loads(self.rfile.read(length) or b"{}")
+        LAST_BODY["json"] = body
         auth = self.headers.get("Authorization", "")
         assert auth == "Bearer mock-upstream-key", f"bad auth header: {auth}"
         if body.get("stream"):
@@ -175,6 +178,24 @@ def main():
     check("static root 404 (no dist)", st in (404, 200), str(st))
     st, body = http_get(B + "/api/nonexistent")
     check("unknown api 404", st == 404, str(st))
+
+    # 10b. extra_json shallow override (provider-level body patch)
+    cur.execute("UPDATE provider SET extra_json = ? WHERE id = 'mockp1'", ('{"max_tokens": 555, "temperature": 0.1}',))
+    con.commit()
+    st, body = http_post(B + "/api/chat/completions", {"model": "mock-alias", "max_tokens": 100, "messages": [{"role": "user", "content": "hi"}]}, {"x-api-key": api_key})
+    check("extra_json override request ok", st == 200, body[:200])
+    up = LAST_BODY.get("json", {})
+    check("extra_json overrides client field", up.get("max_tokens") == 555, str(up.get("max_tokens")))
+    check("extra_json adds new field", up.get("temperature") == 0.1, str(up.get("temperature")))
+    check("extra_json keeps other fields", up.get("model") == "mock-model" and up.get("stream") is False, str({k: up.get(k) for k in ("model", "stream")}))
+
+    # 10c. invalid extra_json silently ignored
+    cur.execute("UPDATE provider SET extra_json = 'not-json{{' WHERE id = 'mockp1'")
+    con.commit()
+    st, body = http_post(B + "/api/chat/completions", {"model": "mock-alias", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 77}, {"x-api-key": api_key})
+    check("invalid extra_json ignored", st == 200 and LAST_BODY.get("json", {}).get("max_tokens") == 77, f"{st} {LAST_BODY.get('json', {}).get('max_tokens')}")
+    cur.execute("UPDATE provider SET extra_json = NULL WHERE id = 'mockp1'")
+    con.commit()
 
     # 11. CORS headers present
     req = urllib.request.Request(B + "/api/auth/config")

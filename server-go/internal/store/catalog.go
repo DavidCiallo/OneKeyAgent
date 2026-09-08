@@ -123,7 +123,7 @@ func ModelWhere(db *sql.DB, cond string, args []any) ([]*Model, error) {
 
 // ─────────────────────────── Provider ───────────────────────────
 
-const providerCols = "id,model_alias,priority,name,base_url,model,api_key,auth_type,api_type,proxy_url,supports_thinking,supports_reasoning_effort,replay_reasoning,enable_search,enabled,create_time,update_time,delete_time"
+const providerCols = "id,model_alias,priority,name,base_url,model,api_key,auth_type,api_type,proxy_url,supports_thinking,supports_reasoning_effort,replay_reasoning,enable_search,extra_json,enabled,create_time,update_time,delete_time"
 
 type Provider struct {
 	ID                     string  `json:"id"`
@@ -140,6 +140,7 @@ type Provider struct {
 	SupportsReasoningEffort *int64 `json:"supports_reasoning_effort"`
 	ReplayReasoning        *int64  `json:"replay_reasoning"`
 	EnableSearch           *int64  `json:"enable_search"`
+	ExtraJSON              *string `json:"extra_json"`
 	Enabled                int64   `json:"enabled"`
 	CreateTime             int64   `json:"create_time"`
 	UpdateTime             *int64  `json:"update_time"`
@@ -151,7 +152,7 @@ func scanProvider(row interface{ Scan(...any) error }) (*Provider, error) {
 	err := row.Scan(&p.ID, &p.ModelAlias, &p.Priority, &p.Name, &p.BaseURL, &p.Model,
 		&p.ApiKey, &p.AuthType, &p.ApiType, &p.ProxyURL,
 		&p.SupportsThinking, &p.SupportsReasoningEffort, &p.ReplayReasoning, &p.EnableSearch,
-		&p.Enabled, &p.CreateTime, &p.UpdateTime, &p.DeleteTime)
+		&p.ExtraJSON, &p.Enabled, &p.CreateTime, &p.UpdateTime, &p.DeleteTime)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -167,7 +168,7 @@ func (p *Provider) DTO() map[string]any {
 		"base_url": p.BaseURL, "model": p.Model, "api_key": p.ApiKey, "auth_type": p.AuthType,
 		"api_type": p.ApiType, "proxy_url": p.ProxyURL, "supports_thinking": p.SupportsThinking,
 		"supports_reasoning_effort": p.SupportsReasoningEffort, "replay_reasoning": p.ReplayReasoning,
-		"enable_search": p.EnableSearch, "enabled": p.Enabled, "create_time": p.CreateTime,
+		"enable_search": p.EnableSearch, "extra_json": p.ExtraJSON, "enabled": p.Enabled, "create_time": p.CreateTime,
 		"update_time": p.UpdateTime, "delete_time": p.DeleteTime,
 	}
 }
@@ -482,6 +483,14 @@ func (p *Provider) ApiKeyStr() string {
 		return ""
 	}
 	return *p.ApiKey
+}
+
+// ExtraJSONStr — nil-safe accessor.
+func (p *Provider) ExtraJSONStr() string {
+	if p.ExtraJSON == nil {
+		return ""
+	}
+	return *p.ExtraJSON
 }
 
 // ModelRestoreOrInsert — create, or revive a soft-deleted row with the same

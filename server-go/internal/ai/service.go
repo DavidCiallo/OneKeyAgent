@@ -354,6 +354,21 @@ func sessionKey(accountID string, body map[string]any) string {
 	return accountID + "::" + encoded
 }
 
+// mergeExtraJSON — provider-level shallow body overrides (OpenRouter-style
+// params). Invalid JSON or non-objects are silently ignored, like the TS.
+func mergeExtraJSON(body map[string]any, extra string) {
+	if extra == "" {
+		return
+	}
+	var m map[string]any
+	if err := json.Unmarshal([]byte(extra), &m); err != nil || m == nil {
+		return
+	}
+	for k, v := range m {
+		body[k] = v
+	}
+}
+
 func thinkingEnabled(body map[string]any) bool {
 	if _, ok := body["reasoning_effort"]; ok && body["reasoning_effort"] != nil {
 		return true
@@ -435,6 +450,8 @@ func (s *Server) ChatCompletions(body map[string]any, accountID string) (map[str
 		}
 		requestBody["stream"] = false
 		requestBody["model"] = provider.Model
+		// Shallow-merge provider-level extra_json overrides (OpenRouter-style params etc.)
+		mergeExtraJSON(requestBody, provider.ExtraJSONStr())
 
 		replay := provider.ReplayReasoning != nil && *provider.ReplayReasoning == 1
 		if replay && thinkingEnabled(requestBody) {
@@ -517,6 +534,8 @@ func (s *Server) StartStream(body map[string]any, accountID string) (*StreamPipe
 		}
 		requestBody["stream"] = true
 		requestBody["model"] = provider.Model
+		// Shallow-merge provider-level extra_json overrides (OpenRouter-style params etc.)
+		mergeExtraJSON(requestBody, provider.ExtraJSONStr())
 
 		replay := provider.ReplayReasoning != nil && *provider.ReplayReasoning == 1
 		doCapture := replay && thinkingEnabled(requestBody)
