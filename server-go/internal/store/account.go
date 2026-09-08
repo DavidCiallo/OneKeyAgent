@@ -78,11 +78,6 @@ func AccountFindByLogin(db *sql.DB, email, passwordHash string) (*Account, error
 		email, passwordHash))
 }
 
-func AccountFindByTgChat(db *sql.DB, chatID string) (*Account, error) {
-	return scanAccount(db.QueryRow(
-		"SELECT "+accountCols+" FROM account WHERE tg_chat_id = ? AND delete_time IS NULL ORDER BY rowid DESC LIMIT 1", chatID))
-}
-
 func AccountListPage(db *sql.DB, page int64, name, email *string) ([]*Account, int64, error) {
 	conds := []string{"delete_time IS NULL"}
 	args := []any{}

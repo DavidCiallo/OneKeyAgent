@@ -76,6 +76,7 @@ def main():
         d = json.loads(body)
         keys = [e["key"] for e in d["data"]["entries"]]
         check("settings list", st == 200 and "fallback_model_alias" in keys, body[:200])
+        check("tg settings removed", "tg_bot_api_base_url" not in keys and "tg_user_id" not in keys, str(keys))
 
         st, body = http_post(B + "/api/settings/save",
                              {"entries": [{"key": "fallback_model_alias", "value": "gpt-fallback"}]},
