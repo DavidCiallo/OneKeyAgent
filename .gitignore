@@ -6,3 +6,5 @@ data/*
 server/data/*
 *.local.json
 logs/*
+server-go/bin/
+server-go/testtmp/

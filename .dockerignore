@@ -4,3 +4,11 @@ data
 .git
 .claude
 *.md
+server-go/bin
+server-go/testtmp
+server-rs
+logs
+*.exe
+*.db
+*.db-wal
+*.db-shm

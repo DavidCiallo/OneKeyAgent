@@ -79,7 +79,8 @@ export default function UsagePage() {
         if (!admin) return;
         accountApi.list({ page: 1, filter: {} }).then((res) => {
             if (res.success && res.data) {
-                const totalPages = Math.ceil(res.data.total / 40);
+                // account list paginates at 10/page — derive from actual page size
+                const totalPages = Math.ceil(res.data.total / Math.max(res.data.list.length, 1));
                 if (totalPages <= 1) {
                     setAccounts(res.data.list.map((a: any) => ({ id: a.id, name: a.name, email: a.email })));
                 } else {

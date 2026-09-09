@@ -94,7 +94,7 @@ export default function ProviderPage() {
             provider: {
                 model_alias: item.model_alias,
                 priority: item.priority,
-                name: item.name,
+                name: `${item.name}_copy`,
                 base_url: item.base_url,
                 model: item.model,
                 api_key: item.api_key || undefined,
