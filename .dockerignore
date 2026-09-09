@@ -4,9 +4,8 @@ data
 .git
 .claude
 *.md
-server-go/bin
-server-go/testtmp
-server-rs
+server/bin
+server/testtmp
 logs
 *.exe
 *.db

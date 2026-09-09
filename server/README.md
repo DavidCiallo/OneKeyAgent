@@ -28,7 +28,7 @@ Go 版逐项修复：
 ## 构建 & 运行
 
 ```bash
-cd server-go
+cd server
 go build -o bin/onekey-server.exe ./cmd/server
 go build -o bin/onekey-migrate.exe ./cmd/migrate
 

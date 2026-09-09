@@ -1,27 +1,46 @@
-FROM oven/bun:1-alpine
+# syntax=docker/dockerfile:1
+# ─────────────────────────────────────────────────────────────────
+# OneKeyAgent — Go server + React frontend, single container.
+# Build context is the REPO ROOT (frontend + server both needed):
+#   docker build -f server-go/Dockerfile .
+# ─────────────────────────────────────────────────────────────────
 
+# ── Stage 1: frontend (same build as the old Bun Dockerfile) ──
+FROM oven/bun:1-alpine AS frontend
 WORKDIR /app
-
-# Install build tools for native addons (better-sqlite3)
-RUN apk add --no-cache python3 make g++ gcc
-
-# Copy package files
 COPY package.json bun.lock ./
-
-# Install dependencies
 RUN bun install --frozen-lockfile
-
-# Copy source code (includes pre-committed Drizzle migration files)
-COPY . .
-
-# Build frontend
+COPY index.html rsbuild.config.ts postcss.config.mjs tsconfig.json ./
+COPY client ./client
+COPY public ./public
+COPY shared ./shared
 RUN bun run build
 
-# Create data directory for SQLite
-RUN mkdir -p data
+# ── Stage 2: Go build (modernc.org/sqlite is pure Go → CGO off) ──
+FROM golang:1.27-alpine AS build
+WORKDIR /src
+ENV CGO_ENABLED=0
+COPY server/go.mod server/go.sum ./
+RUN go mod download
+COPY server ./
+RUN go build -trimpath -ldflags="-s -w" -o /out/onekey-server ./cmd/server \
+ && go build -trimpath -ldflags="-s -w" -o /out/onekey-migrate ./cmd/migrate
 
-# Expose port
+# ── Stage 3: runtime ──
+FROM alpine:3.21
+RUN apk add --no-cache ca-certificates tzdata
+WORKDIR /app
+
+COPY --from=build /out/onekey-server  /app/onekey-server
+COPY --from=build /out/onekey-migrate /app/onekey-migrate
+COPY --from=frontend /app/dist        /app/dist
+COPY server/entrypoint.sh             /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh \
+ && mkdir -p /app/data
+
+ENV SQLITE_PATH=/app/data/onekey.db \
+    STATIC_DIR=/app/dist \
+    SERVER_PORT=3300
+
 EXPOSE 3300
-
-# Start the server (migrate.ts runs automatically on startup)
-CMD ["bun", "run", "server/app/index.ts"]
+ENTRYPOINT ["/app/entrypoint.sh"]
