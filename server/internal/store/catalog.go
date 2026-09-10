@@ -228,6 +228,9 @@ func ProviderListPage(db *sql.DB, page int64, alias *string, enabled *int64) ([]
 	return all[start:end], total, nil
 }
 
+// ProviderWhere — rows matching cond, ordered by model_alias ASC then priority
+// ASC, so providers sharing an alias come back in failover order (lower
+// priority value is tried first) while the admin list stays grouped by alias.
 func ProviderWhere(db *sql.DB, cond string, args []any) ([]*Provider, error) {
 	rows, err := db.Query("SELECT "+providerCols+" FROM provider WHERE "+cond, args...)
 	if err != nil {
@@ -243,11 +246,19 @@ func ProviderWhere(db *sql.DB, cond string, args []any) ([]*Provider, error) {
 		out = append(out, p)
 	}
 	for i := 1; i < len(out); i++ {
-		for j := i; j > 0 && out[j].ModelAlias < out[j-1].ModelAlias; j-- {
+		for j := i; j > 0 && providerLess(out[j], out[j-1]); j-- {
 			out[j], out[j-1] = out[j-1], out[j]
 		}
 	}
 	return out, rows.Err()
+}
+
+// providerLess — model_alias ASC, then priority ASC.
+func providerLess(a, b *Provider) bool {
+	if a.ModelAlias != b.ModelAlias {
+		return a.ModelAlias < b.ModelAlias
+	}
+	return a.Priority < b.Priority
 }
 
 // ProviderGetByAlias — enabled providers for an alias, priority ASC with a
@@ -257,7 +268,8 @@ func ProviderGetByAlias(db *sql.DB, alias string) ([]*Provider, error) {
 	if err != nil {
 		return nil, err
 	}
-	// group shuffle by priority
+	// Group shuffle: equal priorities are adjacent thanks to providerLess, so
+	// peers at the same priority rotate instead of the first row always winning.
 	for i := 0; i < len(list); {
 		j := i + 1
 		for j < len(list) && list[j].Priority == list[i].Priority {
