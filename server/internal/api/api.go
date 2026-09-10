@@ -88,6 +88,8 @@ func (a *App) Routes() *http.ServeMux {
 		{"/api/usage/stats", a.wrap(a.usageStats)},
 		{"/api/usage/sessions", a.wrap(a.usageSessions)},
 		{"/api/usage/stats/batch", a.wrap(a.usageStatsBatch)},
+		// audit
+		{"/api/audit/list", a.wrap(a.auditList)},
 		// subscription
 		{"/api/subscription/records", a.wrap(a.subscriptionRecords)},
 		{"/api/subscription/createtopup", a.wrap(a.subscriptionCreateTopup)},

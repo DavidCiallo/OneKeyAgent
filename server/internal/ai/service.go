@@ -101,6 +101,72 @@ func (s *Server) reasoningCacheSet(key, content string) {
 	}
 }
 
+// ─────────────────── request audit (latest 100 success / 100 failure) ───────────────────
+
+// maxAuditErr bounds the stored error text so a verbose upstream body can't
+// bloat the table.
+const maxAuditErr = 500
+
+type auditRecord struct {
+	AccountID    string
+	AccountName  string
+	ModelAlias   string
+	ProviderID   string
+	ProviderName string
+	ApiType      string
+	Endpoint     string
+	Success      bool
+	StatusCode   int
+	DurationMs   int64
+	InputTokens  int64
+	CachedInput  int64
+	OutputTokens int64
+	Cost         float64
+	Stream       bool
+	Err          string
+}
+
+// audit persists one attempt. Best-effort by design: a broken audit trail must
+// never fail the relayed request, so errors are only logged.
+func (s *Server) audit(r auditRecord) {
+	if len(r.Err) > maxAuditErr {
+		r.Err = r.Err[:maxAuditErr]
+	}
+	rec := store.AuditLog{
+		AccountID: r.AccountID, AccountName: r.AccountName, ModelAlias: r.ModelAlias,
+		ProviderID: r.ProviderID, ProviderName: r.ProviderName, ApiType: r.ApiType,
+		Endpoint: r.Endpoint, StatusCode: int64(r.StatusCode), DurationMs: r.DurationMs,
+		InputTokens: r.InputTokens, CachedInputTokens: r.CachedInput, OutputTokens: r.OutputTokens,
+		Cost: r.Cost, Err: r.Err,
+	}
+	if r.Success {
+		rec.Success = 1
+	}
+	if r.Stream {
+		rec.Stream = 1
+	}
+	if err := store.AuditInsert(s.DB, rec); err != nil {
+		fmt.Println("[Audit] insert failed:", err)
+	}
+}
+
+// accountName — display name for the audit row; empty when the account is gone.
+func (s *Server) accountName(accountID string) string {
+	acc, err := store.AccountFindOne(s.DB, accountID)
+	if err != nil || acc == nil {
+		return ""
+	}
+	return acc.Name
+}
+
+func elapsedMs(start time.Time) int64 {
+	d := time.Since(start).Milliseconds()
+	if d < 0 {
+		return 0
+	}
+	return d
+}
+
 // ─────────────────── model access ───────────────────
 
 func (s *Server) allModels() ([]*store.Model, error) {
@@ -281,12 +347,18 @@ func buildRequestConfig(p *store.Provider, body map[string]any, stream bool) ups
 
 // ─────────────────── upstream calls ───────────────────
 
-// tryProvider — non-stream call; converts to OpenAI format. ok=false → failed.
-func (s *Server) tryProvider(p *store.Provider, body map[string]any) (map[string]any, bool) {
+// upstreamErr — captured failure detail for audit logging.
+type upstreamErr struct {
+	status int
+	msg    string
+}
+
+// tryProvider — non-stream call; converts to OpenAI format.
+func (s *Server) tryProvider(p *store.Provider, body map[string]any) (map[string]any, *upstreamErr) {
 	cfg := buildRequestConfig(p, body, false)
 	req, err := http.NewRequest("POST", cfg.url, strings.NewReader(cfg.body))
 	if err != nil {
-		return nil, false
+		return nil, &upstreamErr{msg: "build request: " + err.Error()}
 	}
 	for _, h := range cfg.headers {
 		req.Header.Set(h[0], h[1])
@@ -294,34 +366,42 @@ func (s *Server) tryProvider(p *store.Provider, body map[string]any) (map[string
 	resp, err := s.HTTPClient(p.ProxyStr()).Do(req)
 	if err != nil {
 		fmt.Printf("[AI] upstream request failed (%s -> %s): %v\n", p.Name, cfg.url, err)
-		return nil, false
+		return nil, &upstreamErr{msg: err.Error()}
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 300))
-		fmt.Printf("[AI] upstream %s returned %d (%s): %s\n", p.Name, resp.StatusCode, cfg.url, strings.TrimSpace(string(snippet)))
-		return nil, false
+		msg := strings.TrimSpace(string(snippet))
+		fmt.Printf("[AI] upstream %s returned %d (%s): %s\n", p.Name, resp.StatusCode, cfg.url, msg)
+		return nil, &upstreamErr{status: resp.StatusCode, msg: fmt.Sprintf("upstream http %d: %s", resp.StatusCode, msg)}
 	}
 	var parsed map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil || parsed == nil {
-		return nil, false
+		return nil, &upstreamErr{status: resp.StatusCode, msg: "invalid upstream JSON: " + errString(err)}
 	}
 	switch p.ApiTypeStr() {
 	case "anthropic":
-		return anthropicToOpenAI(parsed, p.Model), true
+		return anthropicToOpenAI(parsed, p.Model), nil
 	case "gemini":
-		return geminiToOpenAI(parsed, p.Model), true
+		return geminiToOpenAI(parsed, p.Model), nil
 	default:
-		return parsed, true
+		return parsed, nil
 	}
 }
 
+func errString(err error) string {
+	if err == nil {
+		return "empty body"
+	}
+	return err.Error()
+}
+
 // tryProviderStream — streaming call; returns the raw upstream body.
-func (s *Server) tryProviderStream(p *store.Provider, body map[string]any) (io.ReadCloser, bool) {
+func (s *Server) tryProviderStream(p *store.Provider, body map[string]any) (io.ReadCloser, *upstreamErr) {
 	cfg := buildRequestConfig(p, body, true)
 	req, err := http.NewRequest("POST", cfg.url, strings.NewReader(cfg.body))
 	if err != nil {
-		return nil, false
+		return nil, &upstreamErr{msg: "build request: " + err.Error()}
 	}
 	for _, h := range cfg.headers {
 		req.Header.Set(h[0], h[1])
@@ -329,15 +409,16 @@ func (s *Server) tryProviderStream(p *store.Provider, body map[string]any) (io.R
 	resp, err := s.HTTPClient(p.ProxyStr()).Do(req)
 	if err != nil {
 		fmt.Printf("[AI] upstream request failed (%s -> %s): %v\n", p.Name, cfg.url, err)
-		return nil, false
+		return nil, &upstreamErr{msg: err.Error()}
 	}
 	if resp.StatusCode != http.StatusOK {
 		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 300))
-		fmt.Printf("[AI] upstream %s returned %d (%s): %s\n", p.Name, resp.StatusCode, cfg.url, strings.TrimSpace(string(snippet)))
+		msg := strings.TrimSpace(string(snippet))
+		fmt.Printf("[AI] upstream %s returned %d (%s): %s\n", p.Name, resp.StatusCode, cfg.url, msg)
 		resp.Body.Close()
-		return nil, false
+		return nil, &upstreamErr{status: resp.StatusCode, msg: fmt.Sprintf("upstream http %d: %s", resp.StatusCode, msg)}
 	}
-	return resp.Body, true
+	return resp.Body, nil
 }
 
 // ─────────────────── reasoning replay ───────────────────
@@ -433,20 +514,38 @@ func findLastToolCallID(body map[string]any) string {
 	return ""
 }
 
+// auditReject — a request that failed before any upstream call (bad alias,
+// unauthorized model, preflight gate). Recorded so the audit view shows the
+// full failure picture, not just upstream errors.
+func (s *Server) auditReject(accountID, alias, endpoint string, stream bool, status int, err error) {
+	s.audit(auditRecord{
+		AccountID: accountID, AccountName: s.accountName(accountID), ModelAlias: alias,
+		Endpoint: endpoint, StatusCode: status, Stream: stream, Err: err.Error(),
+	})
+}
+
 // ─────────────────── entry points ───────────────────
 
 // ChatCompletions — non-streaming; converted OpenAI response.
 func (s *Server) ChatCompletions(body map[string]any, accountID string) (map[string]any, error) {
+	return s.ChatCompletionsAt(body, accountID, "/api/chat/completions")
+}
+
+// ChatCompletionsAt is ChatCompletions with an explicit endpoint label for audit.
+func (s *Server) ChatCompletionsAt(body map[string]any, accountID, endpoint string) (map[string]any, error) {
 	alias, _ := body["model"].(string)
 	if err := s.requireModelAccess(accountID, alias); err != nil {
+		s.auditReject(accountID, alias, endpoint, false, 403, err)
 		return nil, err
 	}
 	fallback := s.Settings.Get("fallback_model_alias")
 	providers, err := s.providersForAlias(alias, fallback)
 	if err != nil {
+		s.auditReject(accountID, alias, endpoint, false, 404, err)
 		return nil, err
 	}
 	skey := sessionKey(accountID, body)
+	acctName := s.accountName(accountID)
 
 	for _, provider := range providers {
 		requestBody := map[string]any{}
@@ -463,8 +562,15 @@ func (s *Server) ChatCompletions(body map[string]any, accountID string) (map[str
 			injectReplayReasoning(s, requestBody, skey)
 		}
 
-		rdata, ok := s.tryProvider(provider, requestBody)
-		if !ok {
+		started := time.Now()
+		rdata, uerr := s.tryProvider(provider, requestBody)
+		if uerr != nil {
+			s.audit(auditRecord{
+				AccountID: accountID, AccountName: acctName, ModelAlias: alias,
+				ProviderID: provider.ID, ProviderName: provider.Name, ApiType: provider.ApiTypeStr(),
+				Endpoint: endpoint, StatusCode: uerr.status, DurationMs: elapsedMs(started),
+				Err: uerr.msg,
+			})
 			time.Sleep(500 * time.Millisecond)
 			continue
 		}
@@ -484,6 +590,13 @@ func (s *Server) ChatCompletions(body map[string]any, accountID string) (map[str
 			return nil, err
 		}
 		if weekly+cost > service.WeeklyLimit {
+			s.audit(auditRecord{
+				AccountID: accountID, AccountName: acctName, ModelAlias: alias,
+				ProviderID: provider.ID, ProviderName: provider.Name, ApiType: provider.ApiTypeStr(),
+				Endpoint: endpoint, StatusCode: 429, DurationMs: elapsedMs(started),
+				InputTokens: rawInput, CachedInput: cachedInput, OutputTokens: rawOutput, Cost: cost,
+				Err: "429 Weekly spending limit reached",
+			})
 			return nil, fmt.Errorf("429 Weekly spending limit reached")
 		}
 		balance, err := store.AccountGetBalance(s.DB, accountID)
@@ -491,6 +604,13 @@ func (s *Server) ChatCompletions(body map[string]any, accountID string) (map[str
 			return nil, err
 		}
 		if balance < cost {
+			s.audit(auditRecord{
+				AccountID: accountID, AccountName: acctName, ModelAlias: alias,
+				ProviderID: provider.ID, ProviderName: provider.Name, ApiType: provider.ApiTypeStr(),
+				Endpoint: endpoint, StatusCode: 429, DurationMs: elapsedMs(started),
+				InputTokens: rawInput, CachedInput: cachedInput, OutputTokens: rawOutput, Cost: cost,
+				Err: "429 Insufficient balance",
+			})
 			return nil, fmt.Errorf("429 Insufficient balance")
 		}
 
@@ -501,6 +621,12 @@ func (s *Server) ChatCompletions(body map[string]any, accountID string) (map[str
 		})
 
 		rdata["model"] = alias
+		s.audit(auditRecord{
+			AccountID: accountID, AccountName: acctName, ModelAlias: alias,
+			ProviderID: provider.ID, ProviderName: provider.Name, ApiType: provider.ApiTypeStr(),
+			Endpoint: endpoint, Success: true, StatusCode: 200, DurationMs: elapsedMs(started),
+			InputTokens: rawInput, CachedInput: cachedInput, OutputTokens: rawOutput, Cost: cost,
+		})
 		return rdata, nil
 	}
 	return nil, fmt.Errorf("All providers failed")
@@ -515,22 +641,32 @@ type StreamPipeline struct {
 // StartStream preflights, picks the first working provider (failover with
 // 500ms gaps like the TS loop) and returns the metered OpenAI SSE stream.
 func (s *Server) StartStream(body map[string]any, accountID string) (*StreamPipeline, error) {
+	return s.StartStreamAt(body, accountID, "/api/chat/completions")
+}
+
+// StartStreamAt is StartStream with an explicit endpoint label for audit.
+func (s *Server) StartStreamAt(body map[string]any, accountID, endpoint string) (*StreamPipeline, error) {
 	// Preflight: reject overdrawn accounts before any upstream call — the fix
 	// for the TS behavior where streams always completed and billed after.
 	if err := service.Preflight(s.DB, accountID); err != nil {
+		alias, _ := body["model"].(string)
+		s.auditReject(accountID, alias, endpoint, true, 429, err)
 		return nil, err
 	}
 	alias, _ := body["model"].(string)
 	if err := s.requireModelAccess(accountID, alias); err != nil {
+		s.auditReject(accountID, alias, endpoint, true, 403, err)
 		return nil, err
 	}
 	fallback := s.Settings.Get("fallback_model_alias")
 	providers, err := s.providersForAlias(alias, fallback)
 	if err != nil {
+		s.auditReject(accountID, alias, endpoint, true, 404, err)
 		return nil, err
 	}
 	skey := sessionKey(accountID, body)
 	tcID := findLastToolCallID(body)
+	acctName := s.accountName(accountID)
 
 	for _, provider := range providers {
 		requestBody := map[string]any{}
@@ -548,8 +684,15 @@ func (s *Server) StartStream(body map[string]any, accountID string) (*StreamPipe
 			injectReplayReasoning(s, requestBody, skey)
 		}
 
-		raw, ok := s.tryProviderStream(provider, requestBody)
-		if !ok {
+		started := time.Now()
+		raw, uerr := s.tryProviderStream(provider, requestBody)
+		if uerr != nil {
+			s.audit(auditRecord{
+				AccountID: accountID, AccountName: acctName, ModelAlias: alias,
+				ProviderID: provider.ID, ProviderName: provider.Name, ApiType: provider.ApiTypeStr(),
+				Endpoint: endpoint, StatusCode: uerr.status, DurationMs: elapsedMs(started),
+				Stream: true, Err: uerr.msg,
+			})
 			time.Sleep(500 * time.Millisecond)
 			continue
 		}
@@ -598,10 +741,18 @@ func (s *Server) StartStream(body map[string]any, accountID string) (*StreamPipe
 				rawOutput = int64(est)
 			}
 			cachedInput := service.ExtractCachedTokens(sc.Usage)
+			cost := service.CalculateCost(rawInput, cachedInput, rawOutput, inputPrice, cachePrice, outputPrice)
 			service.Settle(s.DB, service.UsageLog{
 				AccountID: accountID, ModelAlias: alias, ProviderID: provider.ID,
 				InputTokens: rawInput, CachedInputTokens: cachedInput, OutputTokens: rawOutput,
 				InputPrice: inputPrice, CachePrice: cachePrice, OutputPrice: outputPrice,
+			})
+			s.audit(auditRecord{
+				AccountID: accountID, AccountName: acctName, ModelAlias: alias,
+				ProviderID: provider.ID, ProviderName: provider.Name, ApiType: provider.ApiTypeStr(),
+				Endpoint: endpoint, Success: true, StatusCode: 200, DurationMs: elapsedMs(started),
+				InputTokens: rawInput, CachedInput: cachedInput, OutputTokens: rawOutput, Cost: cost,
+				Stream: true,
 			})
 			pw.Close()
 		}()
@@ -674,7 +825,7 @@ func containsStr(list []string, s string) bool {
 // AntMessages — POST /v1/messages non-streaming.
 func (s *Server) AntMessages(body map[string]any, accountID string) (map[string]any, error) {
 	openaiBody := antMessagesToOpenAI(body)
-	result, err := s.ChatCompletions(openaiBody, accountID)
+	result, err := s.ChatCompletionsAt(openaiBody, accountID, "/api/v1/messages")
 	if err != nil {
 		return nil, err
 	}
@@ -685,7 +836,7 @@ func (s *Server) AntMessages(body map[string]any, accountID string) (map[string]
 // AntMessagesStream — POST /v1/messages streaming; returns Anthropic SSE.
 func (s *Server) AntMessagesStream(body map[string]any, accountID string) (io.Reader, error) {
 	openaiBody := antMessagesToOpenAI(body)
-	pipeline, err := s.StartStream(openaiBody, accountID)
+	pipeline, err := s.StartStreamAt(openaiBody, accountID, "/api/v1/messages")
 	if err != nil {
 		return nil, err
 	}
