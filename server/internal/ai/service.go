@@ -38,9 +38,9 @@ type Server struct {
 
 func NewServer(db *sql.DB, settings *service.Settings) *Server {
 	return &Server{
-		DB:       db,
-		Settings: settings,
-		clients:  map[string]*http.Client{},
+		DB:        db,
+		Settings:  settings,
+		clients:   map[string]*http.Client{},
 		reasoning: map[string]reasonEntry{},
 	}
 }
@@ -293,10 +293,13 @@ func (s *Server) tryProvider(p *store.Provider, body map[string]any) (map[string
 	}
 	resp, err := s.HTTPClient(p.ProxyStr()).Do(req)
 	if err != nil {
+		fmt.Printf("[AI] upstream request failed (%s -> %s): %v\n", p.Name, cfg.url, err)
 		return nil, false
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 300))
+		fmt.Printf("[AI] upstream %s returned %d (%s): %s\n", p.Name, resp.StatusCode, cfg.url, strings.TrimSpace(string(snippet)))
 		return nil, false
 	}
 	var parsed map[string]any
@@ -325,10 +328,12 @@ func (s *Server) tryProviderStream(p *store.Provider, body map[string]any) (io.R
 	}
 	resp, err := s.HTTPClient(p.ProxyStr()).Do(req)
 	if err != nil {
-		fmt.Println("[AI] Error request", err)
+		fmt.Printf("[AI] upstream request failed (%s -> %s): %v\n", p.Name, cfg.url, err)
 		return nil, false
 	}
 	if resp.StatusCode != http.StatusOK {
+		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 300))
+		fmt.Printf("[AI] upstream %s returned %d (%s): %s\n", p.Name, resp.StatusCode, cfg.url, strings.TrimSpace(string(snippet)))
 		resp.Body.Close()
 		return nil, false
 	}
@@ -575,7 +580,7 @@ func (s *Server) StartStream(body map[string]any, accountID string) (*StreamPipe
 				content := capture.buf.String()
 				capture.mu.Unlock()
 				if content != "" {
-					s.reasoningCacheSet(skey + "::" + tcID, content)
+					s.reasoningCacheSet(skey+"::"+tcID, content)
 				}
 			}
 			inputPrice, cachePrice, outputPrice, perr := service.ModelPrices(s.DB, alias)
