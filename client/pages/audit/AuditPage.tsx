@@ -24,6 +24,12 @@ function formatCost(cost: number): string {
     return `$${cost.toFixed(6)}`;
 }
 
+/** Output tokens per second; dash when the attempt produced no tokens. */
+function formatTps(tps: number): string {
+    if (!tps) return "-";
+    return `${tps.toFixed(1)} t/s`;
+}
+
 /** HTTP status → chip color, so failures read at a glance. */
 function statusColor(code: number): "success" | "warning" | "danger" | "default" {
     if (code === 200) return "success";
@@ -115,15 +121,16 @@ export default function AuditPage() {
                                 <th className="px-3 py-2 font-medium">{locale.Status || "Status"}</th>
                                 <th className="px-3 py-2 font-medium">{locale.Duration || "Duration"}</th>
                                 <th className="px-3 py-2 font-medium">{locale.Tokens || "Tokens"}</th>
+                                <th className="px-3 py-2 font-medium">{locale.Tps || "TPS"}</th>
                                 <th className="px-3 py-2 font-medium">{locale.Cost || "Cost"}</th>
                                 {tab === "failed" && <th className="px-3 py-2 font-medium">{locale.Error || "Error"}</th>}
                             </tr>
                         </thead>
                         <tbody>
                             {loading && rows.length === 0 ? (
-                                <tr><td colSpan={tab === "failed" ? 10 : 9} className="px-3 py-6 text-center text-gray-400">Loading...</td></tr>
+                                <tr><td colSpan={tab === "failed" ? 11 : 10} className="px-3 py-6 text-center text-gray-400">Loading...</td></tr>
                             ) : rows.length === 0 ? (
-                                <tr><td colSpan={tab === "failed" ? 10 : 9} className="px-3 py-6 text-center text-gray-400">{locale.NoData || "No data"}</td></tr>
+                                <tr><td colSpan={tab === "failed" ? 11 : 10} className="px-3 py-6 text-center text-gray-400">{locale.NoData || "No data"}</td></tr>
                             ) : rows.map(r => (
                                 <tr key={r.id} className="border-t border-gray-100 align-top">
                                     <td className="px-3 py-2 whitespace-nowrap">{formatTime(r.ts)}</td>
@@ -144,6 +151,7 @@ export default function AuditPage() {
                                     <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">
                                         {r.input_tokens || 0}/{r.cached_input_tokens || 0}/{r.output_tokens || 0}
                                     </td>
+                                    <td className="px-3 py-2 whitespace-nowrap">{formatTps(r.tps)}</td>
                                     <td className="px-3 py-2 whitespace-nowrap">{formatCost(r.cost)}</td>
                                     {tab === "failed" && (
                                         <td className="px-3 py-2 text-xs text-red-600 max-w-md break-all">{r.err || "-"}</td>

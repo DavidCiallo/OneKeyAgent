@@ -285,6 +285,7 @@
         "Status": "Trạng thái",
         "Duration": "Thời lượng",
         "Tokens": "Vào/Đệm/Ra",
+        "Tps": "TPS",
         "Cost": "Chi phí",
         "Error": "Lỗi",
         "NoData": "Không có dữ liệu"

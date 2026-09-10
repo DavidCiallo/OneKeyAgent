@@ -28,7 +28,18 @@ func (a *App) auditList(c *httpx.Ctx) (any, error) {
 			"duration_ms": r.DurationMs, "input_tokens": r.InputTokens,
 			"cached_input_tokens": r.CachedInputTokens, "output_tokens": r.OutputTokens,
 			"cost": r.Cost, "stream": r.Stream, "err": r.Err,
+			"tps": throughput(r.OutputTokens, r.DurationMs),
 		})
 	}
 	return map[string]any{"list": list, "keep": store.AuditKeep}, nil
+}
+
+// throughput — output tokens per second, derived here rather than stored so a
+// later change to the formula applies to existing rows too. Measured across the
+// whole upstream call, so for streams it includes time to first token.
+func throughput(outputTokens, durationMs int64) float64 {
+	if outputTokens <= 0 || durationMs <= 0 {
+		return 0
+	}
+	return store.Round6(float64(outputTokens) / (float64(durationMs) / 1000))
 }
