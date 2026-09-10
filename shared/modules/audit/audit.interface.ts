@@ -20,6 +20,8 @@ export interface AuditDTO {
     cost: number;
     stream: number;
     err: string;
+    /** Output tokens per second, derived server-side from tokens/duration. */
+    tps: number;
 }
 
 export class AuditListRequest implements BaseRequest {

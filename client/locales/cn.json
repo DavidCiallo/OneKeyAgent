@@ -292,6 +292,7 @@
         "Status": "状态码",
         "Duration": "耗时",
         "Tokens": "输入/缓存/输出",
+        "Tps": "TPS",
         "Cost": "费用",
         "Error": "错误",
         "NoData": "暂无数据"
