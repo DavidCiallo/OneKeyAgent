@@ -291,6 +291,7 @@
         "Status": "Status",
         "Duration": "Duration",
         "Tokens": "In/Cache/Out",
+        "Tps": "TPS",
         "Cost": "Cost",
         "Error": "Error",
         "NoData": "No data"

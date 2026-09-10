@@ -288,6 +288,7 @@
         "Status": "ステータス",
         "Duration": "所要時間",
         "Tokens": "入力/キャッシュ/出力",
+        "Tps": "TPS",
         "Cost": "コスト",
         "Error": "エラー",
         "NoData": "データなし"
