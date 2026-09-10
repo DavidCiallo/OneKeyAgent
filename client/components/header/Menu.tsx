@@ -6,7 +6,7 @@ import { Locale } from "../../methods/locale";
 import { useAuth } from "../../methods/auth-context";
 import { clearAuthData } from "../../methods/auth";
 
-const ALL_MENUS = ["account", "settings", "profile", "subscription", "model", "provider", "usage"] as const;
+const ALL_MENUS = ["account", "settings", "profile", "subscription", "model", "provider", "usage", "audit"] as const;
 
 export const MenuComp = ({ now }: { now?: string }) => {
     const locale = Locale("Menu");
@@ -22,6 +22,7 @@ export const MenuComp = ({ now }: { now?: string }) => {
         usage: { name: locale.Usage, link: "/usage" },
         account: { name: locale.Account, link: "/account" },
         settings: { name: locale.Settings || "Settings", link: "/settings" },
+        audit: { name: locale.Audit || "Audit", link: "/audit" },
         nocontent: { name: locale.NoContent, link: "/nocontent" },
     };
 

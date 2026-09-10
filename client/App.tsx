@@ -15,6 +15,7 @@ import TermsPage from "./pages/terms/TermsPage";
 import NoContentPage from "./pages/nocontent/NoContentPage";
 import TopupPage from "./pages/topup/TopupPage";
 import SettingsPage from "./pages/settings/SettingsPage";
+import AuditPage from "./pages/audit/AuditPage";
 import { authApi } from "./api/instance";
 import { AuthProvider, useAuth } from "./methods/auth-context";
 
@@ -58,6 +59,7 @@ const TITLE_MAP: Record<string, string> = {
     "/profile": "Profile",
     "/subscription": "Subscription",
     "/settings": "Settings",
+    "/audit": "Audit",
     "/nocontent": "No Content",
     "/terms": "Terms",
 };
@@ -87,6 +89,7 @@ const AppRoutes = () => {
                 <Route path="/profile" element={<ProtectedRoute name="profile"><ProfilePage /></ProtectedRoute>} />
                 <Route path="/subscription" element={<ProtectedRoute name="subscription"><TopupPage /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute name="settings"><SettingsPage /></ProtectedRoute>} />
+                <Route path="/audit" element={<ProtectedRoute name="audit"><AuditPage /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>

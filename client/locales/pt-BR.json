@@ -20,6 +20,7 @@
         "Account": "Conta",
         "Profile": "Perfil",
         "Subscription": "Faturamento",
+        "Audit": "Auditoria",
         "NoContent": "Sem acesso",
         "Logout": "Sair"
     },
@@ -270,5 +271,25 @@
         "Section4Body": "1. A plataforma não oferece garantia, expressa ou implícita, quanto à precisão, integridade ou confiabilidade do conteúdo gerado por modelos. Você assume todos os riscos associados ao uso de tal conteúdo.\n\n2. Na máxima extensão permitida pela lei aplicável, a plataforma não será responsável por quaisquer danos indiretos, incidentais, especiais, consequenciais ou exemplares decorrentes do uso ou da impossibilidade de acesso ao serviço.\n\n3. A plataforma reserva-se o direito de modificar, suspender ou descontinuar o serviço a qualquer momento. Alterações materiais serão comunicadas com antecedência por meios razoáveis.",
         "Section5Title": "5. Fale conosco",
         "Section5Body": "Se você tiver alguma dúvida ou precisar de ajuda, contate o administrador. Valorizamos o feedback de cada usuário.\n\n\"Palavras simples, inteligência profunda.\""
+    }
+,
+    "AuditPage": {
+        "Title": "Auditoria de requisições",
+        "Success": "Sucesso",
+        "Failed": "Falhas",
+        "AutoRefresh": "Atualização automática",
+        "Refresh": "Atualizar",
+        "KeepHint": "Mantém os últimos {n} registros de cada tipo.",
+        "Time": "Hora",
+        "Account": "Conta",
+        "Model": "Modelo",
+        "Provider": "Provedor",
+        "Endpoint": "Endpoint",
+        "Status": "Status",
+        "Duration": "Duração",
+        "Tokens": "Entrada/Cache/Saída",
+        "Cost": "Custo",
+        "Error": "Erro",
+        "NoData": "Sem dados"
     }
 }

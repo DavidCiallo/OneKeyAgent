@@ -148,6 +148,30 @@ var Schema = []string{
 		update_time INTEGER,
 		delete_time INTEGER
 	)`,
+	`CREATE TABLE IF NOT EXISTS audit_log (
+		id TEXT PRIMARY KEY,
+		ts INTEGER NOT NULL DEFAULT 0,
+		success INTEGER NOT NULL DEFAULT 0,
+		account_id TEXT NOT NULL DEFAULT '',
+		account_name TEXT NOT NULL DEFAULT '',
+		model_alias TEXT NOT NULL DEFAULT '',
+		provider_id TEXT NOT NULL DEFAULT '',
+		provider_name TEXT NOT NULL DEFAULT '',
+		api_type TEXT NOT NULL DEFAULT '',
+		endpoint TEXT NOT NULL DEFAULT '',
+		status_code INTEGER NOT NULL DEFAULT 0,
+		duration_ms INTEGER NOT NULL DEFAULT 0,
+		input_tokens INTEGER NOT NULL DEFAULT 0,
+		cached_input_tokens INTEGER NOT NULL DEFAULT 0,
+		output_tokens INTEGER NOT NULL DEFAULT 0,
+		cost REAL NOT NULL DEFAULT 0,
+		stream INTEGER NOT NULL DEFAULT 0,
+		err TEXT NOT NULL DEFAULT '',
+		create_time INTEGER NOT NULL DEFAULT 0,
+		update_time INTEGER,
+		delete_time INTEGER
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_audit_success_ts ON audit_log(success, ts)`,
 }
 
 func Open(path string) (*sql.DB, error) {

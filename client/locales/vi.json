@@ -20,6 +20,7 @@
         "Account": "Tài khoản",
         "Profile": "Hồ sơ",
         "Subscription": "Quản lý phí",
+        "Audit": "Kiểm toán",
         "NoContent": "Không có nội dung",
         "Logout": "Đăng xuất"
     },
@@ -267,5 +268,25 @@
         "Section4Body": "1. Nền tảng không bảo đảm, dù rõ ràng hay ngụ ý, về tính chính xác, đầy đủ hoặc độ tin cậy của nội dung do mô hình tạo ra. Bạn tự chịu mọi rủi ro liên quan đến việc sử dụng nội dung đó.\n\n2. Trong phạm vi tối đa được pháp luật áp dụng cho phép, nền tảng không chịu trách nhiệm đối với bất kỳ thiệt hại gián tiếp, ngẫu nhiên, đặc biệt, do hậu quả hoặc mang tính chất răn đe nào phát sinh từ việc sử dụng hoặc không thể truy cập dịch vụ.\n\n3. Nền tảng bảo lưu quyền sửa đổi, tạm ngừng hoặc chấm dứt dịch vụ bất cứ lúc nào. Các thay đổi quan trọng sẽ được thông báo trước bằng các phương tiện hợp lý.",
         "Section5Title": "5. Liên hệ",
         "Section5Body": "Nếu bạn có bất kỳ câu hỏi hoặc cần trợ giúp, vui lòng liên hệ quản trị viên. Chúng tôi trân trọng mọi phản hồi từ người dùng.\n\n\"Ngôn từ giản dị, trí tuệ sâu sắc.\""
+    }
+,
+    "AuditPage": {
+        "Title": "Kiểm toán yêu cầu",
+        "Success": "Thành công",
+        "Failed": "Thất bại",
+        "AutoRefresh": "Tự động làm mới",
+        "Refresh": "Làm mới",
+        "KeepHint": "Chỉ lưu {n} bản ghi mới nhất cho mỗi loại.",
+        "Time": "Thời gian",
+        "Account": "Tài khoản",
+        "Model": "Mô hình",
+        "Provider": "Nhà cung cấp",
+        "Endpoint": "Điểm cuối",
+        "Status": "Trạng thái",
+        "Duration": "Thời lượng",
+        "Tokens": "Vào/Đệm/Ra",
+        "Cost": "Chi phí",
+        "Error": "Lỗi",
+        "NoData": "Không có dữ liệu"
     }
 }
