@@ -301,6 +301,117 @@ func TestApplyOutboxPutCreatesAndUpdates(t *testing.T) {
 	}
 }
 
+// TestApplyOutboxSettingsMatchesByKey — settings rows are keyed by their name,
+// not by id. Each node generates its own id for the same setting, so an
+// id-based upsert would insert a second row and trip the unique index on
+// settings(key).
+func TestApplyOutboxSettingsMatchesByKey(t *testing.T) {
+	db, err := Open(t.TempDir() + "/applysettings.db")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+
+	// The main database already has the setting under its own row id.
+	if _, err := db.Exec(`INSERT INTO settings (id, key, value, create_time, update_time, delete_time)
+		VALUES ('main-row-id','fallback_model_alias','old',1,1,NULL)`); err != nil {
+		t.Fatalf("seed setting: %v", err)
+	}
+
+	// A replica's put arrives keyed by name, as SettingsSet buffers it.
+	if err := ApplyOutbox(db, OutboxEntry{
+		Table: "settings", RowID: "fallback_model_alias", Op: "put",
+		Payload: map[string]any{"key": "fallback_model_alias", "value": "new"},
+	}); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+
+	var rows int64
+	if err := db.QueryRow("SELECT COUNT(*) FROM settings WHERE key = 'fallback_model_alias'").Scan(&rows); err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if rows != 1 {
+		t.Fatalf("got %d rows for the setting, want 1 (the replica's put forked it)", rows)
+	}
+	var id, value string
+	if err := db.QueryRow("SELECT id, value FROM settings WHERE key = 'fallback_model_alias'").Scan(&id, &value); err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if value != "new" {
+		t.Fatalf("value = %q, want \"new\"", value)
+	}
+	if id != "main-row-id" {
+		t.Fatalf("id = %q, want the existing row's id (main-row-id)", id)
+	}
+}
+
+// TestSettingsSetBuffersByKey — the enqueue side must key on the setting name,
+// so replicas' rows collapse onto one entry.
+func TestSettingsSetBuffersByKey(t *testing.T) {
+	db, err := Open(t.TempDir() + "/settingsbuf.db")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+	SetOutboxEnabled(true)
+	defer SetOutboxEnabled(false)
+
+	if err := SettingsSet(db, "fallback_model_alias", "first"); err != nil {
+		t.Fatalf("set 1: %v", err)
+	}
+	if err := SettingsSet(db, "fallback_model_alias", "second"); err != nil {
+		t.Fatalf("set 2: %v", err)
+	}
+
+	batch, err := OutboxBatch(db, 100, 0)
+	if err != nil {
+		t.Fatalf("batch: %v", err)
+	}
+	if len(batch) != 1 {
+		t.Fatalf("got %d entries, want 1 collapsed entry", len(batch))
+	}
+	if batch[0].Table != "settings" || batch[0].RowID != "fallback_model_alias" {
+		t.Fatalf("entry = %s/%s, want settings/fallback_model_alias", batch[0].Table, batch[0].RowID)
+	}
+	if batch[0].Payload["value"] != "second" {
+		t.Fatalf("value = %v, want the later \"second\"", batch[0].Payload["value"])
+	}
+}
+
+// TestAccountAdminEditsAreBuffered — admin edits that go through the targeted
+// field helper must reach the main database too, not just the generic helpers.
+func TestAccountAdminEditsAreBuffered(t *testing.T) {
+	db, err := Open(t.TempDir() + "/adminedit.db")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+	SetOutboxEnabled(true)
+	defer SetOutboxEnabled(false)
+
+	if _, err := GenericInsert(db, "account", map[string]any{
+		"id": "acc1", "name": "old", "email": "a@example.com", "api_key": "sk-1", "balance": 5.0,
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	// GenericInsert itself buffers a put; clear it so the assertion below is
+	// about the field update.
+	if err := OutboxAck(db, 1<<40); err != nil {
+		t.Fatalf("clear: %v", err)
+	}
+
+	if err := AccountSetField(db, "acc1", "name", "renamed"); err != nil {
+		t.Fatalf("set field: %v", err)
+	}
+	batch, err := OutboxBatch(db, 100, 0)
+	if err != nil {
+		t.Fatalf("batch: %v", err)
+	}
+	if len(batch) != 1 || batch[0].Table != "account" || batch[0].Payload["name"] != "renamed" {
+		t.Fatalf("field edit not buffered: %v", batch)
+	}
+}
+
 // TestApplyOutboxDeltaAccumulatesAndFloorsAtZero — the main database side of a
 // balance delta: increments add up across nodes, and the balance can never go
 // negative even if several nodes each deduct to the limit.

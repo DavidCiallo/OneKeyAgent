@@ -319,6 +319,7 @@ func ProviderUpdatePriority(db *sql.DB, id string, delta int64) error {
 	_, err = db.Exec("UPDATE provider SET priority = ?, update_time = ? WHERE id = ?", np, Now(), id)
 	if err == nil {
 		InvalidateRefCache()
+		_ = EnqueuePut(db, "provider", id, map[string]any{"priority": np})
 	}
 	return err
 }
@@ -474,17 +475,27 @@ func SettingsAll(db *sql.DB) (map[string]string, error) {
 	return out, rows.Err()
 }
 
+// SettingsSet — upsert one setting.
+//
+// The buffered change is keyed by the setting's name, not its row id: each node
+// seeds its settings rows with its own generated id, so an id-based push would
+// create a second row for the same key on the main database and collide with
+// the unique index on settings(key).
 func SettingsSet(db *sql.DB, key, value string) error {
 	exists := false
 	_ = db.QueryRow("SELECT 1 FROM settings WHERE key = ?", key).Scan(&exists)
 	if exists {
-		_, err := db.Exec("UPDATE settings SET value = ?, update_time = ? WHERE key = ?", value, Now(), key)
-		return err
+		if _, err := db.Exec("UPDATE settings SET value = ?, update_time = ? WHERE key = ?", value, Now(), key); err != nil {
+			return err
+		}
+	} else {
+		if _, err := db.Exec(
+			"INSERT INTO settings (id, key, value, create_time, update_time, delete_time) VALUES (?, ?, ?, ?, ?, NULL)",
+			cryptox.Nanoid(6), key, value, Now(), Now()); err != nil {
+			return err
+		}
 	}
-	_, err := db.Exec(
-		"INSERT INTO settings (id, key, value, create_time, update_time, delete_time) VALUES (?, ?, ?, ?, ?, NULL)",
-		cryptox.Nanoid(6), key, value, Now(), Now())
-	return err
+	return EnqueuePut(db, "settings", key, map[string]any{"key": key, "value": value})
 }
 
 // ProxyStr / ApiTypeStr — nil-safe accessors used by the AI proxy.

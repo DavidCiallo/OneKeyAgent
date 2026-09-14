@@ -386,8 +386,13 @@ func CountAccountSince(db *sql.DB, since int64) (int64, error) {
 func AccountSetField(db *sql.DB, id, field string, value any) error {
 	switch field {
 	case "name", "email", "password", "api_key", "is_admin", "tg_chat_id", "last_daily_time", "balance":
-		_, err := db.Exec("UPDATE account SET "+field+" = ?, update_time = ? WHERE id = ?", value, Now(), id)
-		return err
+		if _, err := db.Exec("UPDATE account SET "+field+" = ?, update_time = ? WHERE id = ?", value, Now(), id); err != nil {
+			return err
+		}
+		if syncPutTables["account"] {
+			_ = EnqueuePut(db, "account", id, map[string]any{field: value})
+		}
+		return nil
 	}
 	return fmt.Errorf("field %s not updatable", field)
 }

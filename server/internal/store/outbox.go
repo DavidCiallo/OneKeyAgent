@@ -428,6 +428,15 @@ func ApplyOutboxTx(tx *sql.Tx, e OutboxEntry) error {
 // execer — a *sql.DB or *sql.Tx, whichever the apply helpers were handed.
 type execer interface {
 	Exec(query string, args ...any) (sql.Result, error)
+	QueryRow(query string, args ...any) *sql.Row
+}
+
+// putConflictCols — how an incoming put is matched to an existing row. Most
+// tables match on id, but settings is keyed by its name: every node generates
+// its own row id for the same setting, so matching on id would insert a second
+// row and violate the unique index on settings(key).
+var putConflictCols = map[string]string{
+	"settings": "key",
 }
 
 func applyPut(x execer, e OutboxEntry) error {
@@ -435,8 +444,18 @@ func applyPut(x execer, e OutboxEntry) error {
 		return fmt.Errorf("unknown table %s", e.Table)
 	}
 	now := Now()
+	conflictCol := putConflictCols[e.Table]
 	cols := []string{"id"}
-	args := []any{e.RowID}
+	args := []any{cryptox.Nanoid(8)}
+	if conflictCol == "" {
+		args[0] = e.RowID // match on the row id
+	} else if v, has := e.Payload[conflictCol]; has {
+		cols = append(cols, conflictCol)
+		args = append(args, v)
+	} else {
+		return fmt.Errorf("put %s/%s missing key column %s", e.Table, e.RowID, conflictCol)
+	}
+
 	for _, c := range append(append([]string{}, updatable[e.Table]...), "create_time", "update_time", "delete_time") {
 		v, has := e.Payload[c]
 		if !has {
@@ -462,9 +481,37 @@ func applyPut(x execer, e OutboxEntry) error {
 		sets = append(sets, c+" = excluded."+c)
 	}
 	ph := strings.TrimSuffix(strings.Repeat("?,", len(cols)), ",")
+
+	if conflictCol == "" {
+		_, err := x.Exec(
+			fmt.Sprintf(`INSERT INTO "%s" (%s) VALUES (%s) ON CONFLICT(id) DO UPDATE SET %s`,
+				e.Table, strings.Join(cols, ","), ph, strings.Join(sets, ", ")),
+			args...)
+		return err
+	}
+	// Natural-key tables: find the existing row first, update it in place,
+	// otherwise insert. Two statements rather than an ON CONFLICT target so the
+	// node-local id is preserved when the row already exists.
+	var existingID string
+	if err := x.QueryRow(fmt.Sprintf(`SELECT id FROM "%s" WHERE %s = ? LIMIT 1`, e.Table, conflictCol),
+		e.Payload[conflictCol]).Scan(&existingID); err == nil && existingID != "" {
+		sets := []string{}
+		uargs := []any{}
+		for i, c := range cols {
+			if c == "id" {
+				continue
+			}
+			sets = append(sets, c+" = ?")
+			uargs = append(uargs, args[i])
+		}
+		uargs = append(uargs, existingID)
+		_, err := x.Exec(fmt.Sprintf(`UPDATE "%s" SET %s WHERE id = ?`, e.Table, strings.Join(sets, ", ")), uargs...)
+		return err
+	} else if err != nil && err != sql.ErrNoRows {
+		return err
+	}
 	_, err := x.Exec(
-		fmt.Sprintf(`INSERT INTO "%s" (%s) VALUES (%s) ON CONFLICT(id) DO UPDATE SET %s`,
-			e.Table, strings.Join(cols, ","), ph, strings.Join(sets, ", ")),
+		fmt.Sprintf(`INSERT INTO "%s" (%s) VALUES (%s)`, e.Table, strings.Join(cols, ","), ph),
 		args...)
 	return err
 }

@@ -239,19 +239,36 @@ def main():
         con.close()
         check("replica's buffer is trimmed after a push", pending == 0, f"pending={pending}")
 
-        # 10. an admin edit on main propagates to the replica. main writes the
-        # model price; the replica refetches via its own bootstrap-on-change path
-        # (reference data refreshes through the snapshot on restart, so assert
-        # the value is readable on main and the replica keeps serving).
+        # 10. an admin edit made ON THE REPLICA must reach main (the replica is
+        # not read-only: it accepts admin writes and reports them as puts).
+        st, body = http("POST", f"http://127.0.0.1:{PORT_REPLICA}/api/provider/update",
+                        {"id": "p1", "provider": {"name": "Renamed On Replica"}}, {"token": token_main})
+        check("replica accepts an admin edit", st == 200, f"{st} {body[:200]}")
+
+        reached = False
+        deadline = time.time() + 20
+        while time.time() < deadline:
+            con = sqlite3.connect(MAIN_DB)
+            row = con.execute("SELECT name FROM provider WHERE id='p1'").fetchone()
+            con.close()
+            if row and row[0] == "Renamed On Replica":
+                reached = True
+                break
+            time.sleep(0.5)
+        check("replica's admin edit reaches main", reached,
+              f"main provider name = {row[0] if row else None}")
+
+        # 11. main's own admin edit is visible to main immediately (it buffers
+        # nothing, so there is no self-sync step to wait for).
         st, body = http("POST", f"http://127.0.0.1:{PORT_MAIN}/api/model/create",
                         {"model": {"alias": "new-alias", "input_price": 3.0, "cache_price": 0.0,
                                    "output_price": 3.0, "is_public": 1}}, {"token": token_main})
         check("main accepts an admin model create", st == 200, f"{st} {body[:200]}")
 
-        st, body = http("GET", f"http://127.0.0.1:{PORT_REPLICA}/api/models", headers={"x-api-key": API_KEY})
+        st, body = http("GET", f"http://127.0.0.1:{PORT_MAIN}/api/models", headers={"x-api-key": API_KEY})
         d = json.loads(body) if st == 200 else {}
         aliases = [m["id"] for m in d.get("data", [])]
-        check("replica still serves models after the edit", "mock-alias" in aliases, body[:300])
+        check("main serves its own new model", "new-alias" in aliases, body[:300])
 
         print()
         if fails:
