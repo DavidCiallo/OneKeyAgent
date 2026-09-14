@@ -175,6 +175,28 @@ var tables = []tableDef{
 		{"update_time", "INTEGER"},
 		{"delete_time", "INTEGER"},
 	}},
+	// outbox — changes made on this node that the main database has not
+	// acknowledged yet. Only populated when the node is a replica
+	// (MAIN_DB_URL set); on the main node it stays empty.
+	{"outbox", []colDef{
+		{"id", "TEXT PRIMARY KEY"},
+		{"table_name", "TEXT NOT NULL DEFAULT ''"},
+		{"row_id", "TEXT NOT NULL DEFAULT ''"},
+		{"op", "TEXT NOT NULL DEFAULT ''"},
+		{"payload", "TEXT NOT NULL DEFAULT ''"},
+		{"seq", "INTEGER NOT NULL DEFAULT 0"},
+		{"create_time", "INTEGER NOT NULL DEFAULT 0"},
+		{"update_time", "INTEGER"},
+		{"delete_time", "INTEGER"},
+	}},
+	// node_state — per-node bookkeeping (last acknowledged outbox seq).
+	{"node_state", []colDef{
+		{"id", "TEXT PRIMARY KEY"},
+		{"value", "TEXT NOT NULL DEFAULT ''"},
+		{"create_time", "INTEGER NOT NULL DEFAULT 0"},
+		{"update_time", "INTEGER"},
+		{"delete_time", "INTEGER"},
+	}},
 }
 
 // indexes — created after column reconciliation, so an index over a column
@@ -202,6 +224,10 @@ var indexes = []string{
 	`CREATE INDEX IF NOT EXISTS idx_tx_account ON "transaction"(account_id)`,
 	`CREATE INDEX IF NOT EXISTS idx_tx_txid ON "transaction"(txid)`,
 	`CREATE INDEX IF NOT EXISTS idx_audit_success_ts ON audit_log(success, ts)`,
+	`CREATE INDEX IF NOT EXISTS idx_outbox_seq ON outbox(seq)`,
+	// One buffered change per (row, op): a profile patch and a balance delta for
+	// the same account are different operations and must both survive.
+	`CREATE UNIQUE INDEX IF NOT EXISTS idx_outbox_row ON outbox(table_name, row_id, op)`,
 }
 
 // createDDL — the CREATE TABLE statement for this table.

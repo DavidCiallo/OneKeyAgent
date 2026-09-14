@@ -130,6 +130,9 @@ func AccountGetBalance(db *sql.DB, id string) (float64, error) {
 // AccountDeductBalance — single atomic UPDATE with a floor at 0.
 // Returns the amount actually deducted. Concurrent requests can never
 // overdraft past zero (the TS version could).
+//
+// The deduction and its outbox delta commit together, so a crash cannot record
+// a charge that the main database never hears about.
 func AccountDeductBalance(db *sql.DB, id string, cost float64) (float64, error) {
 	if cost <= 0 {
 		return 0, nil
@@ -141,15 +144,50 @@ func AccountDeductBalance(db *sql.DB, id string, cost float64) (float64, error) 
 	if err != nil {
 		return 0, err
 	}
-	res, err := db.Exec(
-		"UPDATE account SET balance = MAX(balance - ?, 0), update_time = ? WHERE id = ?",
-		cost, Now(), id)
+
+	buffer := OutboxOn() && !outboxPaused() && syncDeltaTables["account"]
+	if !buffer {
+		res, err := db.Exec(
+			"UPDATE account SET balance = MAX(balance - ?, 0), update_time = ? WHERE id = ?",
+			cost, Now(), id)
+		if err != nil {
+			return 0, err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return 0, nil
+		}
+		deducted := a.Balance - cost
+		if deducted < 0 {
+			deducted = 0
+		}
+		return deducted, nil
+	}
+
+	outboxSeqMu.Lock()
+	tx, err := db.Begin()
 	if err != nil {
+		outboxSeqMu.Unlock()
 		return 0, err
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return 0, nil
+	defer tx.Rollback()
+	if _, err := tx.Exec(
+		"UPDATE account SET balance = MAX(balance - ?, 0), update_time = ? WHERE id = ?",
+		cost, Now(), id); err != nil {
+		outboxSeqMu.Unlock()
+		return 0, err
 	}
+	// A negative balance delta: the main database applies the same floor.
+	if err := mergeOutboxEntryTx(tx, "account", id, "delta",
+		map[string]any{"id": id, "balance": -cost}, true); err != nil {
+		outboxSeqMu.Unlock()
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		outboxSeqMu.Unlock()
+		return 0, err
+	}
+	outboxSeqMu.Unlock()
+
 	deducted := a.Balance - cost
 	if deducted < 0 {
 		deducted = 0
@@ -161,6 +199,23 @@ func AccountDeductBalance(db *sql.DB, id string, cost float64) (float64, error) 
 func AccountAddBalance(db *sql.DB, id string, delta float64) error {
 	if delta == 0 {
 		return nil
+	}
+	if OutboxOn() && !outboxPaused() && syncDeltaTables["account"] {
+		outboxSeqMu.Lock()
+		defer outboxSeqMu.Unlock()
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+		if _, err := tx.Exec("UPDATE account SET balance = balance + ?, update_time = ? WHERE id = ?", delta, Now(), id); err != nil {
+			return err
+		}
+		if err := mergeOutboxEntryTx(tx, "account", id, "delta",
+			map[string]any{"id": id, "balance": delta}, true); err != nil {
+			return err
+		}
+		return tx.Commit()
 	}
 	_, err := db.Exec("UPDATE account SET balance = balance + ?, update_time = ? WHERE id = ?", delta, Now(), id)
 	return err
@@ -229,6 +284,9 @@ func GenericInsert(db *sql.DB, table string, data map[string]any) (map[string]an
 	}
 	invalidateForTable(table)
 	row["id"] = id
+	if syncPutTables[table] {
+		_ = EnqueuePut(db, table, id, row)
+	}
 	return row, nil
 }
 
@@ -254,14 +312,23 @@ func GenericUpdateByID(db *sql.DB, table, id string, data map[string]any) error 
 	if err == nil {
 		invalidateForTable(table)
 	}
+	if err == nil && syncPutTables[table] {
+		// Only the patched columns need to travel: the main database keeps the
+		// rest. Additive columns are stripped by EnqueuePut.
+		_ = EnqueuePut(db, table, id, data)
+	}
 	return err
 }
 
 // GenericSoftDelete — set delete_time.
 func GenericSoftDelete(db *sql.DB, table, id string) error {
-	_, err := db.Exec(fmt.Sprintf("UPDATE \"%s\" SET delete_time = ?, update_time = ? WHERE id = ? AND delete_time IS NULL", table), Now(), Now(), id)
+	now := Now()
+	_, err := db.Exec(fmt.Sprintf("UPDATE \"%s\" SET delete_time = ?, update_time = ? WHERE id = ? AND delete_time IS NULL", table), now, now, id)
 	if err == nil {
 		invalidateForTable(table)
+	}
+	if err == nil && syncPutTables[table] {
+		_ = EnqueuePut(db, table, id, map[string]any{"delete_time": now})
 	}
 	return err
 }

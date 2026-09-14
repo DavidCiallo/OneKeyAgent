@@ -67,6 +67,13 @@ type BucketLogInput struct {
 // Port of ai.session.ts logUsage, minus its per-request TTL sweep (see
 // PurgeExpiredBuckets).
 func BucketLogUsage(db *sql.DB, u BucketLogInput) error {
+	buffer := OutboxOn() && !outboxPaused() && syncDeltaTables["usage_bucket"]
+	if buffer {
+		// The sequence cache and the buffered entry must be consistent with the
+		// single transaction below.
+		outboxSeqMu.Lock()
+		defer outboxSeqMu.Unlock()
+	}
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -95,6 +102,20 @@ func BucketLogUsage(db *sql.DB, u BucketLogInput) error {
 			u.InputTokens, u.CachedInputTokens, u.OutputTokens, Round6(u.Cost), now, now,
 		); err != nil {
 			return err
+		}
+		// Buffer the same increment for the main database, in this transaction
+		// so usage and its sync record commit together.
+		if buffer {
+			if err := mergeOutboxEntryTx(tx, "usage_bucket",
+				BucketDeltaRowID(u.AccountID, u.ModelAlias, u.ProviderID, gran, bucketTime), "delta",
+				map[string]any{
+					"account_id": u.AccountID, "model_alias": u.ModelAlias, "provider_id": u.ProviderID,
+					"granularity": gran, "bucket_time": bucketTime,
+					"input_tokens": u.InputTokens, "cached_input_tokens": u.CachedInputTokens,
+					"output_tokens": u.OutputTokens, "cost": Round6(u.Cost), "request_count": int64(1),
+				}, true); err != nil {
+				return err
+			}
 		}
 	}
 	return tx.Commit()

@@ -9,20 +9,24 @@ import (
 	"onekey/server/internal/ai"
 	"onekey/server/internal/httpx"
 	"onekey/server/internal/service"
+	"onekey/server/internal/sync"
 )
 
 type App struct {
 	DB       *sql.DB
 	Settings *service.Settings
 	AI       *ai.Server
+	// Syncer is nil on the main node: a main database has nothing to push.
+	Syncer    *sync.Syncer
 	staticDir string
 }
 
-func NewApp(db *sql.DB, settings *service.Settings, staticDir string) *App {
+func NewApp(db *sql.DB, settings *service.Settings, staticDir string, syncer *sync.Syncer) *App {
 	return &App{
 		DB:        db,
 		Settings:  settings,
 		AI:        ai.NewServer(db, settings),
+		Syncer:    syncer,
 		staticDir: staticDir,
 	}
 }
@@ -90,6 +94,11 @@ func (a *App) Routes() *http.ServeMux {
 		{"/api/usage/stats/batch", a.wrap(a.usageStatsBatch)},
 		// audit
 		{"/api/audit/list", a.wrap(a.auditList)},
+		// node sync (replica ⇄ main database; SYNC_SECRET, not a user token)
+		{"/api/sync/snapshot", a.wrap(a.syncSnapshot)},
+		{"/api/sync/push", a.wrap(a.syncPush)},
+		{"/api/sync/status", a.wrap(a.syncStatus)},
+		{"/api/sync/flush", a.wrap(a.syncTrigger)},
 		// subscription
 		{"/api/subscription/records", a.wrap(a.subscriptionRecords)},
 		{"/api/subscription/createtopup", a.wrap(a.subscriptionCreateTopup)},
