@@ -385,9 +385,13 @@ func RoleFindOrCreate(db *sql.DB, name, typ string) (string, error) {
 	return r.ID, nil
 }
 
+// RolesByAccount — distinct roles for an account. The DISTINCT matters:
+// account_role is a link table, and rows predating the write-side dedupe (or
+// produced by it before the fix) can repeat the same role, which otherwise
+// renders the same sidebar entry several times.
 func RolesByAccount(db *sql.DB, accountID string) ([]*Role, error) {
 	rows, err := db.Query(
-		"SELECT r.id, r.name, r.type, r.create_time, r.update_time, r.delete_time FROM role r "+
+		"SELECT DISTINCT r.id, r.name, r.type, r.create_time, r.update_time, r.delete_time FROM role r "+
 			"INNER JOIN account_role ar ON ar.role_id = r.id "+
 			"WHERE ar.account_id = ? AND ar.delete_time IS NULL AND r.delete_time IS NULL", accountID)
 	if err != nil {
@@ -405,12 +409,21 @@ func RolesByAccount(db *sql.DB, accountID string) ([]*Role, error) {
 	return out, rows.Err()
 }
 
-// AssignPermissions — replace the account's role assignments.
+// AssignPermissions — replace the account's role assignments. Duplicate
+// (name, type) pairs collapse to a single row: the caller sends checkbox
+// values, and a repeated entry would otherwise create a second link row that
+// repeats the sidebar entry for that role.
 func AssignPermissions(db *sql.DB, accountID string, perms [][2]string) error {
 	if _, err := db.Exec("DELETE FROM account_role WHERE account_id = ?", accountID); err != nil {
 		return err
 	}
+	seen := map[string]bool{}
 	for _, p := range perms {
+		key := p[0] + "\x00" + p[1]
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
 		roleID, err := RoleFindOrCreate(db, p[0], p[1])
 		if err != nil {
 			return err

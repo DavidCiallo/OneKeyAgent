@@ -29,7 +29,7 @@ export const MenuComp = ({ now }: { now?: string }) => {
     const menuKeys = is_admin
         ? ALL_MENUS
         : (roles.length > 0
-            ? roles.filter(r => r.type === "menu").map(r => r.name)
+            ? Array.from(new Set(roles.filter(r => r.type === "menu").map(r => r.name)))
             : ["nocontent"]);
     const menuList = menuKeys
         .filter((key): key is string => key in menuMap)
