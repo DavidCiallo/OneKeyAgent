@@ -227,6 +227,7 @@ func GenericInsert(db *sql.DB, table string, data map[string]any) (map[string]an
 	if _, err := db.Exec(q, args...); err != nil {
 		return nil, err
 	}
+	invalidateForTable(table)
 	row["id"] = id
 	return row, nil
 }
@@ -250,12 +251,18 @@ func GenericUpdateByID(db *sql.DB, table, id string, data map[string]any) error 
 	}
 	args = append(args, id)
 	_, err := db.Exec(fmt.Sprintf("UPDATE \"%s\" SET %s WHERE id = ?", table, strings.Join(sets, ", ")), args...)
+	if err == nil {
+		invalidateForTable(table)
+	}
 	return err
 }
 
 // GenericSoftDelete — set delete_time.
 func GenericSoftDelete(db *sql.DB, table, id string) error {
 	_, err := db.Exec(fmt.Sprintf("UPDATE \"%s\" SET delete_time = ?, update_time = ? WHERE id = ? AND delete_time IS NULL", table), Now(), Now(), id)
+	if err == nil {
+		invalidateForTable(table)
+	}
 	return err
 }
 

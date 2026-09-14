@@ -253,11 +253,24 @@ func ProviderWhere(db *sql.DB, cond string, args []any) ([]*Provider, error) {
 // ProviderGetByAlias — enabled providers for an alias, priority ASC with a
 // random tiebreak inside equal-priority groups (mirrors the TS sort).
 func ProviderGetByAlias(db *sql.DB, alias string) ([]*Provider, error) {
-	list, err := ProviderWhere(db, "model_alias = ? AND enabled = 1 AND delete_time IS NULL", []any{alias})
+	list, err := providerListForAlias(db, alias)
 	if err != nil {
 		return nil, err
 	}
-	// group shuffle by priority
+	shuffleEqualPriority(list)
+	return list, nil
+}
+
+// providerListForAlias — the query behind ProviderGetByAlias, before the
+// per-call random tiebreak. Split out so the cache can store the stable order
+// and still hand each request its own shuffle.
+func providerListForAlias(db *sql.DB, alias string) ([]*Provider, error) {
+	return ProviderWhere(db, "model_alias = ? AND enabled = 1 AND delete_time IS NULL", []any{alias})
+}
+
+// shuffleEqualPriority — randomly reorders within each run of equal priority,
+// preserving the priority ordering across runs. Applied to a caller-owned slice.
+func shuffleEqualPriority(list []*Provider) {
 	for i := 0; i < len(list); {
 		j := i + 1
 		for j < len(list) && list[j].Priority == list[i].Priority {
@@ -267,7 +280,6 @@ func ProviderGetByAlias(db *sql.DB, alias string) ([]*Provider, error) {
 		rand.Shuffle(len(g), func(a, b int) { g[a], g[b] = g[b], g[a] })
 		i = j
 	}
-	return list, nil
 }
 
 func ProviderModelAliases(db *sql.DB) ([]string, error) {
@@ -305,6 +317,9 @@ func ProviderUpdatePriority(db *sql.DB, id string, delta int64) error {
 		np = 1
 	}
 	_, err = db.Exec("UPDATE provider SET priority = ?, update_time = ? WHERE id = ?", np, Now(), id)
+	if err == nil {
+		InvalidateRefCache()
+	}
 	return err
 }
 
@@ -417,6 +432,9 @@ func AssignPermissions(db *sql.DB, accountID string, perms [][2]string) error {
 	if _, err := db.Exec("DELETE FROM account_role WHERE account_id = ?", accountID); err != nil {
 		return err
 	}
+	// The DELETE above is raw SQL and the loop below may not run at all when
+	// perms is empty, so invalidate here rather than relying on GenericInsert.
+	InvalidateRefCache()
 	seen := map[string]bool{}
 	for _, p := range perms {
 		key := p[0] + "\x00" + p[1]

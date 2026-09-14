@@ -170,7 +170,7 @@ func elapsedMs(start time.Time) int64 {
 // ─────────────────── model access ───────────────────
 
 func (s *Server) allModels() ([]*store.Model, error) {
-	models, err := store.ModelAllActive(s.DB)
+	models, err := store.ModelAllActiveCached(s.DB)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +202,7 @@ func (s *Server) allowedAliases(accountID string) ([]string, error) {
 			allowed = append(allowed, m.Alias)
 		}
 	}
-	roles, err := store.RolesByAccount(s.DB, accountID)
+	roles, err := store.RolesByAccountCached(s.DB, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +233,7 @@ func (s *Server) requireModelAccess(accountID, alias string) error {
 }
 
 func (s *Server) providersForAlias(requested, fallbackAlias string) ([]*store.Provider, error) {
-	providers, err := store.ProviderGetByAlias(s.DB, requested)
+	providers, err := store.ProviderGetByAliasCached(s.DB, requested)
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +241,7 @@ func (s *Server) providersForAlias(requested, fallbackAlias string) ([]*store.Pr
 		return nil, fmt.Errorf("No providers found for alias: %s", requested)
 	}
 	if fallbackAlias != "" && fallbackAlias != requested {
-		fb, err := store.ProviderGetByAlias(s.DB, fallbackAlias)
+		fb, err := store.ProviderGetByAliasCached(s.DB, fallbackAlias)
 		if err == nil {
 			providers = append(providers, fb...)
 		}

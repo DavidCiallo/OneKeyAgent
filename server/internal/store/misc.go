@@ -215,6 +215,9 @@ func AllRowsIgnoreDelete(db *sql.DB, table string) ([]map[string]any, error) {
 // Truncate — wipe a collection (import).
 func Truncate(db *sql.DB, table string) error {
 	_, err := db.Exec(fmt.Sprintf("DELETE FROM \"%s\"", table))
+	if err == nil {
+		invalidateForTable(table)
+	}
 	return err
 }
 
@@ -266,6 +269,7 @@ func BatchInsertRows(db *sql.DB, table string, items []map[string]any) (int, err
 		}
 		count++
 	}
+	invalidateForTable(table)
 	return count, nil
 }
 

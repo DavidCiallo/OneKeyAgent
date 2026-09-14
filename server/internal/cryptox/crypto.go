@@ -1,8 +1,9 @@
 // Package cryptox is a drop-in port of server/methods/crypto.ts.
 //
-// Key = sha256(SECRET); the AES-256-CBC IV is generated once per process
-// (tokens do not survive a restart — same as the TS server).
-// Ciphertext layout: AES-CBC(nonceHexSuffix + reversed(plaintext)), hex encoded.
+// Key = sha256(SECRET); the AES-256-CBC IV is derived from SECRET so that every
+// node sharing a SECRET can read the others' tokens, and tokens survive a
+// restart. Ciphertext layout: AES-CBC(nonceHexSuffix + reversed(plaintext)),
+// hex encoded.
 package cryptox
 
 import (
@@ -25,6 +26,17 @@ var (
 	nonceLen int
 )
 
+// deriveIV — a fixed IV for a given SECRET. A random per-process IV (what the
+// TS server used) cannot be shared: the IV is not carried in the ciphertext, so
+// a token minted by one node was unreadable by any other, and every restart
+// invalidated all sessions. Uniqueness per message comes from the random nonce
+// that AesEncrypt prepends to the plaintext, so a fixed IV here does not make
+// equal payloads produce equal ciphertext.
+func deriveIV(secret string) []byte {
+	sum := sha256.Sum256([]byte(secret + "|iv"))
+	return sum[:16]
+}
+
 // Init derives the key/IV from the environment. Called lazily.
 func Init() {
 	initOnce.Do(func() {
@@ -46,8 +58,7 @@ func Init() {
 		}
 		sum := sha256.Sum256([]byte(secret))
 		key = sum[:]
-		iv = make([]byte, 16)
-		_, _ = rand.Read(iv)
+		iv = deriveIV(secret)
 	})
 }
 
