@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -117,6 +118,21 @@ func PurgeExpiredBuckets(db *sql.DB) error {
 		}
 	}
 	return nil
+}
+
+// StartMaintenance runs the housekeeping that must not sit on the request path
+// (currently the bucket TTL sweep) until the process exits.
+func StartMaintenance(db *sql.DB) {
+	go func() {
+		ticker := time.NewTicker(10 * time.Minute)
+		defer ticker.Stop()
+		for {
+			if err := PurgeExpiredBuckets(db); err != nil {
+				fmt.Println("[Maintenance] purge buckets failed:", err)
+			}
+			<-ticker.C
+		}
+	}()
 }
 
 // BucketSumCost — weekly spend / profile weekly usage.

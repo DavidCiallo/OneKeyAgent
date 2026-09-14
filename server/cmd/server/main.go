@@ -52,6 +52,7 @@ func main() {
 	cryptox.Init()
 	seedAdmin(db, settings)
 	monitor.Start(db, settings)
+	store.StartMaintenance(db)
 
 	staticDir := resolveStaticDir()
 

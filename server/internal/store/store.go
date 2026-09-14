@@ -191,6 +191,11 @@ var indexes = []string{
 	`CREATE INDEX IF NOT EXISTS idx_bucket_gt ON usage_bucket(granularity, bucket_time)`,
 	`CREATE INDEX IF NOT EXISTS idx_bucket_acct ON usage_bucket(account_id, granularity, bucket_time)`,
 	`CREATE INDEX IF NOT EXISTS idx_bucket_window ON usage_bucket(account_id, model_alias, provider_id, granularity, bucket_time)`,
+	// The unique index is what makes BucketLogUsage's ON CONFLICT upsert work:
+	// exactly one row per (account, alias, provider, granularity, window). It is
+	// created after dedupeBucketRows, because a database written by the previous
+	// read-modify-write implementation can already hold duplicates for a window.
+	`CREATE UNIQUE INDEX IF NOT EXISTS idx_bucket_unique ON usage_bucket(account_id, model_alias, provider_id, granularity, bucket_time)`,
 	`CREATE INDEX IF NOT EXISTS idx_gift_card_code ON gift_card(code)`,
 	`CREATE INDEX IF NOT EXISTS idx_gift_card_redeemed_by ON gift_card(redeemed_by)`,
 	`CREATE INDEX IF NOT EXISTS idx_tx_status ON "transaction"(status)`,
@@ -223,6 +228,9 @@ func Open(path string) (*sql.DB, error) {
 	if err := reconcileColumns(db); err != nil {
 		return nil, err
 	}
+	if err := dedupeBucketRows(db); err != nil {
+		return nil, err
+	}
 	for _, stmt := range indexes {
 		if _, err := db.Exec(stmt); err != nil {
 			return nil, fmt.Errorf("index: %w", err)
@@ -232,6 +240,89 @@ func Open(path string) (*sql.DB, error) {
 	db.SetMaxOpenConns(8)
 	db.SetMaxIdleConns(8)
 	return db, nil
+}
+
+// dedupeBucketRows merges usage_bucket rows that share a window, keeping the
+// earliest row and folding the others' counters into it. Required before the
+// unique index can be created on a database written by the previous
+// SELECT-then-INSERT implementation, which could leave two rows for the same
+// window when concurrent settles raced. Only the aggregate columns are summed;
+// bucket_time and granularity are equal by definition of the group.
+func dedupeBucketRows(db *sql.DB) error {
+	rows, err := db.Query(`SELECT account_id, model_alias, provider_id, granularity, bucket_time,
+			COUNT(*) FROM usage_bucket
+		GROUP BY account_id, model_alias, provider_id, granularity, bucket_time
+		HAVING COUNT(*) > 1`)
+	if err != nil {
+		return fmt.Errorf("dedupe scan: %w", err)
+	}
+	type group struct {
+		account, alias, provider, gran string
+		bucketTime                     int64
+	}
+	var dupes []group
+	for rows.Next() {
+		var g group
+		var n int64
+		if err := rows.Scan(&g.account, &g.alias, &g.provider, &g.gran, &g.bucketTime, &n); err != nil {
+			rows.Close()
+			return err
+		}
+		dupes = append(dupes, g)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if len(dupes) == 0 {
+		return nil
+	}
+
+	for _, g := range dupes {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		// Sum the duplicate rows, keep the oldest one, and give it the totals.
+		var keepID string
+		var in, cin, out, rc int64
+		var cost float64
+		if err := tx.QueryRow(`SELECT id FROM usage_bucket
+			WHERE account_id = ? AND model_alias = ? AND provider_id = ? AND granularity = ? AND bucket_time = ?
+			ORDER BY create_time ASC, rowid ASC LIMIT 1`,
+			g.account, g.alias, g.provider, g.gran, g.bucketTime).Scan(&keepID); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("dedupe keep row: %w", err)
+		}
+		if err := tx.QueryRow(`SELECT COALESCE(SUM(input_tokens),0), COALESCE(SUM(cached_input_tokens),0),
+				COALESCE(SUM(output_tokens),0), COALESCE(SUM(cost),0), COALESCE(SUM(request_count),0)
+			FROM usage_bucket
+			WHERE account_id = ? AND model_alias = ? AND provider_id = ? AND granularity = ? AND bucket_time = ?`,
+			g.account, g.alias, g.provider, g.gran, g.bucketTime).Scan(&in, &cin, &out, &cost, &rc); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("dedupe sum: %w", err)
+		}
+		// Delete the other rows first, so the unique index (created right after)
+		// never sees two rows for this window.
+		if _, err := tx.Exec(`DELETE FROM usage_bucket
+			WHERE account_id = ? AND model_alias = ? AND provider_id = ? AND granularity = ? AND bucket_time = ? AND id <> ?`,
+			g.account, g.alias, g.provider, g.gran, g.bucketTime, keepID); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("dedupe delete: %w", err)
+		}
+		if _, err := tx.Exec(`UPDATE usage_bucket SET input_tokens = ?, cached_input_tokens = ?,
+				output_tokens = ?, cost = ?, request_count = ? WHERE id = ?`,
+			in, cin, out, Round6(cost), rc, keepID); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("dedupe write back: %w", err)
+		}
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+		fmt.Printf("[Init] merged duplicate usage_bucket rows for account=%s alias=%s granularity=%s\n",
+			g.account, g.alias, g.gran)
+	}
+	return nil
 }
 
 // reconcileColumns adds any column declared in the schema but missing from an
