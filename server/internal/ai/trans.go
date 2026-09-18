@@ -61,6 +61,21 @@ func jStringify(v any) string {
 	}
 }
 
+// mapDeveloperRole — rewrite OpenAI's "developer" role to "system" in place.
+// "developer" is OpenAI's successor of "system" and means the same thing, but
+// other providers' deserializers don't know the variant (DeepSeek answers
+// "unknown variant `developer`" with a 400).
+func mapDeveloperRole(body map[string]any) {
+	msgs, _ := body["messages"].([]any)
+	for _, m := range msgs {
+		if jStrField(m, "role") == "developer" {
+			if msg := jMap(m); msg != nil {
+				msg["role"] = "system"
+			}
+		}
+	}
+}
+
 // normalizeReasoningEffort — canonical reasoning_effort value ("low",
 // "medium", "high", "minimal") from whatever a client sends. Case is
 // normalized and common synonyms fold onto the nearest level ("Max" → high),
@@ -154,7 +169,9 @@ func toAnthropicBody(body map[string]any) map[string]any {
 	msgs := jArr(body["messages"])
 	var system, chat []any
 	for _, m := range msgs {
-		if jStrField(m, "role") == "system" {
+		// "developer" is OpenAI's successor of "system"; Anthropic only knows
+		// system/user/assistant, so it belongs with the system block.
+		if r := jStrField(m, "role"); r == "system" || r == "developer" {
 			system = append(system, m)
 		} else {
 			chat = append(chat, m)
@@ -669,6 +686,9 @@ func toGeminiBody(body map[string]any, enableSearch int64) map[string]any {
 
 	for _, m := range jArr(body["messages"]) {
 		role := jStrField(m, "role")
+		if role == "developer" {
+			role = "system" // OpenAI's successor of "system"; Gemini knows neither.
+		}
 		if role == "system" {
 			continue
 		}
@@ -754,7 +774,7 @@ func toGeminiBody(body map[string]any, enableSearch int64) map[string]any {
 
 	var system []any
 	for _, m := range jArr(body["messages"]) {
-		if jStrField(m, "role") == "system" {
+		if r := jStrField(m, "role"); r == "system" || r == "developer" {
 			system = append(system, m)
 		}
 	}

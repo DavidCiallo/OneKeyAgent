@@ -318,6 +318,17 @@ func buildRequestConfig(p *store.Provider, body map[string]any, stream bool) ups
 		for k, v := range body {
 			clean[k] = v
 		}
+		// OpenAI-specific fields that other OpenAI-compatible upstreams don't
+		// know: "developer" is OpenAI's successor of "system" (DeepSeek's
+		// deserializer rejects it with "unknown variant"), and
+		// max_completion_tokens is OpenAI's renamed max_tokens.
+		mapDeveloperRole(clean)
+		if mv, has := clean["max_completion_tokens"]; has {
+			if _, hasMaxTokens := clean["max_tokens"]; !hasMaxTokens {
+				clean["max_tokens"] = mv
+			}
+			delete(clean, "max_completion_tokens")
+		}
 		// The effort value travels normalized, not verbatim: clients send
 		// things like "Max" that strict OpenAI-compatible upstreams reject with
 		// a 400. Unrecognized values are dropped entirely rather than relayed.
