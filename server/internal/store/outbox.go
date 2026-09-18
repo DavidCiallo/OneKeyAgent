@@ -687,6 +687,136 @@ func ImportSnapshot(db *sql.DB, data map[string]any) (map[string]int, error) {
 	return counts, nil
 }
 
+// ─────────────────── refresh import (main → replica) ───────────────────
+
+// RefreshSnapshot re-applies a main-database snapshot on top of a replica's
+// existing rows, so reference data edited on the main database (a model price,
+// a new provider, a renamed alias) reaches replicas that are already running.
+//
+// ImportSnapshot cannot be reused for this: it is a one-shot bootstrap that
+// refuses to run twice, and it writes whole rows with INSERT OR REPLACE. On a
+// running replica that would clobber the additive columns with the main
+// database's older values, silently erasing every deduction this node has not
+// pushed yet — i.e. it would give away free balance.
+//
+// So the update path here is column-scoped and skips additiveCols entirely:
+//
+//   - balance and the usage counters always keep their local value. They travel
+//     to the main database as deltas, never as absolute values, so the replica's
+//     copy is strictly ahead of the snapshot's and must not be overwritten.
+//   - every other whitelisted column is taken from the snapshot, because those
+//     are admin-owned reference data that the main database is the writer of
+//     record for.
+//   - a row that is absent locally is inserted whole (nothing to preserve).
+//
+// Runs with the outbox suppressed: this data came from the main database, so
+// queuing it back would echo the main database's own state at it.
+func RefreshSnapshot(db *sql.DB, data map[string]any) (map[string]int, error) {
+	counts := map[string]int{}
+	err := SuppressOutbox(func() error {
+		for _, t := range bootstrapTables {
+			items, _ := data[t[1]].([]any)
+			rows := make([]map[string]any, 0, len(items))
+			for _, it := range items {
+				if m, ok := it.(map[string]any); ok {
+					rows = append(rows, m)
+				}
+			}
+			if len(rows) == 0 {
+				continue
+			}
+			n, err := upsertPreservingAdditive(db, t[0], rows)
+			if err != nil {
+				return fmt.Errorf("refresh %s: %w", t[0], err)
+			}
+			counts[t[1]] = n
+		}
+		InvalidateRefCache()
+		return nil
+	})
+	return counts, err
+}
+
+// upsertPreservingAdditive writes snapshot rows without ever touching an
+// additive column on a row that already exists locally.
+func upsertPreservingAdditive(db *sql.DB, table string, items []map[string]any) (int, error) {
+	cols, ok := updatable[table]
+	if !ok {
+		return 0, fmt.Errorf("unknown table %s", table)
+	}
+	additive := additiveCols[table]
+
+	count := 0
+	for _, item := range items {
+		row := map[string]any{}
+		for k, v := range item {
+			row[k] = v
+		}
+		id, _ := row["id"].(string)
+		if id == "" {
+			// No id to key on; fall back to a plain insert like BatchInsertRows.
+			id = cryptox.Nanoid(6)
+			row["id"] = id
+		}
+
+		// Which columns to write: the whitelist, minus additive ones.
+		write := make([]string, 0, len(cols))
+		for _, c := range cols {
+			if additive[c] {
+				continue
+			}
+			if _, has := row[c]; has {
+				write = append(write, c)
+			}
+		}
+
+		now := Now()
+		insertCols := []string{"id"}
+		insertArgs := []any{id}
+		for _, c := range write {
+			insertCols = append(insertCols, c)
+			insertArgs = append(insertArgs, row[c])
+		}
+		// Additive columns are only carried by a fresh insert, never an update.
+		for _, c := range cols {
+			if !additive[c] {
+				continue
+			}
+			if v, has := row[c]; has {
+				insertCols = append(insertCols, c)
+				insertArgs = append(insertArgs, v)
+			}
+		}
+		for _, c := range []string{"create_time", "update_time", "delete_time"} {
+			v, has := row[c]
+			if c != "delete_time" && !has {
+				v = now
+			}
+			insertCols = append(insertCols, c)
+			insertArgs = append(insertArgs, v)
+		}
+		ph := strings.TrimSuffix(strings.Repeat("?,", len(insertCols)), ",")
+
+		// Insert when absent; on conflict update only the non-additive columns,
+		// leaving both the additive counters and delete_time (row lifecycle)
+		// exactly as this node had them.
+		sets := make([]string, 0, len(write))
+		for _, c := range write {
+			sets = append(sets, c+" = excluded."+c)
+		}
+		sets = append(sets, "update_time = excluded.update_time")
+
+		q := fmt.Sprintf(`INSERT INTO "%s" (%s) VALUES (%s) ON CONFLICT(id) DO UPDATE SET %s`,
+			table, strings.Join(insertCols, ","), ph, strings.Join(sets, ", "))
+		if _, err := db.Exec(q, insertArgs...); err != nil {
+			return count, err
+		}
+		count++
+	}
+	invalidateForTable(table)
+	return count, nil
+}
+
 // ─────────────────── node_state ───────────────────
 
 // SetNodeState — per-node bookkeeping key/value.
