@@ -291,7 +291,22 @@ func GenericInsert(db *sql.DB, table string, data map[string]any) (map[string]an
 }
 
 // GenericUpdateByID — partial update restricted to the whitelist.
+//
+// A soft-deleted row is never patched: the caller reports the change as
+// successful while the row stays invisible, which is how a deleted provider
+// came to be edited into a state nobody could see. Returns ErrNotFound when no
+// live row matches.
 func GenericUpdateByID(db *sql.DB, table, id string, data map[string]any) error {
+	return genericUpdateByID(db, table, id, data, false)
+}
+
+// GenericUpdateByIDIgnoreDelete — same, but also matches a soft-deleted row.
+// Only for reviving one; the caller must clear delete_time itself.
+func GenericUpdateByIDIgnoreDelete(db *sql.DB, table, id string, data map[string]any) error {
+	return genericUpdateByID(db, table, id, data, true)
+}
+
+func genericUpdateByID(db *sql.DB, table, id string, data map[string]any, includeDeleted bool) error {
 	cols, ok := updatable[table]
 	if !ok {
 		return fmt.Errorf("unknown table %s", table)
@@ -304,33 +319,50 @@ func GenericUpdateByID(db *sql.DB, table, id string, data map[string]any) error 
 			args = append(args, v)
 		}
 	}
+	// delete_time sits outside the whitelist; a revive clears it.
+	if v, ok := data["delete_time"]; ok {
+		sets = append(sets, "delete_time = ?")
+		args = append(args, v)
+	}
 	if len(sets) == 1 {
 		return nil
 	}
-	args = append(args, id)
-	_, err := db.Exec(fmt.Sprintf("UPDATE \"%s\" SET %s WHERE id = ?", table, strings.Join(sets, ", ")), args...)
-	if err == nil {
-		invalidateForTable(table)
+	where := "WHERE id = ?"
+	if !includeDeleted {
+		where += " AND delete_time IS NULL"
 	}
-	if err == nil && syncPutTables[table] {
+	args = append(args, id)
+	res, err := db.Exec(fmt.Sprintf("UPDATE \"%s\" SET %s %s", table, strings.Join(sets, ", "), where), args...)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	invalidateForTable(table)
+	if syncPutTables[table] {
 		// Only the patched columns need to travel: the main database keeps the
 		// rest. Additive columns are stripped by EnqueuePut.
 		_ = EnqueuePut(db, table, id, data)
 	}
-	return err
+	return nil
 }
 
 // GenericSoftDelete — set delete_time.
 func GenericSoftDelete(db *sql.DB, table, id string) error {
 	now := Now()
-	_, err := db.Exec(fmt.Sprintf("UPDATE \"%s\" SET delete_time = ?, update_time = ? WHERE id = ? AND delete_time IS NULL", table), now, now, id)
-	if err == nil {
-		invalidateForTable(table)
+	res, err := db.Exec(fmt.Sprintf("UPDATE \"%s\" SET delete_time = ?, update_time = ? WHERE id = ? AND delete_time IS NULL", table), now, now, id)
+	if err != nil {
+		return err
 	}
-	if err == nil && syncPutTables[table] {
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	invalidateForTable(table)
+	if syncPutTables[table] {
 		_ = EnqueuePut(db, table, id, map[string]any{"delete_time": now})
 	}
-	return err
+	return nil
 }
 
 // GenericRowToMap — read a whole row as a JSON-ready map (export/import, detail).

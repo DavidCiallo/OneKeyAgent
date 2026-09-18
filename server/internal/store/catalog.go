@@ -198,8 +198,14 @@ func ProviderAllIgnoreDelete(db *sql.DB) ([]*Provider, error) {
 	return out, rows.Err()
 }
 
+// ProviderListPage — the admin table. Soft-deleted rows are excluded: the
+// legacy repository's find() skipped delete_time by default, and the port to
+// SQL dropped that filter, so a deleted provider kept showing in the list —
+// delete looked like it did nothing, and editing the ghost row failed.
+// Rows come back in the order the UI displays them (alias, then priority), so
+// a copied provider lands next to its source and pagination is stable.
 func ProviderListPage(db *sql.DB, page int64, alias *string, enabled *int64) ([]*Provider, int64, error) {
-	conds := []string{"1=1"}
+	conds := []string{"delete_time IS NULL"}
 	args := []any{}
 	if alias != nil {
 		conds = append(conds, "model_alias = ?")
@@ -209,23 +215,31 @@ func ProviderListPage(db *sql.DB, page int64, alias *string, enabled *int64) ([]
 		conds = append(conds, "enabled = ?")
 		args = append(args, *enabled)
 	}
-	all, err := ProviderWhere(db, strings.Join(conds, " AND "), args)
+	where := strings.Join(conds, " AND ")
+
+	var total int64
+	if err := db.QueryRow("SELECT COUNT(*) FROM provider WHERE "+where, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	if page < 1 {
+		page = 1
+	}
+	offset := (page - 1) * 10
+	rows, err := db.Query("SELECT "+providerCols+" FROM provider WHERE "+where+
+		" ORDER BY model_alias ASC, priority ASC, rowid ASC LIMIT 10 OFFSET ?", append(args, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
-	total := int64(len(all))
-	start := (page - 1) * 10
-	if start < 0 {
-		start = 0
+	defer rows.Close()
+	var out []*Provider
+	for rows.Next() {
+		p, err := scanProvider(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		out = append(out, p)
 	}
-	if start > total {
-		start = total
-	}
-	end := start + 10
-	if end > total {
-		end = total
-	}
-	return all[start:end], total, nil
+	return out, total, rows.Err()
 }
 
 func ProviderWhere(db *sql.DB, cond string, args []any) ([]*Provider, error) {
@@ -543,7 +557,10 @@ func ModelRestoreOrInsert(db *sql.DB, data map[string]any) (*Model, error) {
 		existing, err := ModelFindByAliasIgnoreDelete(db, alias)
 		if err == nil && existing != nil && existing.DeleteTime != nil {
 			data["id"] = existing.ID
-			if err := GenericUpdateByID(db, "model", existing.ID, data); err != nil {
+			// The revive has to clear delete_time as well as patch the fields,
+			// otherwise ModelFindOne right after still sees the row as deleted.
+			data["delete_time"] = nil
+			if err := GenericUpdateByIDIgnoreDelete(db, "model", existing.ID, data); err != nil {
 				return nil, err
 			}
 			return ModelFindOne(db, existing.ID)
