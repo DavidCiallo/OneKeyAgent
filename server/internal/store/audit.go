@@ -50,10 +50,14 @@ type AuditLog struct {
 
 func scanAudit(row interface{ Scan(...any) error }) (*AuditLog, error) {
 	a := &AuditLog{}
+	// The body columns are scanned as nullable strings: rows written before the
+	// columns existed (or by a build without the default) hold NULL, and one
+	// NULL must not take down the whole audit list.
+	var reqBody, respBody sql.NullString
 	err := row.Scan(&a.ID, &a.Ts, &a.Success, &a.AccountID, &a.AccountName, &a.ModelAlias, &a.ProviderID,
 		&a.ProviderName, &a.ApiType, &a.Endpoint, &a.StatusCode, &a.DurationMs, &a.InputTokens,
 		&a.CachedInputTokens, &a.OutputTokens, &a.Cost, &a.Stream, &a.Err,
-		&a.RequestBody, &a.ResponseBody,
+		&reqBody, &respBody,
 		&a.CreateTime, &a.UpdateTime, &a.DeleteTime)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -61,6 +65,7 @@ func scanAudit(row interface{ Scan(...any) error }) (*AuditLog, error) {
 	if err != nil {
 		return nil, err
 	}
+	a.RequestBody, a.ResponseBody = reqBody.String, respBody.String
 	return a, nil
 }
 
