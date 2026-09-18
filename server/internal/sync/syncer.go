@@ -29,7 +29,8 @@ type Config struct {
 	MaxRows   int    // SYNC_MAX_ROWS per push
 	MaxBytes  int    // SYNC_MAX_BYTES per push
 	Interval  time.Duration
-	Threshold int64 // SYNC_FLUSH_BYTES: flush once the buffer exceeds this
+	Threshold int64         // SYNC_FLUSH_BYTES: flush once the buffer exceeds this
+	PullEvery time.Duration // SYNC_PULL_SECONDS: refresh reference data from main
 }
 
 // ConfigFromEnv — empty MainURL means this node is the main database and no
@@ -41,7 +42,8 @@ func ConfigFromEnv() Config {
 		MaxRows:   500,
 		MaxBytes:  2 << 20,
 		Interval:  30 * time.Second,
-		Threshold: 256 << 10, // 256 KiB
+		Threshold: 256 << 10,       // 256 KiB
+		PullEvery: 5 * time.Minute, // refresh reference data
 	}
 	if v := os.Getenv("SYNC_MAX_ROWS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
@@ -56,6 +58,11 @@ func ConfigFromEnv() Config {
 	if v := os.Getenv("SYNC_FLUSH_BYTES"); v != "" {
 		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 {
 			c.Threshold = n
+		}
+	}
+	if v := os.Getenv("SYNC_PULL_SECONDS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			c.PullEvery = time.Duration(n) * time.Second
 		}
 	}
 	return c
@@ -122,8 +129,55 @@ func (s *Syncer) Bootstrap() error {
 	return nil
 }
 
+// Refresh pulls the main database's current reference data and re-applies it
+// locally, so models, providers, roles and settings edited on the main database
+// reach a replica that is already running.
+//
+// Bootstrap alone is not enough: it is a one-shot import that a node records as
+// done and never repeats, so without this a replica keeps serving whatever
+// catalog it was first deployed with. The import preserves additive columns
+// (balances, usage counters) — see store.RefreshSnapshot.
+func (s *Syncer) Refresh() error {
+	req, err := http.NewRequest(http.MethodGet, s.cfg.MainURL+"/api/sync/snapshot", nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("token", s.cfg.Secret)
+	if id := os.Getenv("NODE_ID"); id != "" {
+		req.Header.Set("x-node-id", id)
+	}
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("refresh request: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 256<<20))
+	if err != nil {
+		return fmt.Errorf("refresh read: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("refresh http %d: %s", resp.StatusCode, truncate(string(body), 300))
+	}
+
+	var envelope struct {
+		Data map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return fmt.Errorf("refresh decode: %w", err)
+	}
+
+	applied, err := store.RefreshSnapshot(s.db, envelope.Data)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("[Sync] refreshed reference data from %s: %v\n", s.cfg.MainURL, applied)
+	return nil
+}
+
 // Start runs the push loop until the process exits: flush when the buffer grows
-// past the threshold, otherwise on the interval.
+// past the threshold, otherwise on the interval. It also runs the pull loop that
+// keeps this replica's reference data current with the main database.
 func (s *Syncer) Start() {
 	go func() {
 		ticker := time.NewTicker(s.cfg.Interval)
@@ -152,6 +206,17 @@ func (s *Syncer) Start() {
 			}
 		}
 	}()
+	if s.cfg.PullEvery > 0 {
+		go func() {
+			ticker := time.NewTicker(s.cfg.PullEvery)
+			defer ticker.Stop()
+			for range ticker.C {
+				if err := s.Refresh(); err != nil {
+					fmt.Println("[Sync] refresh failed (will retry):", err)
+				}
+			}
+		}()
+	}
 }
 
 // Flush pushes one batch and trims it from the buffer. A failed push leaves the
