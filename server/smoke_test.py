@@ -191,6 +191,30 @@ def main():
     d = json.loads(body)
     check("v1/messages", st == 200 and d.get("type") == "message" and d.get("stop_reason") == "end_turn" and d["content"][0]["text"] == "Hello from mock!", body[:300])
 
+    # 7b. anthropic parallel tool call -> OpenAI upstream must see both results.
+    # The converter used to keep only the LAST tool_result of a user message,
+    # which made every OpenAI upstream reject the history with "insufficient
+    # tool messages following tool_calls message".
+    ant_history = [
+        {"role": "user", "content": "check"},
+        {"role": "assistant", "content": [
+            {"type": "tool_use", "id": "t1", "name": "weather", "input": {"city": "BJ"}},
+            {"type": "tool_use", "id": "t2", "name": "time", "input": {"tz": "utc"}},
+        ]},
+        {"role": "user", "content": [
+            {"type": "tool_result", "tool_use_id": "t1", "content": "sunny"},
+            {"type": "tool_result", "tool_use_id": "t2", "content": "10:00"},
+        ]},
+    ]
+    st, body = http_post(B + "/api/v1/messages", {"model": "mock-alias", "max_tokens": 100, "messages": ant_history}, {"x-api-key": api_key})
+    check("v1/messages parallel tool call ok", st == 200, f"{st} {body[:200]}")
+    up_msgs = LAST_BODY.get("json", {}).get("messages", [])
+    roles = [(m.get("role"), m.get("tool_call_id")) for m in up_msgs]
+    tool_n = sum(1 for r, _ in roles if r == "tool")
+    acalls = [tc["id"] for m in up_msgs if m.get("role") == "assistant" for tc in (m.get("tool_calls") or [])]
+    check("v1/messages converts parallel tool results", tool_n == 2 and acalls == ["t1", "t2"]
+          and roles[-2:] == [("tool", "t1"), ("tool", "t2")], f"upstream messages roles={roles} calls={acalls}")
+
     # 8. anthropic /v1/messages streaming
     req = urllib.request.Request(B + "/api/v1/messages", data=json.dumps({"model": "mock-alias", "max_tokens": 100, "stream": True, "messages": [{"role": "user", "content": "hi"}]}).encode(), method="POST")
     req.add_header("x-api-key", api_key)
