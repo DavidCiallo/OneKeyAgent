@@ -57,8 +57,9 @@ func main() {
 	// buffers its own changes for periodic push. The main node (no MAIN_DB_URL)
 	// buffers nothing and serves the sync API.
 	syncerCfg := sync.ConfigFromEnv()
+	isReplica := syncerCfg.Enabled()
 	var syncer *sync.Syncer
-	if syncerCfg.Enabled() {
+	if isReplica {
 		store.SetOutboxEnabled(true)
 		syncer = sync.New(db, syncerCfg)
 		if err := syncer.Bootstrap(); err != nil {
@@ -71,7 +72,15 @@ func main() {
 	}
 
 	seedAdmin(db, settings)
-	monitor.Start(db, settings)
+	// Only the main database polls NowPayments. A replica polled the same
+	// invoice independently, confirmed it locally, and its credit reached the
+	// main database as a delta on top of the main's own credit — one payment
+	// paid out twice. The replica still serves the recharge UI; the invoice row
+	// it creates travels to the main database as a put, and the main confirms
+	// and credits it there.
+	if !isReplica {
+		monitor.Start(db, settings)
+	}
 	store.StartMaintenance(db)
 
 	staticDir := resolveStaticDir()

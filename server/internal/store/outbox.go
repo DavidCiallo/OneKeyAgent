@@ -69,9 +69,15 @@ var floorAtZeroCols = map[string]bool{"balance": true}
 // syncPutTables — tables whose changes are buffered as absolute row snapshots.
 // These are admin-owned reference data: a replica reads them, and an edit made
 // anywhere is a whole-value change.
+//
+// gift_card and transaction are here despite being written by user actions
+// rather than the admin UI. A redemption or an invoice created on a replica
+// would otherwise stay invisible to the main database: the card would still
+// read as unused there, and with an ephemeral replica volume a re-bootstrap
+// would hand the same card back for a second redemption.
 var syncPutTables = map[string]bool{
 	"model": true, "provider": true, "role": true, "account_role": true,
-	"account": true, "settings": true,
+	"account": true, "settings": true, "gift_card": true, "transaction": true,
 }
 
 // syncDeltaTables — tables whose changes are buffered as increments. Usage
