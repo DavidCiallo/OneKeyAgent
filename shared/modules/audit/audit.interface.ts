@@ -20,6 +20,9 @@ export interface AuditDTO {
     cost: number;
     stream: number;
     err: string;
+    /** What was sent upstream and what came back — failed attempts only. */
+    request_body?: string;
+    response_body?: string;
     /** Output tokens per second, derived server-side from tokens/duration. */
     tps: number;
 }

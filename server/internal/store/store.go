@@ -171,6 +171,11 @@ var tables = []tableDef{
 		{"cost", "REAL NOT NULL DEFAULT 0"},
 		{"stream", "INTEGER NOT NULL DEFAULT 0"},
 		{"err", "TEXT NOT NULL DEFAULT ''"},
+		// Failed attempts carry what was sent upstream and what came back, so a
+		// reject (a 400 about tool messages, say) can be debugged from the row.
+		// Cleared again once a newer attempt supersedes them (AuditDetailKeep).
+		{"request_body", "TEXT"},
+		{"response_body", "TEXT"},
 		{"create_time", "INTEGER NOT NULL DEFAULT 0"},
 		{"update_time", "INTEGER"},
 		{"delete_time", "INTEGER"},

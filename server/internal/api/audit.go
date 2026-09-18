@@ -28,6 +28,9 @@ func (a *App) auditList(c *httpx.Ctx) (any, error) {
 			"duration_ms": r.DurationMs, "input_tokens": r.InputTokens,
 			"cached_input_tokens": r.CachedInputTokens, "output_tokens": r.OutputTokens,
 			"cost": r.Cost, "stream": r.Stream, "err": r.Err,
+			// Only failed upstream attempts carry bodies; success rows are
+			// summary-only so the trail doesn't fill up with prompts.
+			"request_body": r.RequestBody, "response_body": r.ResponseBody,
 			"tps": throughput(r.OutputTokens, r.DurationMs),
 		})
 	}

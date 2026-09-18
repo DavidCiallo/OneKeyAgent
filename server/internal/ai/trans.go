@@ -136,14 +136,42 @@ func toAnthropicBody(body map[string]any) map[string]any {
 		}
 	}
 
-	anthropicMessages := make([]any, len(chat))
-	for i, m := range chat {
-		if _, isArray := jGet(m, "content").([]any); isArray {
-			anthropicMessages[i] = map[string]any{"role": jGet(m, "role"), "content": jGet(m, "content")}
+	anthropicMessages := []any{}
+	for _, m := range chat {
+		// A run of "tool" messages (one per parallel tool call) merges into a
+		// single user message of tool_result blocks: Anthropic expects the
+		// results of one assistant turn to arrive together, and consecutive
+		// user roles get rejected.
+		if jStrField(m, "role") == "tool" {
+			block := map[string]any{
+				"type":        "tool_result",
+				"tool_use_id": jGet(m, "tool_call_id"),
+				"content":     jStringify(jGet(m, "content")),
+			}
+			if n := len(anthropicMessages); n > 0 {
+				last := jMap(anthropicMessages[n-1])
+				if last != nil && jStrField(last, "role") == "user" {
+					if blocks, ok := last["content"].([]any); ok && len(blocks) > 0 && allToolResults(blocks) {
+						anthropicMessages[n-1] = map[string]any{
+							"role": "user", "content": append(blocks, block),
+						}
+						continue
+					}
+				}
+			}
+			anthropicMessages = append(anthropicMessages, map[string]any{
+				"role": "user", "content": []any{block},
+			})
 			continue
 		}
+
 		content := []any{}
 		if c := jGet(m, "content"); c != nil {
+			if arr, isArray := c.([]any); isArray {
+				content = append(content, arr...)
+				anthropicMessages = append(anthropicMessages, map[string]any{"role": jGet(m, "role"), "content": content})
+				continue
+			}
 			text := jStringify(c)
 			if text != "" {
 				content = append(content, map[string]any{"type": "text", "text": text})
@@ -167,21 +195,7 @@ func toAnthropicBody(body map[string]any) map[string]any {
 				"type": "tool_use", "id": jGet(tc, "id"), "name": name, "input": input,
 			})
 		}
-		anthropicMessages[i] = map[string]any{"role": jGet(m, "role"), "content": content}
-	}
-
-	// "tool" role → user with tool_result blocks
-	for i, m := range chat {
-		if jStrField(m, "role") == "tool" {
-			anthropicMessages[i] = map[string]any{
-				"role": "user",
-				"content": []any{map[string]any{
-					"type":        "tool_result",
-					"tool_use_id": jGet(m, "tool_call_id"),
-					"content":     jStringify(jGet(m, "content")),
-				}},
-			}
-		}
+		anthropicMessages = append(anthropicMessages, map[string]any{"role": jGet(m, "role"), "content": content})
 	}
 
 	result := map[string]any{
@@ -250,15 +264,26 @@ func antMessagesToOpenAI(body map[string]any) map[string]any {
 		if jStrField(m, "role") == "assistant" {
 			role = "assistant"
 		}
-		switch content := jGet(m, "content").(type) {
+		// content may be absent on a tool-calling assistant turn; emitting an
+		// empty message keeps the sequence intact, since dropping it would
+		// leave the following tool results without their tool_calls message.
+		content := jGet(m, "content")
+		handled := false
+		switch c := content.(type) {
 		case string:
-			messages = append(messages, map[string]any{"role": role, "content": content})
+			messages = append(messages, map[string]any{"role": role, "content": c})
+			handled = true
 		case []any:
+			handled = true
 			var textParts []string
 			var toolCalls []any
-			var functionResult *[2]string
+			// Every tool_result becomes its own OpenAI tool message, in order:
+			// an assistant turn may call several tools in parallel, and each
+			// upstream (DeepSeek included) requires one tool message per
+			// tool_call_id right after that assistant message.
+			var toolResults [][2]string
 
-			for _, block := range content {
+			for _, block := range c {
 				switch jStrField(block, "type") {
 				case "text":
 					textParts = append(textParts, jStrField(block, "text"))
@@ -293,22 +318,33 @@ func antMessagesToOpenAI(body map[string]any) map[string]any {
 						}
 						resultContent = strings.Join(parts, "\n")
 					}
-					functionResult = &[2]string{toolUseID, resultContent}
+					toolResults = append(toolResults, [2]string{toolUseID, resultContent})
 				}
 			}
 
 			text := strings.Join(textParts, "\n")
-			if role == "assistant" && len(toolCalls) > 0 {
+			switch {
+			case role == "assistant" && len(toolCalls) > 0:
 				messages = append(messages, map[string]any{
 					"role": "assistant", "content": text, "tool_calls": toolCalls,
 				})
-			} else if role == "user" && functionResult != nil {
-				messages = append(messages, map[string]any{
-					"role": "tool", "tool_call_id": functionResult[0], "content": functionResult[1],
-				})
-			} else {
+			case role == "user" && len(toolResults) > 0:
+				for _, tr := range toolResults {
+					messages = append(messages, map[string]any{
+						"role": "tool", "tool_call_id": tr[0], "content": tr[1],
+					})
+				}
+				// A user turn may carry text alongside the results; it follows
+				// them so the tool messages stay directly after tool_calls.
+				if text != "" {
+					messages = append(messages, map[string]any{"role": "user", "content": text})
+				}
+			default:
 				messages = append(messages, map[string]any{"role": role, "content": text})
 			}
+		}
+		if !handled {
+			messages = append(messages, map[string]any{"role": role, "content": ""})
 		}
 	}
 
@@ -344,6 +380,17 @@ func antMessagesToOpenAI(body map[string]any) map[string]any {
 }
 
 // ─────────────────── OpenAI response → Anthropic /v1/messages ───────────────────
+
+// allToolResults — whether every content block is a tool_result, i.e. this
+// user message is the result turn a run of OpenAI tool messages merged into.
+func allToolResults(blocks []any) bool {
+	for _, b := range blocks {
+		if jStrField(b, "type") != "tool_result" {
+			return false
+		}
+	}
+	return true
+}
 
 func openAIToAntMessages(data map[string]any, model string) map[string]any {
 	choices := jArr(data["choices"])
