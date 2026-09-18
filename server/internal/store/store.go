@@ -174,8 +174,10 @@ var tables = []tableDef{
 		// Failed attempts carry what was sent upstream and what came back, so a
 		// reject (a 400 about tool messages, say) can be debugged from the row.
 		// Cleared again once a newer attempt supersedes them (AuditDetailKeep).
-		{"request_body", "TEXT"},
-		{"response_body", "TEXT"},
+		// NOT NULL DEFAULT '' matters: a plain TEXT upgrade would leave NULL in
+		// every pre-existing row, and the audit list scan rejects NULL strings.
+		{"request_body", "TEXT NOT NULL DEFAULT ''"},
+		{"response_body", "TEXT NOT NULL DEFAULT ''"},
 		{"create_time", "INTEGER NOT NULL DEFAULT 0"},
 		{"update_time", "INTEGER"},
 		{"delete_time", "INTEGER"},
@@ -262,6 +264,9 @@ func Open(path string) (*sql.DB, error) {
 	if err := dedupeBucketRows(db); err != nil {
 		return nil, err
 	}
+	if err := backfillAuditBodies(db); err != nil {
+		return nil, err
+	}
 	for _, stmt := range indexes {
 		if _, err := db.Exec(stmt); err != nil {
 			return nil, fmt.Errorf("index: %w", err)
@@ -271,6 +276,17 @@ func Open(path string) (*sql.DB, error) {
 	db.SetMaxOpenConns(8)
 	db.SetMaxIdleConns(8)
 	return db, nil
+}
+
+// backfillAuditBodies — heals databases upgraded before the audit body columns
+// carried a default: reconcile added them as plain TEXT, leaving NULL in every
+// pre-existing row, and reading NULL into the audit list's string fields
+// failed the whole endpoint. Empty string is the correct value there — those
+// attempts predate body capture.
+func backfillAuditBodies(db *sql.DB) error {
+	_, err := db.Exec(`UPDATE audit_log SET request_body = '', response_body = ''
+		WHERE request_body IS NULL OR response_body IS NULL`)
+	return err
 }
 
 // dedupeBucketRows merges usage_bucket rows that share a window, keeping the
