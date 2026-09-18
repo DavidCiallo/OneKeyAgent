@@ -10,7 +10,16 @@ import (
 // Audit retention: newest N successful and newest N failed requests.
 const AuditKeep = 100
 
-const auditCols = "id,ts,success,account_id,account_name,model_alias,provider_id,provider_name,api_type,endpoint,status_code,duration_ms,input_tokens,cached_input_tokens,output_tokens,cost,stream,err,create_time,update_time,delete_time"
+// AuditDetailKeep — how many failed attempts keep their request/response
+// bodies. The bodies are the debugging payload (a full prompt can be large),
+// so older failures keep their summary and error text but lose them.
+const AuditDetailKeep = 10
+
+// auditBodyKey — how much of a stored request body counts as "the same
+// request" for dedupe: the first 1000 characters.
+const auditBodyKey = 1000
+
+const auditCols = "id,ts,success,account_id,account_name,model_alias,provider_id,provider_name,api_type,endpoint,status_code,duration_ms,input_tokens,cached_input_tokens,output_tokens,cost,stream,err,request_body,response_body,create_time,update_time,delete_time"
 
 // AuditLog — one relayed upstream attempt (success or failure).
 type AuditLog struct {
@@ -32,6 +41,8 @@ type AuditLog struct {
 	Cost              float64 `json:"cost"`
 	Stream            int64   `json:"stream"`
 	Err               string  `json:"err"`
+	RequestBody       string  `json:"request_body"`
+	ResponseBody      string  `json:"response_body"`
 	CreateTime        int64   `json:"create_time"`
 	UpdateTime        *int64  `json:"update_time"`
 	DeleteTime        *int64  `json:"delete_time"`
@@ -42,6 +53,7 @@ func scanAudit(row interface{ Scan(...any) error }) (*AuditLog, error) {
 	err := row.Scan(&a.ID, &a.Ts, &a.Success, &a.AccountID, &a.AccountName, &a.ModelAlias, &a.ProviderID,
 		&a.ProviderName, &a.ApiType, &a.Endpoint, &a.StatusCode, &a.DurationMs, &a.InputTokens,
 		&a.CachedInputTokens, &a.OutputTokens, &a.Cost, &a.Stream, &a.Err,
+		&a.RequestBody, &a.ResponseBody,
 		&a.CreateTime, &a.UpdateTime, &a.DeleteTime)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -52,9 +64,13 @@ func scanAudit(row interface{ Scan(...any) error }) (*AuditLog, error) {
 	return a, nil
 }
 
-// AuditInsert records one attempt and trims the table back to the newest
-// AuditKeep rows per outcome. Errors are returned so callers can log them;
-// the audit trail must never break a relayed request.
+// AuditInsert records one attempt and applies retention. Errors are returned
+// so callers can log them; the audit trail must never break a relayed request.
+//
+// A failed attempt that carries a request body is only recorded when no recent
+// failure still holds the same body: retries of one broken request would
+// otherwise flood the trail with identical rows, so the first occurrence stands
+// in for all of them.
 func AuditInsert(db *sql.DB, a AuditLog) error {
 	if a.ID == "" {
 		a.ID = cryptox.Nanoid(8)
@@ -63,16 +79,54 @@ func AuditInsert(db *sql.DB, a AuditLog) error {
 		a.Ts = Now()
 	}
 	a.CreateTime = Now()
+	detailed := a.Success == 0 && (a.RequestBody != "" || a.ResponseBody != "")
+	if detailed && auditDuplicateBody(db, a.RequestBody, a.Err) {
+		return nil
+	}
 	_, err := db.Exec(`INSERT INTO audit_log (`+auditCols+`)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		a.ID, a.Ts, a.Success, a.AccountID, a.AccountName, a.ModelAlias, a.ProviderID,
 		a.ProviderName, a.ApiType, a.Endpoint, a.StatusCode, a.DurationMs, a.InputTokens,
 		a.CachedInputTokens, a.OutputTokens, a.Cost, a.Stream, a.Err,
+		a.RequestBody, a.ResponseBody,
 		a.CreateTime, nil, nil)
 	if err != nil {
 		return err
 	}
-	return auditTrim(db, a.Success)
+	if err := auditTrim(db, a.Success); err != nil {
+		return err
+	}
+	if detailed {
+		return auditTrimBodies(db)
+	}
+	return nil
+}
+
+// auditDuplicateBody — whether a retained failed attempt already holds this
+// request body. Only rows that still carry bodies count: once a body has been
+// aged out the failure is old enough that a repeat is worth its own row.
+func auditDuplicateBody(db *sql.DB, requestBody, errText string) bool {
+	if requestBody == "" {
+		return false
+	}
+	var id string
+	err := db.QueryRow(`SELECT id FROM audit_log
+		WHERE success = 0 AND request_body <> ''
+		  AND substr(request_body, 1, ?) = substr(?, 1, ?)
+		  AND err = ?
+		LIMIT 1`, auditBodyKey, requestBody, auditBodyKey, errText).Scan(&id)
+	return err == nil
+}
+
+// auditTrimBodies — keep request/response bodies on the newest AuditDetailKeep
+// failures only; older rows keep their summary and error text.
+func auditTrimBodies(db *sql.DB) error {
+	_, err := db.Exec(`UPDATE audit_log SET request_body = '', response_body = ''
+		WHERE success = 0 AND (request_body <> '' OR response_body <> '')
+		  AND id NOT IN (
+			SELECT id FROM audit_log WHERE success = 0
+			ORDER BY ts DESC, rowid DESC LIMIT ?)`, AuditDetailKeep)
+	return err
 }
 
 // auditTrim deletes rows of one outcome beyond the newest AuditKeep.

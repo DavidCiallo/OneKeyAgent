@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"onekey/server/internal/cryptox"
 	"onekey/server/internal/service"
@@ -107,6 +108,14 @@ func (s *Server) reasoningCacheSet(key, content string) {
 // bloat the table.
 const maxAuditErr = 500
 
+// Body caps for failed attempts. The request keeps the tail of the conversation
+// (that is where tool pairing breaks) and drops the oldest messages instead of
+// cutting mid-JSON; the response is an error document, so a straight cut does.
+const (
+	maxAuditReqBody  = 64 << 10 // 64 KiB
+	maxAuditRespBody = 16 << 10 // 16 KiB
+)
+
 type auditRecord struct {
 	AccountID    string
 	AccountName  string
@@ -124,6 +133,11 @@ type auditRecord struct {
 	Cost         float64
 	Stream       bool
 	Err          string
+	// RequestBody / ResponseBody are only populated on failed upstream attempts:
+	// what was sent and what came back, for debugging rejects. Success rows stay
+	// summary-only so the table does not fill up with prompts.
+	RequestBody  string
+	ResponseBody string
 }
 
 // audit persists one attempt. Best-effort by design: a broken audit trail must
@@ -138,6 +152,9 @@ func (s *Server) audit(r auditRecord) {
 		Endpoint: r.Endpoint, StatusCode: int64(r.StatusCode), DurationMs: r.DurationMs,
 		InputTokens: r.InputTokens, CachedInputTokens: r.CachedInput, OutputTokens: r.OutputTokens,
 		Cost: r.Cost, Err: r.Err,
+	}
+	if !r.Success {
+		rec.RequestBody, rec.ResponseBody = r.RequestBody, r.ResponseBody
 	}
 	if r.Success {
 		rec.Success = 1
@@ -351,6 +368,12 @@ func buildRequestConfig(p *store.Provider, body map[string]any, stream bool) ups
 type upstreamErr struct {
 	status int
 	msg    string
+	// ReqBody is the request body as sent upstream and RespBody the raw
+	// response document, stored on the failed audit row so an upstream reject
+	// (a 400 about tool messages, say) can be debugged without guessing what
+	// was actually sent.
+	ReqBody  string
+	RespBody string
 }
 
 // tryProvider — non-stream call; converts to OpenAI format.
@@ -366,14 +389,19 @@ func (s *Server) tryProvider(p *store.Provider, body map[string]any) (map[string
 	resp, err := s.HTTPClient(p.ProxyStr()).Do(req)
 	if err != nil {
 		fmt.Printf("[AI] upstream request failed (%s -> %s): %v\n", p.Name, cfg.url, err)
-		return nil, &upstreamErr{msg: err.Error()}
+		return nil, &upstreamErr{msg: err.Error(), ReqBody: cfg.body}
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 300))
+		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, maxAuditRespBody))
 		msg := strings.TrimSpace(string(snippet))
-		fmt.Printf("[AI] upstream %s returned %d (%s): %s\n", p.Name, resp.StatusCode, cfg.url, msg)
-		return nil, &upstreamErr{status: resp.StatusCode, msg: fmt.Sprintf("upstream http %d: %s", resp.StatusCode, msg)}
+		fmt.Printf("[AI] upstream %s returned %d (%s): %s\n", p.Name, resp.StatusCode, cfg.url, firstLine(msg, 300))
+		return nil, &upstreamErr{
+			status:   resp.StatusCode,
+			msg:      fmt.Sprintf("upstream http %d: %s", resp.StatusCode, firstLine(msg, 300)),
+			ReqBody:  auditRequestBody(cfg.body, maxAuditReqBody),
+			RespBody: cutWithMarker(msg, maxAuditRespBody),
+		}
 	}
 	var parsed map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil || parsed == nil {
@@ -409,16 +437,97 @@ func (s *Server) tryProviderStream(p *store.Provider, body map[string]any) (io.R
 	resp, err := s.HTTPClient(p.ProxyStr()).Do(req)
 	if err != nil {
 		fmt.Printf("[AI] upstream request failed (%s -> %s): %v\n", p.Name, cfg.url, err)
-		return nil, &upstreamErr{msg: err.Error()}
+		return nil, &upstreamErr{msg: err.Error(), ReqBody: cfg.body}
 	}
 	if resp.StatusCode != http.StatusOK {
-		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 300))
+		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, maxAuditRespBody))
 		msg := strings.TrimSpace(string(snippet))
-		fmt.Printf("[AI] upstream %s returned %d (%s): %s\n", p.Name, resp.StatusCode, cfg.url, msg)
+		fmt.Printf("[AI] upstream %s returned %d (%s): %s\n", p.Name, resp.StatusCode, cfg.url, firstLine(msg, 300))
 		resp.Body.Close()
-		return nil, &upstreamErr{status: resp.StatusCode, msg: fmt.Sprintf("upstream http %d: %s", resp.StatusCode, msg)}
+		return nil, &upstreamErr{
+			status:   resp.StatusCode,
+			msg:      fmt.Sprintf("upstream http %d: %s", resp.StatusCode, firstLine(msg, 300)),
+			ReqBody:  auditRequestBody(cfg.body, maxAuditReqBody),
+			RespBody: cutWithMarker(msg, maxAuditRespBody),
+		}
 	}
 	return resp.Body, nil
+}
+
+// firstLine — the error text for the summary column: one line, bounded, so a
+// multi-KB document doesn't drown the table.
+func firstLine(s string, max int) string {
+	if i := strings.IndexAny(s, "\r\n"); i >= 0 {
+		s = s[:i]
+	}
+	if len(s) > max {
+		s = s[:max] + "…"
+	}
+	return s
+}
+
+// auditRequestBody — the request body as sent upstream, sized for the audit
+// trail. Oversized bodies drop their earliest messages first — the tail is
+// where tool pairing breaks — and keep the JSON valid, so the stored document
+// can still be read with a JSON viewer. Falls back to a plain cut when the
+// body is not an object with a message list.
+func auditRequestBody(body string, max int) string {
+	if len(body) <= max {
+		return body
+	}
+	var parsed map[string]any
+	if jsonUnmarshal(body, &parsed) != nil || parsed == nil {
+		return cutWithMarker(body, max)
+	}
+	for _, key := range []string{"messages", "contents"} {
+		msgs, ok := parsed[key].([]any)
+		if !ok || len(msgs) < 2 {
+			continue
+		}
+		sizes := make([]int, len(msgs))
+		total := 0
+		for i, m := range msgs {
+			sizes[i] = len(jStringify(m))
+			total += sizes[i]
+		}
+		overhead := len(body) - total
+		dropped := 0
+		for dropped < len(msgs)-1 && overhead+sum(sizes[dropped:]) > max {
+			dropped++
+		}
+		if dropped == 0 {
+			break
+		}
+		parsed[key] = msgs[dropped:]
+		parsed["_audit_truncated"] = fmt.Sprintf("dropped the first %d of %d messages to fit the audit size cap", dropped, len(msgs))
+		out := jStringify(parsed)
+		if len(out) <= max {
+			return out
+		}
+		break
+	}
+	return cutWithMarker(body, max)
+}
+
+func sum(xs []int) int {
+	n := 0
+	for _, x := range xs {
+		n += x
+	}
+	return n
+}
+
+// cutWithMarker — head-keep truncation with an explicit tail marker, for
+// documents that cannot be rebuilt (non-JSON, or a single message over cap).
+func cutWithMarker(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	cut := max
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + "\n…[truncated]"
 }
 
 // ─────────────────── reasoning replay ───────────────────
@@ -569,7 +678,8 @@ func (s *Server) ChatCompletionsAt(body map[string]any, accountID, endpoint stri
 				AccountID: accountID, AccountName: acctName, ModelAlias: alias,
 				ProviderID: provider.ID, ProviderName: provider.Name, ApiType: provider.ApiTypeStr(),
 				Endpoint: endpoint, StatusCode: uerr.status, DurationMs: elapsedMs(started),
-				Err: uerr.msg,
+				Err:          uerr.msg,
+				RequestBody:  uerr.ReqBody, ResponseBody: uerr.RespBody,
 			})
 			time.Sleep(500 * time.Millisecond)
 			continue
@@ -691,7 +801,8 @@ func (s *Server) StartStreamAt(body map[string]any, accountID, endpoint string) 
 				AccountID: accountID, AccountName: acctName, ModelAlias: alias,
 				ProviderID: provider.ID, ProviderName: provider.Name, ApiType: provider.ApiTypeStr(),
 				Endpoint: endpoint, StatusCode: uerr.status, DurationMs: elapsedMs(started),
-				Stream: true, Err: uerr.msg,
+				Stream:       true, Err: uerr.msg,
+				RequestBody: uerr.ReqBody, ResponseBody: uerr.RespBody,
 			})
 			time.Sleep(500 * time.Millisecond)
 			continue

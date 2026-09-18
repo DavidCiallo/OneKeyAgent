@@ -1,5 +1,5 @@
 import { Header } from "../../components/header/Header";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, Fragment } from "react";
 import { AuditDTO } from "../../../shared/modules/audit/audit.interface";
 import { auditApi } from "../../api/instance";
 import { Locale } from "../../methods/locale";
@@ -77,6 +77,19 @@ export default function AuditPage() {
 
     const rows = tab === "success" ? successRows : failedRows;
 
+    // Failed attempts that still carry their request/response bodies can be
+    // expanded inline; bodies age out with the newest-10 detail window.
+    const [expanded, setExpanded] = useState<Set<string>>(new Set());
+    const toggleDetail = (id: string) => {
+        setExpanded(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+    const hasDetail = (r: AuditDTO) => !!(r.request_body || r.response_body);
+
     return (
         <div className="max-w-screen flex flex-col h-screen">
             <Header name={locale.Title || "Audit"} />
@@ -132,31 +145,63 @@ export default function AuditPage() {
                             ) : rows.length === 0 ? (
                                 <tr><td colSpan={tab === "failed" ? 11 : 10} className="px-3 py-6 text-center text-gray-400">{locale.NoData || "No data"}</td></tr>
                             ) : rows.map(r => (
-                                <tr key={r.id} className="border-t border-gray-100 align-top">
-                                    <td className="px-3 py-2 whitespace-nowrap">{formatTime(r.ts)}</td>
-                                    <td className="px-3 py-2">{r.account_name || r.account_id || "-"}</td>
-                                    <td className="px-3 py-2">{r.model_alias || "-"}</td>
-                                    <td className="px-3 py-2">
-                                        {r.provider_name || "-"}
-                                        {r.api_type ? <span className="ml-1 text-xs text-gray-400">{r.api_type}</span> : null}
-                                        {r.stream ? <span className="ml-1 text-xs text-gray-400">stream</span> : null}
-                                    </td>
-                                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">{r.endpoint || "-"}</td>
-                                    <td className="px-3 py-2">
-                                        <Chip size="sm" variant="flat" color={statusColor(r.status_code)}>
-                                            {r.status_code || "-"}
-                                        </Chip>
-                                    </td>
-                                    <td className="px-3 py-2 whitespace-nowrap">{formatDuration(r.duration_ms)}</td>
-                                    <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">
-                                        {r.input_tokens || 0}/{r.cached_input_tokens || 0}/{r.output_tokens || 0}
-                                    </td>
-                                    <td className="px-3 py-2 whitespace-nowrap">{formatTps(r.tps)}</td>
-                                    <td className="px-3 py-2 whitespace-nowrap">{formatCost(r.cost)}</td>
-                                    {tab === "failed" && (
-                                        <td className="px-3 py-2 text-xs text-red-600 max-w-md break-all">{r.err || "-"}</td>
+                                <Fragment key={r.id}>
+                                    <tr className="border-t border-gray-100 align-top">
+                                        <td className="px-3 py-2 whitespace-nowrap">{formatTime(r.ts)}</td>
+                                        <td className="px-3 py-2">{r.account_name || r.account_id || "-"}</td>
+                                        <td className="px-3 py-2">{r.model_alias || "-"}</td>
+                                        <td className="px-3 py-2">
+                                            {r.provider_name || "-"}
+                                            {r.api_type ? <span className="ml-1 text-xs text-gray-400">{r.api_type}</span> : null}
+                                            {r.stream ? <span className="ml-1 text-xs text-gray-400">stream</span> : null}
+                                        </td>
+                                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">{r.endpoint || "-"}</td>
+                                        <td className="px-3 py-2">
+                                            <Chip size="sm" variant="flat" color={statusColor(r.status_code)}>
+                                                {r.status_code || "-"}
+                                            </Chip>
+                                        </td>
+                                        <td className="px-3 py-2 whitespace-nowrap">{formatDuration(r.duration_ms)}</td>
+                                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">
+                                            {r.input_tokens || 0}/{r.cached_input_tokens || 0}/{r.output_tokens || 0}
+                                        </td>
+                                        <td className="px-3 py-2 whitespace-nowrap">{formatTps(r.tps)}</td>
+                                        <td className="px-3 py-2 whitespace-nowrap">{formatCost(r.cost)}</td>
+                                        {tab === "failed" && (
+                                            <td className="px-3 py-2 text-xs text-red-600 max-w-md break-all">
+                                                {r.err || "-"}
+                                                {hasDetail(r) && (
+                                                    <button
+                                                        className="ml-2 underline text-gray-500 hover:text-gray-800 whitespace-nowrap"
+                                                        onClick={() => toggleDetail(r.id)}
+                                                    >
+                                                        {expanded.has(r.id) ? (locale.HideDetail || "收起详情") : (locale.ShowDetail || "查看详情")}
+                                                    </button>
+                                                )}
+                                            </td>
+                                        )}
+                                    </tr>
+                                    {tab === "failed" && expanded.has(r.id) && (
+                                        <tr className="border-t border-gray-100 bg-gray-50/60">
+                                            <td colSpan={11} className="px-4 py-3">
+                                                <div className="flex flex-col gap-3">
+                                                    {r.request_body && (
+                                                        <div>
+                                                            <p className="text-xs font-medium text-gray-500 mb-1">{locale.RequestBody || "请求参数（提示词）"}</p>
+                                                            <pre className="text-xs bg-white border border-gray-200 rounded p-2 max-h-72 overflow-auto whitespace-pre-wrap break-all">{r.request_body}</pre>
+                                                        </div>
+                                                    )}
+                                                    {r.response_body && (
+                                                        <div>
+                                                            <p className="text-xs font-medium text-gray-500 mb-1">{locale.ResponseBody || "返回结果"}</p>
+                                                            <pre className="text-xs bg-white border border-gray-200 rounded p-2 max-h-72 overflow-auto whitespace-pre-wrap break-all">{r.response_body}</pre>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
                                     )}
-                                </tr>
+                                </Fragment>
                             ))}
                         </tbody>
                     </table>

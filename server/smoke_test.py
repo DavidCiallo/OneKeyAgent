@@ -43,6 +43,18 @@ class MockHandler(BaseHTTPRequestHandler):
         LAST_BODY["json"] = body
         auth = self.headers.get("Authorization", "")
         assert auth == "Bearer mock-upstream-key", f"bad auth header: {auth}"
+        # /v1/fail/* always rejects, so the relay's audit row can be checked for
+        # the captured request/response bodies.
+        if self.path.startswith("/v1/fail/"):
+            resp = {"error": {"message": "An assistant message with 'tool_calls' must be followed by tool messages",
+                              "type": "invalid_request_error", "code": "invalid_request_error"}}
+            data = json.dumps(resp).encode()
+            self.send_response(400)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
         if body.get("stream"):
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
@@ -221,6 +233,18 @@ def main():
     st, body = http_post(B + "/api/chat/completions", {"model": "mock-alias", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 77}, {"x-api-key": api_key})
     check("invalid extra_json ignored", st == 200 and LAST_BODY.get("json", {}).get("max_tokens") == 77, f"{st} {LAST_BODY.get('json', {}).get('max_tokens')}")
     set_extra_json(None)
+
+    # 10d. a rejected upstream attempt records what was sent and what came back
+    # (request/response bodies live on failed audit rows, newest 10 only).
+    cur.execute("INSERT OR REPLACE INTO model (id, alias, input_price, cache_price, output_price, is_public, create_time) VALUES ('failm1','fail-alias',1.0,0.0,1.0,1,1)")
+    cur.execute("INSERT OR REPLACE INTO provider (id, model_alias, priority, name, base_url, model, api_key, api_type, enabled, create_time) VALUES ('failp1','fail-alias',1,'Fail','http://127.0.0.1:3398/v1/fail','fail-model','mock-upstream-key','openai',1,1)")
+    con.commit()
+    st, body = http_post(B + "/api/chat/completions", {"model": "fail-alias", "messages": [{"role": "user", "content": "audit-body-payload"}]}, {"x-api-key": api_key})
+    # The relay surfaces its own aggregate message; the upstream detail lands in the audit row.
+    check("fail provider surfaces 400", st == 400 and "All providers failed" in body, f"{st} {body[:120]}")
+    arow = cur.execute("SELECT request_body, response_body FROM audit_log WHERE model_alias='fail-alias' AND success=0 ORDER BY ts DESC, rowid DESC LIMIT 1").fetchone()
+    check("audit failure stores request body", arow is not None and "audit-body-payload" in (arow[0] or ""), str(arow and (arow[0] or '')[:120]))
+    check("audit failure stores response body", arow is not None and "tool messages" in (arow[1] or ""), str(arow and (arow[1] or '')[:120]))
 
     # 11. CORS headers present
     req = urllib.request.Request(B + "/api/auth/config")
