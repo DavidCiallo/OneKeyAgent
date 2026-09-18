@@ -335,7 +335,10 @@ func ClaimDailyBonus(s *Settings, db *sql.DB, accountID string) (float64, error)
 	if account.LastDailyTime != nil && sameLocalDate(*account.LastDailyTime, now) {
 		return 0, nil
 	}
-	if _, err := db.Exec("UPDATE account SET last_daily_time = ?, update_time = ? WHERE id = ?", now, now, accountID); err != nil {
+	// Through AccountSetField rather than raw SQL: the claim has to travel to
+	// the main database, otherwise the main node still sees this account as
+	// eligible and the same bonus can be claimed again from another node.
+	if err := store.AccountSetField(db, accountID, "last_daily_time", now); err != nil {
 		return 0, err
 	}
 	cards, err := store.CardRedeemedBy(db, accountID)

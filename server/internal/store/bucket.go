@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -55,10 +56,24 @@ type BucketLogInput struct {
 	Cost              float64
 }
 
-// BucketLogUsage — upsert into the three granularity windows then purge
-// expired rows. Runs in one transaction so concurrent settles never create
-// duplicate rows for the same window. Port of ai.session.ts logUsage.
+// BucketLogUsage — accumulate one settled request into the 1m/60m/1d windows.
+//
+// Each window is a single INSERT ... ON CONFLICT DO UPDATE, so the counters are
+// merged by the database rather than read-modify-written by the caller. That is
+// what makes concurrent settles safe against the duplicate-row window the old
+// SELECT-then-INSERT had: two requests racing on the same window now contend on
+// the unique index instead of both inserting.
+//
+// Port of ai.session.ts logUsage, minus its per-request TTL sweep (see
+// PurgeExpiredBuckets).
 func BucketLogUsage(db *sql.DB, u BucketLogInput) error {
+	buffer := OutboxOn() && !outboxPaused() && syncDeltaTables["usage_bucket"]
+	if buffer {
+		// The sequence cache and the buffered entry must be consistent with the
+		// single transaction below.
+		outboxSeqMu.Lock()
+		defer outboxSeqMu.Unlock()
+	}
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -72,56 +87,73 @@ func BucketLogUsage(db *sql.DB, u BucketLogInput) error {
 	for _, gt := range [][2]any{{b1m, "1m"}, {b60m, "60m"}, {b1d, "1d"}} {
 		bucketTime := gt[0].(int64)
 		gran := gt[1].(string)
-
-		var (
-			id                 string
-			it, cit, ot, rc    int64
-			cost               float64
-			existingBucketTime int64
-		)
-		err := tx.QueryRow(
-			`SELECT id, input_tokens, cached_input_tokens, output_tokens, cost, request_count, bucket_time
-			 FROM usage_bucket
-			 WHERE account_id = ? AND model_alias = ? AND provider_id = ? AND granularity = ?
-			 ORDER BY create_time DESC, rowid DESC LIMIT 1`,
-			u.AccountID, u.ModelAlias, u.ProviderID, gran,
-		).Scan(&id, &it, &cit, &ot, &cost, &rc, &existingBucketTime)
-
-		if err == nil && existingBucketTime == bucketTime {
-			if _, err := tx.Exec(
-				`UPDATE usage_bucket SET input_tokens = ?, cached_input_tokens = ?, output_tokens = ?,
-				 cost = ?, request_count = ?, update_time = ? WHERE id = ?`,
-				it+u.InputTokens, cit+u.CachedInputTokens, ot+u.OutputTokens,
-				Round6(float64(cost)+u.Cost), rc+1, now, id,
-			); err != nil {
-				return err
-			}
-			continue
-		}
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return err
-		}
 		if _, err := tx.Exec(
 			`INSERT INTO usage_bucket (id, account_id, model_alias, provider_id, bucket_time, granularity,
 				input_tokens, cached_input_tokens, output_tokens, cost, request_count, create_time, update_time, delete_time)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, NULL)
+			 ON CONFLICT(account_id, model_alias, provider_id, granularity, bucket_time) DO UPDATE SET
+				input_tokens = input_tokens + excluded.input_tokens,
+				cached_input_tokens = cached_input_tokens + excluded.cached_input_tokens,
+				output_tokens = output_tokens + excluded.output_tokens,
+				cost = cost + excluded.cost,
+				request_count = request_count + 1,
+				update_time = excluded.update_time`,
 			cryptox.Nanoid(6), u.AccountID, u.ModelAlias, u.ProviderID, bucketTime, gran,
-			u.InputTokens, u.CachedInputTokens, u.OutputTokens, Round6(u.Cost), 1, now, now,
+			u.InputTokens, u.CachedInputTokens, u.OutputTokens, Round6(u.Cost), now, now,
 		); err != nil {
 			return err
 		}
-	}
-
-	// TTL purge — full indexed DELETE (TS deleted one oldest row per request).
-	ttls := [][2]any{{"1m", int64(7 * 86_400_000)}, {"60m", int64(90 * 86_400_000)}, {"1d", int64(730 * 86_400_000)}}
-	for _, t := range ttls {
-		gran := t[0].(string)
-		cutoff := now - t[1].(int64)
-		if _, err := tx.Exec("DELETE FROM usage_bucket WHERE granularity = ? AND bucket_time < ?", gran, cutoff); err != nil {
-			return err
+		// Buffer the same increment for the main database, in this transaction
+		// so usage and its sync record commit together.
+		if buffer {
+			if err := mergeOutboxEntryTx(tx, "usage_bucket",
+				BucketDeltaRowID(u.AccountID, u.ModelAlias, u.ProviderID, gran, bucketTime), "delta",
+				map[string]any{
+					"account_id": u.AccountID, "model_alias": u.ModelAlias, "provider_id": u.ProviderID,
+					"granularity": gran, "bucket_time": bucketTime,
+					"input_tokens": u.InputTokens, "cached_input_tokens": u.CachedInputTokens,
+					"output_tokens": u.OutputTokens, "cost": Round6(u.Cost), "request_count": int64(1),
+				}, true); err != nil {
+				return err
+			}
 		}
 	}
 	return tx.Commit()
+}
+
+// bucketTTLs — retention per granularity.
+var bucketTTLs = [][2]any{{"1m", int64(7 * 86_400_000)}, {"60m", int64(90 * 86_400_000)}, {"1d", int64(730 * 86_400_000)}}
+
+// PurgeExpiredBuckets drops buckets past their granularity's retention.
+//
+// This used to run inside BucketLogUsage, which put three full indexed DELETEs
+// on every relayed request even though the result changes at most once per
+// bucket. Callers run it on a ticker instead.
+func PurgeExpiredBuckets(db *sql.DB) error {
+	now := Now()
+	for _, t := range bucketTTLs {
+		gran := t[0].(string)
+		cutoff := now - t[1].(int64)
+		if _, err := db.Exec("DELETE FROM usage_bucket WHERE granularity = ? AND bucket_time < ?", gran, cutoff); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// StartMaintenance runs the housekeeping that must not sit on the request path
+// (currently the bucket TTL sweep) until the process exits.
+func StartMaintenance(db *sql.DB) {
+	go func() {
+		ticker := time.NewTicker(10 * time.Minute)
+		defer ticker.Stop()
+		for {
+			if err := PurgeExpiredBuckets(db); err != nil {
+				fmt.Println("[Maintenance] purge buckets failed:", err)
+			}
+			<-ticker.C
+		}
+	}()
 }
 
 // BucketSumCost — weekly spend / profile weekly usage.

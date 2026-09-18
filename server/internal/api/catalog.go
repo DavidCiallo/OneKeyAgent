@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 
 	"onekey/server/internal/httpx"
@@ -187,6 +188,9 @@ func (a *App) providerUpdate(c *httpx.Ctx) (any, error) {
 		return nil, fmt.Errorf("id and provider are required")
 	}
 	if err := store.GenericUpdateByID(a.DB, "provider", id, body); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, fmt.Errorf("provider not found")
+		}
 		return nil, fmt.Errorf("update failed")
 	}
 	p, err := store.ProviderFindOne(a.DB, id, false)
@@ -261,6 +265,11 @@ func (a *App) providerBatchUpdate(c *httpx.Ctx) (any, error) {
 			continue
 		}
 		if err := store.GenericUpdateByID(a.DB, "provider", id, update); err != nil {
+			// A row deleted between the page render and this call shouldn't
+			// abort the rest of the batch.
+			if errors.Is(err, store.ErrNotFound) {
+				continue
+			}
 			return nil, err
 		}
 	}
