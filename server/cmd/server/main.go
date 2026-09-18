@@ -19,6 +19,7 @@ import (
 	"onekey/server/internal/monitor"
 	"onekey/server/internal/service"
 	"onekey/server/internal/store"
+	"onekey/server/internal/sync"
 
 	"github.com/joho/godotenv"
 )
@@ -50,12 +51,41 @@ func main() {
 	}
 
 	cryptox.Init()
+
+	// Node role: a node configured with MAIN_DB_URL is a replica. It serves
+	// traffic locally, pulls a bootstrap snapshot from the main database, and
+	// buffers its own changes for periodic push. The main node (no MAIN_DB_URL)
+	// buffers nothing and serves the sync API.
+	syncerCfg := sync.ConfigFromEnv()
+	isReplica := syncerCfg.Enabled()
+	var syncer *sync.Syncer
+	if isReplica {
+		store.SetOutboxEnabled(true)
+		syncer = sync.New(db, syncerCfg)
+		if err := syncer.Bootstrap(); err != nil {
+			// Not fatal: the node still serves traffic from its local data, and
+			// a later restart retries. Running on stale data beats not starting.
+			fmt.Println("[Sync] bootstrap failed (continuing on local data):", err)
+		} else {
+			syncer.Start()
+		}
+	}
+
 	seedAdmin(db, settings)
-	monitor.Start(db, settings)
+	// Only the main database polls NowPayments. A replica polled the same
+	// invoice independently, confirmed it locally, and its credit reached the
+	// main database as a delta on top of the main's own credit — one payment
+	// paid out twice. The replica still serves the recharge UI; the invoice row
+	// it creates travels to the main database as a put, and the main confirms
+	// and credits it there.
+	if !isReplica {
+		monitor.Start(db, settings)
+	}
+	store.StartMaintenance(db)
 
 	staticDir := resolveStaticDir()
 
-	app := api.NewApp(db, settings, staticDir)
+	app := api.NewApp(db, settings, staticDir, syncer)
 	fmt.Printf("\nServer is running at http://localhost:%s\n", port)
 	if err := http.ListenAndServe(":"+port, app.Routes()); err != nil {
 		fmt.Println("Server failed:", err)

@@ -10,6 +10,7 @@ import { providerRoutes } from "../../shared/modules/provider/provider.router";
 import { subscriptionRoutes } from "../../shared/modules/subscription_record/subscription_record.router";
 import { giftCardRoutes } from "../../shared/modules/gift_card/gift_card.router";
 import { settingsRoutes } from "../../shared/modules/settings/settings.router";
+import { auditRoutes } from "../../shared/modules/audit/audit.router";
 
 export const authApi = createClient(authRoutes);
 export const aiApi = createClient(aiRoutes);
@@ -21,3 +22,4 @@ export const providerApi = createClient(providerRoutes);
 export const subscriptionApi = createClient(subscriptionRoutes);
 export const giftCardApi = createClient(giftCardRoutes);
 export const settingsApi = createClient(settingsRoutes);
+export const auditApi = createClient(auditRoutes);

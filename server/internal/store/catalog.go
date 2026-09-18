@@ -198,8 +198,14 @@ func ProviderAllIgnoreDelete(db *sql.DB) ([]*Provider, error) {
 	return out, rows.Err()
 }
 
+// ProviderListPage — the admin table. Soft-deleted rows are excluded: the
+// legacy repository's find() skipped delete_time by default, and the port to
+// SQL dropped that filter, so a deleted provider kept showing in the list —
+// delete looked like it did nothing, and editing the ghost row failed.
+// Rows come back in the order the UI displays them (alias, then priority), so
+// a copied provider lands next to its source and pagination is stable.
 func ProviderListPage(db *sql.DB, page int64, alias *string, enabled *int64) ([]*Provider, int64, error) {
-	conds := []string{"1=1"}
+	conds := []string{"delete_time IS NULL"}
 	args := []any{}
 	if alias != nil {
 		conds = append(conds, "model_alias = ?")
@@ -209,23 +215,31 @@ func ProviderListPage(db *sql.DB, page int64, alias *string, enabled *int64) ([]
 		conds = append(conds, "enabled = ?")
 		args = append(args, *enabled)
 	}
-	all, err := ProviderWhere(db, strings.Join(conds, " AND "), args)
+	where := strings.Join(conds, " AND ")
+
+	var total int64
+	if err := db.QueryRow("SELECT COUNT(*) FROM provider WHERE "+where, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	if page < 1 {
+		page = 1
+	}
+	offset := (page - 1) * 10
+	rows, err := db.Query("SELECT "+providerCols+" FROM provider WHERE "+where+
+		" ORDER BY model_alias ASC, priority ASC, rowid ASC LIMIT 10 OFFSET ?", append(args, offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
-	total := int64(len(all))
-	start := (page - 1) * 10
-	if start < 0 {
-		start = 0
+	defer rows.Close()
+	var out []*Provider
+	for rows.Next() {
+		p, err := scanProvider(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		out = append(out, p)
 	}
-	if start > total {
-		start = total
-	}
-	end := start + 10
-	if end > total {
-		end = total
-	}
-	return all[start:end], total, nil
+	return out, total, rows.Err()
 }
 
 // ProviderWhere — rows matching cond, ordered by model_alias ASC then priority
@@ -264,12 +278,26 @@ func providerLess(a, b *Provider) bool {
 // ProviderGetByAlias — enabled providers for an alias, priority ASC with a
 // random tiebreak inside equal-priority groups (mirrors the TS sort).
 func ProviderGetByAlias(db *sql.DB, alias string) ([]*Provider, error) {
-	list, err := ProviderWhere(db, "model_alias = ? AND enabled = 1 AND delete_time IS NULL", []any{alias})
+	list, err := providerListForAlias(db, alias)
 	if err != nil {
 		return nil, err
 	}
-	// Group shuffle: equal priorities are adjacent thanks to providerLess, so
-	// peers at the same priority rotate instead of the first row always winning.
+	shuffleEqualPriority(list)
+	return list, nil
+}
+
+// providerListForAlias — the query behind ProviderGetByAlias, before the
+// per-call random tiebreak. Split out so the cache can store the stable order
+// and still hand each request its own shuffle.
+func providerListForAlias(db *sql.DB, alias string) ([]*Provider, error) {
+	return ProviderWhere(db, "model_alias = ? AND enabled = 1 AND delete_time IS NULL", []any{alias})
+}
+
+// shuffleEqualPriority — randomly reorders within each run of equal priority,
+// preserving the priority ordering across runs. Equal priorities are adjacent
+// thanks to providerLess, so peers at the same priority rotate instead of the
+// first row always winning. Applied to a caller-owned slice.
+func shuffleEqualPriority(list []*Provider) {
 	for i := 0; i < len(list); {
 		j := i + 1
 		for j < len(list) && list[j].Priority == list[i].Priority {
@@ -279,7 +307,6 @@ func ProviderGetByAlias(db *sql.DB, alias string) ([]*Provider, error) {
 		rand.Shuffle(len(g), func(a, b int) { g[a], g[b] = g[b], g[a] })
 		i = j
 	}
-	return list, nil
 }
 
 func ProviderModelAliases(db *sql.DB) ([]string, error) {
@@ -317,6 +344,10 @@ func ProviderUpdatePriority(db *sql.DB, id string, delta int64) error {
 		np = 1
 	}
 	_, err = db.Exec("UPDATE provider SET priority = ?, update_time = ? WHERE id = ?", np, Now(), id)
+	if err == nil {
+		InvalidateRefCache()
+		_ = EnqueuePut(db, "provider", id, map[string]any{"priority": np})
+	}
 	return err
 }
 
@@ -397,9 +428,13 @@ func RoleFindOrCreate(db *sql.DB, name, typ string) (string, error) {
 	return r.ID, nil
 }
 
+// RolesByAccount — distinct roles for an account. The DISTINCT matters:
+// account_role is a link table, and rows predating the write-side dedupe (or
+// produced by it before the fix) can repeat the same role, which otherwise
+// renders the same sidebar entry several times.
 func RolesByAccount(db *sql.DB, accountID string) ([]*Role, error) {
 	rows, err := db.Query(
-		"SELECT r.id, r.name, r.type, r.create_time, r.update_time, r.delete_time FROM role r "+
+		"SELECT DISTINCT r.id, r.name, r.type, r.create_time, r.update_time, r.delete_time FROM role r "+
 			"INNER JOIN account_role ar ON ar.role_id = r.id "+
 			"WHERE ar.account_id = ? AND ar.delete_time IS NULL AND r.delete_time IS NULL", accountID)
 	if err != nil {
@@ -417,12 +452,24 @@ func RolesByAccount(db *sql.DB, accountID string) ([]*Role, error) {
 	return out, rows.Err()
 }
 
-// AssignPermissions — replace the account's role assignments.
+// AssignPermissions — replace the account's role assignments. Duplicate
+// (name, type) pairs collapse to a single row: the caller sends checkbox
+// values, and a repeated entry would otherwise create a second link row that
+// repeats the sidebar entry for that role.
 func AssignPermissions(db *sql.DB, accountID string, perms [][2]string) error {
 	if _, err := db.Exec("DELETE FROM account_role WHERE account_id = ?", accountID); err != nil {
 		return err
 	}
+	// The DELETE above is raw SQL and the loop below may not run at all when
+	// perms is empty, so invalidate here rather than relying on GenericInsert.
+	InvalidateRefCache()
+	seen := map[string]bool{}
 	for _, p := range perms {
+		key := p[0] + "\x00" + p[1]
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
 		roleID, err := RoleFindOrCreate(db, p[0], p[1])
 		if err != nil {
 			return err
@@ -455,17 +502,27 @@ func SettingsAll(db *sql.DB) (map[string]string, error) {
 	return out, rows.Err()
 }
 
+// SettingsSet — upsert one setting.
+//
+// The buffered change is keyed by the setting's name, not its row id: each node
+// seeds its settings rows with its own generated id, so an id-based push would
+// create a second row for the same key on the main database and collide with
+// the unique index on settings(key).
 func SettingsSet(db *sql.DB, key, value string) error {
 	exists := false
 	_ = db.QueryRow("SELECT 1 FROM settings WHERE key = ?", key).Scan(&exists)
 	if exists {
-		_, err := db.Exec("UPDATE settings SET value = ?, update_time = ? WHERE key = ?", value, Now(), key)
-		return err
+		if _, err := db.Exec("UPDATE settings SET value = ?, update_time = ? WHERE key = ?", value, Now(), key); err != nil {
+			return err
+		}
+	} else {
+		if _, err := db.Exec(
+			"INSERT INTO settings (id, key, value, create_time, update_time, delete_time) VALUES (?, ?, ?, ?, ?, NULL)",
+			cryptox.Nanoid(6), key, value, Now(), Now()); err != nil {
+			return err
+		}
 	}
-	_, err := db.Exec(
-		"INSERT INTO settings (id, key, value, create_time, update_time, delete_time) VALUES (?, ?, ?, ?, ?, NULL)",
-		cryptox.Nanoid(6), key, value, Now(), Now())
-	return err
+	return EnqueuePut(db, "settings", key, map[string]any{"key": key, "value": value})
 }
 
 // ProxyStr / ApiTypeStr — nil-safe accessors used by the AI proxy.
@@ -513,7 +570,10 @@ func ModelRestoreOrInsert(db *sql.DB, data map[string]any) (*Model, error) {
 		existing, err := ModelFindByAliasIgnoreDelete(db, alias)
 		if err == nil && existing != nil && existing.DeleteTime != nil {
 			data["id"] = existing.ID
-			if err := GenericUpdateByID(db, "model", existing.ID, data); err != nil {
+			// The revive has to clear delete_time as well as patch the fields,
+			// otherwise ModelFindOne right after still sees the row as deleted.
+			data["delete_time"] = nil
+			if err := GenericUpdateByIDIgnoreDelete(db, "model", existing.ID, data); err != nil {
 				return nil, err
 			}
 			return ModelFindOne(db, existing.ID)

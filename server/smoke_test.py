@@ -128,6 +128,11 @@ def main():
     row = cur.execute("SELECT input_tokens, output_tokens, request_count, granularity FROM usage_bucket WHERE account_id=? AND model_alias='mock-alias' AND granularity='1m' ORDER BY create_time DESC LIMIT 1", (acc_id,)).fetchone()
     check("usage bucket logged", row is not None and row[0] == 100 and row[1] == 20 and row[2] == 1, str(row))
 
+    # 5b. audit: the successful attempt is recorded with its summary fields
+    arow = cur.execute("SELECT success, status_code, provider_name, endpoint, input_tokens, output_tokens, stream FROM audit_log WHERE model_alias='mock-alias' ORDER BY ts DESC, rowid DESC LIMIT 1").fetchone()
+    check("audit success row", arow is not None and arow[0] == 1 and arow[1] == 200 and arow[2] == "Mock"
+          and arow[3] == "/api/chat/completions" and arow[4] == 100 and arow[5] == 20 and arow[6] == 0, str(arow))
+
     # 6. streaming completion
     bal1b = cur.execute("SELECT balance FROM account WHERE id=?", (acc_id,)).fetchone()[0]
     req = urllib.request.Request(B + "/api/chat/completions", data=json.dumps({"model": "mock-alias", "messages": [{"role": "user", "content": "hi"}], "stream": True}).encode(), method="POST")
@@ -145,6 +150,20 @@ def main():
     # same minute window as the first request -> accumulated (100+100, 20+40), 2 requests
     row = cur.execute("SELECT input_tokens, output_tokens, request_count FROM usage_bucket WHERE account_id=? AND model_alias='mock-alias' AND granularity='1m' ORDER BY create_time DESC, rowid DESC LIMIT 1", (acc_id,)).fetchone()
     check("usage bucket stream accumulate", row is not None and row[0] == 200 and row[1] == 60 and row[2] == 2, str(row))
+
+    # 6a. audit: the streaming attempt settles asynchronously, so poll briefly
+    n_ok = 0
+    for _ in range(30):
+        n_ok = cur.execute("SELECT COUNT(*) FROM audit_log WHERE model_alias='mock-alias' AND success=1 AND stream=1").fetchone()[0]
+        if n_ok >= 1:
+            break
+        time.sleep(0.1)
+    check("audit stream attempt recorded", n_ok >= 1, f"stream success rows={n_ok}")
+
+    # 6b2. audit: a request rejected before any upstream call is still recorded
+    st, body = http_post(B + "/api/chat/completions", {"model": "no-such-alias", "messages": [{"role": "user", "content": "hi"}]}, {"x-api-key": api_key})
+    frow = cur.execute("SELECT success, status_code, err FROM audit_log WHERE model_alias='no-such-alias' ORDER BY ts DESC, rowid DESC LIMIT 1").fetchone()
+    check("audit failure row", frow is not None and frow[0] == 0 and frow[1] in (403, 404) and "no-such-alias" in (frow[2] or ""), str(frow))
 
     # 6b. preflight: zero balance must be rejected BEFORE the upstream call
     cur.execute("UPDATE account SET balance = 0 WHERE id=?", (acc_id,))
@@ -179,9 +198,17 @@ def main():
     st, body = http_get(B + "/api/nonexistent")
     check("unknown api 404", st == 404, str(st))
 
-    # 10b. extra_json shallow override (provider-level body patch)
-    cur.execute("UPDATE provider SET extra_json = ? WHERE id = 'mockp1'", ('{"max_tokens": 555, "temperature": 0.1}',))
-    con.commit()
+    # 10b. extra_json shallow override (provider-level body patch).
+    # Edited through the admin API rather than direct SQL: the provider list is
+    # memoized in-process, and only a write through the server invalidates it
+    # (an out-of-process SQLite edit is deliberately invisible until the TTL).
+    TOKEN = json.loads(http_post(B + "/api/auth/login", {"identify": {"email": "admin@test.local", "password": "adminpass123"}})[1])["data"]["token"]
+
+    def set_extra_json(value):
+        st, body = http_post(B + "/api/provider/update", {"id": "mockp1", "provider": {"extra_json": value}}, {"token": TOKEN})
+        assert st == 200, (st, body[:300])
+
+    set_extra_json('{"max_tokens": 555, "temperature": 0.1}')
     st, body = http_post(B + "/api/chat/completions", {"model": "mock-alias", "max_tokens": 100, "messages": [{"role": "user", "content": "hi"}]}, {"x-api-key": api_key})
     check("extra_json override request ok", st == 200, body[:200])
     up = LAST_BODY.get("json", {})
@@ -190,12 +217,10 @@ def main():
     check("extra_json keeps other fields", up.get("model") == "mock-model" and up.get("stream") is False, str({k: up.get(k) for k in ("model", "stream")}))
 
     # 10c. invalid extra_json silently ignored
-    cur.execute("UPDATE provider SET extra_json = 'not-json{{' WHERE id = 'mockp1'")
-    con.commit()
+    set_extra_json("not-json{{")
     st, body = http_post(B + "/api/chat/completions", {"model": "mock-alias", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 77}, {"x-api-key": api_key})
     check("invalid extra_json ignored", st == 200 and LAST_BODY.get("json", {}).get("max_tokens") == 77, f"{st} {LAST_BODY.get('json', {}).get('max_tokens')}")
-    cur.execute("UPDATE provider SET extra_json = NULL WHERE id = 'mockp1'")
-    con.commit()
+    set_extra_json(None)
 
     # 11. CORS headers present
     req = urllib.request.Request(B + "/api/auth/config")

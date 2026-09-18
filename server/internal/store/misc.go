@@ -75,21 +75,45 @@ func TxPending(db *sql.DB) ([]*Transaction, error) {
 }
 
 // TxUpdateByTxid — patch subset of fields by invoice id.
+//
+// The change is buffered like any other admin write: an invoice confirmed on a
+// replica has to reach the main database, or the two nodes disagree about
+// whether the payment happened and the monitor re-confirms it there.
 func TxUpdateByTxid(db *sql.DB, txid string, patch map[string]any) error {
 	sets := []string{"update_time = ?"}
 	args := []any{Now()}
+	travel := map[string]any{}
 	for _, key := range []string{"payment_id", "status", "confirmations", "amount"} {
 		if v, ok := patch[key]; ok {
 			sets = append(sets, key+" = ?")
 			args = append(args, v)
+			travel[key] = v
 		}
 	}
 	if len(sets) == 1 {
 		return nil
 	}
 	args = append(args, txid)
-	_, err := db.Exec(fmt.Sprintf(`UPDATE "transaction" SET %s WHERE txid = ?`, strings.Join(sets, ", ")), args...)
-	return err
+	if _, err := db.Exec(fmt.Sprintf(`UPDATE "transaction" SET %s WHERE txid = ?`, strings.Join(sets, ", ")), args...); err != nil {
+		return err
+	}
+	if syncPutTables["transaction"] {
+		if id, err := txIDByTxid(db, txid); err == nil && id != "" {
+			_ = EnqueuePut(db, "transaction", id, travel)
+		}
+	}
+	return nil
+}
+
+// txIDByTxid — the local row id behind an invoice id, used as the outbox
+// collapse key so repeated status patches fold into one entry.
+func txIDByTxid(db *sql.DB, txid string) (string, error) {
+	var id string
+	err := db.QueryRow(`SELECT id FROM "transaction" WHERE txid = ? ORDER BY rowid DESC LIMIT 1`, txid).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return id, err
 }
 
 // ─────────────────────────── Gift card ───────────────────────────
@@ -171,25 +195,63 @@ func CardRedeemedBy(db *sql.DB, accountID string) ([]*GiftCard, error) {
 
 // CardMarkRedeemed — atomic claim, only flips while still unused. Also fixes
 // the TS double-redeem race (check-then-update there).
+//
+// The claim is buffered so the main database learns the card is spent. Without
+// it a card redeemed on a replica still reads as unused on the main node, which
+// can hand the same code out again — and a replica that re-bootstraps from the
+// main database gets the unused row straight back.
 func CardMarkRedeemed(db *sql.DB, id, accountID string) (bool, error) {
+	now := Now()
 	res, err := db.Exec(
 		`UPDATE gift_card SET status = 'redeemed', redeemed_by = ?, redeemed_at = ?, update_time = ?
 		 WHERE id = ? AND status = 'unused'`,
-		accountID, Now(), Now(), id)
+		accountID, now, now, id)
 	if err != nil {
 		return false, err
 	}
 	n, _ := res.RowsAffected()
+	if n > 0 && syncPutTables["gift_card"] {
+		_ = EnqueuePut(db, "gift_card", id, map[string]any{
+			"status": "redeemed", "redeemed_by": accountID, "redeemed_at": now,
+		})
+	}
 	return n > 0, nil
 }
 
+// CardCleanupExpired — drop unused cards older than the cutoff.
+//
+// Each removed card is buffered as a delete so the main database retires it
+// too; a hard local delete plus a live row on the main node would leave the
+// code redeemable there.
 func CardCleanupExpired(db *sql.DB, before int64) (int64, error) {
-	res, err := db.Exec(
-		"DELETE FROM gift_card WHERE status = 'unused' AND delete_time IS NULL AND create_time < ?", before)
+	rows, err := db.Query(
+		"SELECT id FROM gift_card WHERE status = 'unused' AND delete_time IS NULL AND create_time < ?", before)
 	if err != nil {
 		return 0, err
 	}
-	return res.RowsAffected()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	now := Now()
+	for _, id := range ids {
+		if _, err := db.Exec("DELETE FROM gift_card WHERE id = ?", id); err != nil {
+			return 0, err
+		}
+		if syncPutTables["gift_card"] {
+			_ = EnqueuePut(db, "gift_card", id, map[string]any{"delete_time": now})
+		}
+	}
+	return int64(len(ids)), nil
 }
 
 // ─────────────────────────── Export / Import helpers ───────────────────────────
@@ -215,6 +277,9 @@ func AllRowsIgnoreDelete(db *sql.DB, table string) ([]map[string]any, error) {
 // Truncate — wipe a collection (import).
 func Truncate(db *sql.DB, table string) error {
 	_, err := db.Exec(fmt.Sprintf("DELETE FROM \"%s\"", table))
+	if err == nil {
+		invalidateForTable(table)
+	}
 	return err
 }
 
@@ -266,6 +331,7 @@ func BatchInsertRows(db *sql.DB, table string, items []map[string]any) (int, err
 		}
 		count++
 	}
+	invalidateForTable(table)
 	return count, nil
 }
 

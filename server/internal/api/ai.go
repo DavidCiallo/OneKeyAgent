@@ -30,14 +30,14 @@ func (a *App) aiChatCompletions(c *httpx.Ctx) (any, error) {
 	}
 	body := c.M
 	if stream, _ := body["stream"].(bool); stream {
-		pipeline, err := a.AI.StartStream(body, accountID)
+		pipeline, err := a.AI.StartStreamAt(body, accountID, "/api/chat/completions")
 		if err != nil {
 			return nil, err
 		}
 		ai.ServeSSE(c.W, pipeline.Reader)
 		return streamReply{}, nil
 	}
-	result, err := a.AI.ChatCompletions(body, accountID)
+	result, err := a.AI.ChatCompletionsAt(body, accountID, "/api/chat/completions")
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func (a *App) aiCompletions(c *httpx.Ctx) (any, error) {
 	}
 	body := c.M
 	if stream, _ := body["stream"].(bool); stream {
-		pipeline, err := a.AI.StartStream(body, accountID)
+		pipeline, err := a.AI.StartStreamAt(body, accountID, "/api/completions")
 		if err != nil {
 			return nil, err
 		}
@@ -59,7 +59,7 @@ func (a *App) aiCompletions(c *httpx.Ctx) (any, error) {
 		return streamReply{}, nil
 	}
 	// TS quirk kept: /api/completions returns the chat.completion shape.
-	result, err := a.AI.ChatCompletions(body, accountID)
+	result, err := a.AI.ChatCompletionsAt(body, accountID, "/api/completions")
 	if err != nil {
 		return nil, err
 	}

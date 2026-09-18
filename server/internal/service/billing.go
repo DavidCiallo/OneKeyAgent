@@ -102,27 +102,19 @@ func jsonInt(v any) int64 {
 	return 0
 }
 
-// ModelPrices — alias pricing from the model table.
+// ModelPrices — alias pricing from the model table (memoized; the model list
+// changes only when an admin edits it).
 func ModelPrices(db *sql.DB, alias string) (input, cache, output float64, err error) {
-	models, err := store.ModelAllActive(db)
+	models, err := store.ModelAllActiveCached(db)
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	sortByAlias(models)
 	for _, m := range models {
 		if m.Alias == alias {
 			return m.InputPrice, m.CachePrice, m.OutputPrice, nil
 		}
 	}
 	return 0, 0, 0, nil
-}
-
-func sortByAlias(models []*store.Model) {
-	for i := 1; i < len(models); i++ {
-		for j := i; j > 0 && models[j].Alias < models[j-1].Alias; j-- {
-			models[j], models[j-1] = models[j-1], models[j]
-		}
-	}
 }
 
 // WeeklySpending — sums `1d` granularity only. (The TS version summed all
