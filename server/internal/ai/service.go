@@ -318,21 +318,35 @@ func buildRequestConfig(p *store.Provider, body map[string]any, stream bool) ups
 		for k, v := range body {
 			clean[k] = v
 		}
-		thinking := jMap(body["thinking"])
-		_, hasEffort := body["reasoning_effort"]
-		if thinking != nil && thinking["type"] == "enabled" && !hasEffort {
-			effort := "high"
-			if b, ok := thinking["budget_tokens"].(float64); ok {
-				switch {
-				case b >= 16384:
-					effort = "high"
-				case b >= 8192:
-					effort = "medium"
-				default:
-					effort = "low"
+		// The effort value travels normalized, not verbatim: clients send
+		// things like "Max" that strict OpenAI-compatible upstreams reject with
+		// a 400. Unrecognized values are dropped entirely rather than relayed.
+		effort := normalizeReasoningEffort(body["reasoning_effort"])
+		if effort == "" {
+			thinking := jMap(body["thinking"])
+			if thinking != nil && thinking["type"] == "enabled" {
+				effort = "high"
+				if b, ok := thinking["budget_tokens"].(float64); ok {
+					switch {
+					case b >= 16384:
+						effort = "high"
+					case b >= 8192:
+						effort = "medium"
+					default:
+						effort = "low"
+					}
 				}
 			}
+		}
+		// The provider's "supports reasoning effort" toggle finally means
+		// something: off strips the parameter for this upstream.
+		if p.SupportsReasoningEffort != nil && *p.SupportsReasoningEffort == 0 {
+			effort = ""
+		}
+		if effort != "" {
 			clean["reasoning_effort"] = effort
+		} else {
+			delete(clean, "reasoning_effort")
 		}
 		delete(clean, "thinking")
 		postBody = mustJSON(clean)

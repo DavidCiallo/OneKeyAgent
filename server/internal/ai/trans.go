@@ -61,6 +61,31 @@ func jStringify(v any) string {
 	}
 }
 
+// normalizeReasoningEffort — canonical reasoning_effort value ("low",
+// "medium", "high", "minimal") from whatever a client sends. Case is
+// normalized and common synonyms fold onto the nearest level ("Max" → high),
+// because strict OpenAI-compatible upstreams answer unrecognized values with
+// a 400. Returns "" when the value should not be relayed at all: unknown
+// tokens and explicit opt-outs are dropped so the upstream keeps its default.
+func normalizeReasoningEffort(v any) string {
+	s, ok := v.(string)
+	if !ok {
+		return ""
+	}
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "low":
+		return "low"
+	case "medium", "med":
+		return "medium"
+	case "high", "max", "maximal", "highest", "ultra":
+		return "high"
+	case "minimal":
+		return "minimal"
+	default:
+		return ""
+	}
+}
+
 func safeJSONParse(s string) map[string]any {
 	var m map[string]any
 	if err := json.Unmarshal([]byte(s), &m); err != nil || m == nil {
@@ -223,15 +248,13 @@ func toAnthropicBody(body map[string]any) map[string]any {
 		case float64:
 			budget = int64(e)
 		case string:
-			switch e {
+			switch normalizeReasoningEffort(e) {
 			case "low":
 				budget = 2048
 			case "medium":
 				budget = 8192
 			case "high":
 				budget = 16384
-			case "max":
-				budget = 32768
 			}
 		}
 		if budget > 0 {
@@ -812,18 +835,16 @@ func toGeminiBody(body map[string]any, enableSearch int64) map[string]any {
 	case float64:
 		effortBudget = e
 	case string:
-		switch e {
+		switch normalizeReasoningEffort(e) {
 		case "low":
 			effortBudget = 1024
 		case "medium":
 			effortBudget = 4096
 		case "high":
-			effortBudget = 8192
-		case "max":
 			effortBudget = 16384
 		}
 	}
-	effortPresent := body["reasoning_effort"] != nil
+	effortPresent := normalizeReasoningEffort(body["reasoning_effort"]) != ""
 	thinkingEnabled := effortPresent
 	if thinking != nil && thinking["type"] == "enabled" {
 		thinkingEnabled = true
