@@ -23,6 +23,9 @@ func (a *App) usageList(c *httpx.Ctx) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	if data, handled, err := a.proxyUsage(c); handled || err != nil {
+		return data, err
+	}
 	page := c.Int("page")
 	if page == 0 {
 		page = 1
@@ -137,6 +140,9 @@ func (a *App) usageStats(c *httpx.Ctx) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	if data, handled, err := a.proxyUsage(c); handled || err != nil {
+		return data, err
+	}
 	var accountFilter *string
 	if account.IsAdmin == 0 {
 		aid := account.ID
@@ -220,6 +226,9 @@ func (a *App) usageStatsBatch(c *httpx.Ctx) (any, error) {
 	account, err := service.AccountByAuth(a.DB, c.Auth)
 	if err != nil {
 		return nil, err
+	}
+	if data, handled, err := a.proxyUsage(c); handled || err != nil {
+		return data, err
 	}
 	var accountFilter *string
 	if account.IsAdmin == 0 {
@@ -407,6 +416,9 @@ func (a *App) usageSessions(c *httpx.Ctx) (any, error) {
 	account, err := service.AccountByAuth(a.DB, c.Auth)
 	if err != nil {
 		return nil, err
+	}
+	if data, handled, err := a.proxyUsage(c); handled || err != nil {
+		return data, err
 	}
 	isAdmin := account.IsAdmin != 0
 

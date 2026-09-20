@@ -17,6 +17,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	stdsync "sync"
 	"time"
 
 	"onekey/server/internal/store"
@@ -77,6 +78,16 @@ type Syncer struct {
 	cfg     Config
 	client  *http.Client
 	trigger chan struct{}
+
+	// flushMu serializes Flush. Three goroutines can flush concurrently (the
+	// interval loop, the size-threshold loop, and a manual /api/sync/flush),
+	// and without this they can each read the same outbox batch before either
+	// acks it, pushing the same entries several times. That is harmless for a
+	// "put" (an idempotent upsert) but a "delta" is additive: a re-applied
+	// balance deduction or usage increment would double-count on the main
+	// database. The lock makes the second flush observe an already-trimmed
+	// buffer and no-op.
+	flushMu stdsync.Mutex
 }
 
 func New(db *sql.DB, cfg Config) *Syncer {
@@ -86,6 +97,25 @@ func New(db *sql.DB, cfg Config) *Syncer {
 		client:  &http.Client{Timeout: 60 * time.Second},
 		trigger: make(chan struct{}, 1),
 	}
+}
+
+// MainURL is the configured main-database base URL (no trailing slash). Empty
+// when this node is the main database. Exposed so other packages (e.g. the API
+// layer's usage proxy) can forward to the same endpoint this node syncs with.
+func (s *Syncer) MainURL() string {
+	if s == nil {
+		return ""
+	}
+	return s.cfg.MainURL
+}
+
+// HTTPClient is the syncer's HTTP client, so proxied requests reuse its
+// keep-alive pool and timeout rather than dialing a fresh connection.
+func (s *Syncer) HTTPClient() *http.Client {
+	if s == nil {
+		return nil
+	}
+	return s.client
 }
 
 // Bootstrap pulls the snapshot and imports it locally. Runs before the HTTP
@@ -175,6 +205,25 @@ func (s *Syncer) Refresh() error {
 	return nil
 }
 
+// TriggerPush asks the push loop to flush soon, without blocking the caller.
+//
+// Used after an admin edit so the change reaches the main database promptly
+// instead of waiting up to SYNC_INTERVAL_SECONDS. The trigger channel has room
+// for one signal, so a burst of edits coalesces into a single flush; if a flush
+// is already pending (or running and about to loop) the extra signal is dropped
+// rather than queued, which is exactly what we want: flushing is idempotent and
+// will pick up every buffered change anyway.
+func (s *Syncer) TriggerPush() {
+	if s == nil {
+		return
+	}
+	select {
+	case s.trigger <- struct{}{}:
+	default:
+		// A flush is already pending; the buffered edits will ride along.
+	}
+}
+
 // Start runs the push loop until the process exits: flush when the buffer grows
 // past the threshold, otherwise on the interval. It also runs the pull loop that
 // keeps this replica's reference data current with the main database.
@@ -222,6 +271,8 @@ func (s *Syncer) Start() {
 // Flush pushes one batch and trims it from the buffer. A failed push leaves the
 // buffer untouched, so the next attempt retries exactly the same changes.
 func (s *Syncer) Flush() error {
+	s.flushMu.Lock()
+	defer s.flushMu.Unlock()
 	batch, err := store.OutboxBatch(s.db, s.cfg.MaxRows, s.cfg.MaxBytes)
 	if err != nil {
 		return err
