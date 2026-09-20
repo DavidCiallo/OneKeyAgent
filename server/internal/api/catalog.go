@@ -67,6 +67,7 @@ func (a *App) modelCreate(c *httpx.Ctx) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	a.triggerSyncIfReplica()
 	return map[string]any{"model": m.DTO()}, nil
 }
 
@@ -89,6 +90,7 @@ func (a *App) modelUpdate(c *httpx.Ctx) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	a.triggerSyncIfReplica()
 	return map[string]any{"model": m.DTO()}, nil
 }
 
@@ -103,6 +105,7 @@ func (a *App) modelDelete(c *httpx.Ctx) (any, error) {
 	if err := store.GenericSoftDelete(a.DB, "model", id); err != nil {
 		return nil, err
 	}
+	a.triggerSyncIfReplica()
 	return map[string]any{}, nil
 }
 
@@ -175,6 +178,7 @@ func (a *App) providerCreate(c *httpx.Ctx) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	a.triggerSyncIfReplica()
 	return map[string]any{"provider": p.DTO()}, nil
 }
 
@@ -200,6 +204,7 @@ func (a *App) providerUpdate(c *httpx.Ctx) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	a.triggerSyncIfReplica()
 	return map[string]any{"provider": p.DTO()}, nil
 }
 
@@ -210,6 +215,7 @@ func (a *App) providerUpdatePriority(c *httpx.Ctx) (any, error) {
 	if err := store.ProviderUpdatePriority(a.DB, c.Str("id"), c.Int("delta")); err != nil {
 		return nil, err
 	}
+	a.triggerSyncIfReplica()
 	return map[string]any{}, nil
 }
 
@@ -224,6 +230,7 @@ func (a *App) providerDelete(c *httpx.Ctx) (any, error) {
 	if err := store.GenericSoftDelete(a.DB, "provider", id); err != nil {
 		return nil, err
 	}
+	a.triggerSyncIfReplica()
 	return map[string]any{}, nil
 }
 
@@ -273,6 +280,7 @@ func (a *App) providerBatchUpdate(c *httpx.Ctx) (any, error) {
 			return nil, err
 		}
 	}
+	a.triggerSyncIfReplica()
 	return map[string]any{}, nil
 }
 
