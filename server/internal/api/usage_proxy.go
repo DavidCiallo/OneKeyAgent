@@ -38,9 +38,11 @@ const usageProxyTimeout = 30 * time.Second
 // when this node is a replica and the caller is an admin (i.e. the query is for
 // data the local node cannot see in full).
 //
-// Returns handled=true with the raw reply when the main database answered; the
-// caller must return that value verbatim. When handled=false the caller should
-// fall through to its normal local implementation.
+// Returns handled=true with the main database's payload (the inner data, not
+// the envelope) so the caller can return it like any local result; wrap() then
+// re-wraps it in { success, data } exactly as the non-proxied path would. When
+// handled=false the caller should fall through to its normal local
+// implementation.
 func (a *App) proxyUsage(c *httpx.Ctx) (any, bool, error) {
 	if !a.shouldProxyUsage(c) {
 		return nil, false, nil
@@ -49,7 +51,7 @@ func (a *App) proxyUsage(c *httpx.Ctx) (any, bool, error) {
 	if err != nil {
 		return nil, false, err
 	}
-	return raw(data), true, nil
+	return data, true, nil
 }
 
 // shouldProxyUsage decides whether a usage query has to be answered by the main
