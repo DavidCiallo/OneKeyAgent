@@ -145,9 +145,10 @@ func TestTwoWayFlowOverHTTP(t *testing.T) {
 	}
 
 	// ── the money invariant, end to end ──
-	// The replica already spent 4.0 locally, and that has been pushed. Now the
-	// main database spends 1.0 more, which the replica has not seen yet. A
-	// refresh must not roll the replica's balance back to the main's value.
+	// The replica already spent 4.0 locally, and that has been pushed, so the
+	// main database's balance is the truth. Now the main database spends 1.0
+	// more, which the replica has not seen yet: until the next refresh it
+	// still reads 6.0 (the documented lag window).
 	if _, err := store.AccountDeductBalance(main.db, "acc1", 1.0); err != nil {
 		t.Fatalf("main deduct: %v", err)
 	}
@@ -165,9 +166,28 @@ func TestTwoWayFlowOverHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatalf("replica balance: %v", err)
 	}
-	// The main snapshot says 5.0; the replica must keep its own 6.0.
-	if diff := replicaBal - 6.0; diff > 1e-9 || diff < -1e-9 {
-		t.Fatalf("replica balance = %v after refresh, want 6.0 — the refresh overwrote the replica's own state", replicaBal)
+	// The main database's spend must ARRIVE: the replica reconciles to
+	// snapshot + unpushed = 5.0 + 0. Staying at 6.0 here is the over-serving
+	// bug — the replica would keep handing out money the main database has
+	// already spent.
+	if diff := replicaBal - 5.0; diff > 1e-9 || diff < -1e-9 {
+		t.Fatalf("replica balance = %v after refresh, want 5.0 — the main database's spend never reached the replica", replicaBal)
+	}
+
+	// And unpushed local spend must survive the same refresh: reconciled as
+	// snapshot + unpushed = 5.0 + (−0.5), never snapshotted away.
+	if _, err := store.AccountDeductBalance(replica.db, "acc1", 0.5); err != nil {
+		t.Fatalf("replica deduct: %v", err)
+	}
+	if err := syncer.Refresh(); err != nil {
+		t.Fatalf("third refresh: %v", err)
+	}
+	replicaBal, err = store.AccountGetBalance(replica.db, "acc1")
+	if err != nil {
+		t.Fatalf("replica balance: %v", err)
+	}
+	if diff := replicaBal - 4.5; diff > 1e-9 || diff < -1e-9 {
+		t.Fatalf("replica balance = %v after refresh, want 4.5 (5.0 + (−0.5) unpushed) — the refresh refunded the replica's own spend", replicaBal)
 	}
 }
 

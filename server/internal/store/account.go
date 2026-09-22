@@ -145,7 +145,12 @@ func AccountDeductBalance(db *sql.DB, id string, cost float64) (float64, error) 
 		return 0, err
 	}
 
-	buffer := OutboxOn() && !outboxPaused() && syncDeltaTables["account"]
+	// A local money write must always reach the buffer while this node syncs —
+	// a deduction that commits without its delta is money nobody ever
+	// collects. (The outbox's old "suppress during import" switch used to make
+	// this branch skip the buffer for deductions landing mid-refresh; see the
+	// note in outbox.go.)
+	buffer := OutboxOn() && syncDeltaTables["account"]
 	if !buffer {
 		res, err := db.Exec(
 			"UPDATE account SET balance = MAX(balance - ?, 0), update_time = ? WHERE id = ?",
@@ -200,7 +205,7 @@ func AccountAddBalance(db *sql.DB, id string, delta float64) error {
 	if delta == 0 {
 		return nil
 	}
-	if OutboxOn() && !outboxPaused() && syncDeltaTables["account"] {
+	if OutboxOn() && syncDeltaTables["account"] {
 		outboxSeqMu.Lock()
 		defer outboxSeqMu.Unlock()
 		tx, err := db.Begin()
@@ -417,7 +422,22 @@ func CountAccountSince(db *sql.DB, since int64) (int64, error) {
 // ExecSetField — small helper for targeted field updates on account.
 func AccountSetField(db *sql.DB, id, field string, value any) error {
 	switch field {
-	case "name", "email", "password", "api_key", "is_admin", "tg_chat_id", "last_daily_time", "balance":
+	case "balance":
+		// An absolute balance cannot travel as a put (EnqueuePut strips
+		// additive columns) and a refresh would overwrite it with the
+		// reconciled value — the set would exist nowhere. Route it through the
+		// delta path instead: the change travels to the main database and
+		// survives reconciliation here.
+		target, ok := toFloat(value)
+		if !ok {
+			return fmt.Errorf("balance %v is not numeric", value)
+		}
+		current, err := AccountGetBalance(db, id)
+		if err != nil {
+			return err
+		}
+		return AccountAddBalance(db, id, target-current)
+	case "name", "email", "password", "api_key", "is_admin", "tg_chat_id", "last_daily_time":
 		if _, err := db.Exec("UPDATE account SET "+field+" = ?, update_time = ? WHERE id = ?", value, Now(), id); err != nil {
 			return err
 		}

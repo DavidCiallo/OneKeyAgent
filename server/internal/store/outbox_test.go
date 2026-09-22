@@ -1,9 +1,23 @@
 package store
 
 import (
+	"database/sql"
 	"fmt"
 	"testing"
 )
+
+// drain — acknowledge everything currently buffered, as a successful push
+// would (a push acks exactly the batch it sent).
+func drain(t *testing.T, db *sql.DB) {
+	t.Helper()
+	batch, err := OutboxBatch(db, 10000, 0)
+	if err != nil {
+		t.Fatalf("batch: %v", err)
+	}
+	if err := OutboxAck(db, batch); err != nil {
+		t.Fatalf("ack: %v", err)
+	}
+}
 
 // TestOutboxPutCollapses — repeated puts for one row collapse into a single
 // entry, later columns winning, and the sequence number is preserved so a
@@ -210,7 +224,7 @@ func TestOutboxAckKeepsNewerWork(t *testing.T) {
 		t.Fatalf("put r3: %v", err)
 	}
 
-	if err := OutboxAck(db, batch[len(batch)-1].Seq); err != nil {
+	if err := OutboxAck(db, batch); err != nil {
 		t.Fatalf("ack: %v", err)
 	}
 	rest, err := OutboxBatch(db, 100, 0)
@@ -227,6 +241,98 @@ func TestOutboxAckKeepsNewerWork(t *testing.T) {
 	wantSeq := fmt.Sprintf("%d", batch[len(batch)-1].Seq)
 	if got != wantSeq {
 		t.Fatalf("last_pushed_seq = %q, want %q", got, wantSeq)
+	}
+}
+
+// TestOutboxAckKeepsFoldedTail — a change that folds into an entry while its
+// batch is in flight is NOT part of what the main database confirmed. Acking
+// must trim only the confirmed payload and keep the tail: the old delete-by-seq
+// dropped the fold silently — deducted locally, reported nowhere, collected
+// never.
+func TestOutboxAckKeepsFoldedTail(t *testing.T) {
+	db, err := Open(t.TempDir() + "/foldtail.db")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+	SetOutboxEnabled(true)
+	defer SetOutboxEnabled(false)
+
+	if err := EnqueueDelta(db, "account", "acc1", map[string]any{"id": "acc1", "balance": -4.0}); err != nil {
+		t.Fatalf("delta: %v", err)
+	}
+	batch, err := OutboxBatch(db, 100, 0) // the push now in flight carries −4.0
+	if err != nil {
+		t.Fatalf("batch: %v", err)
+	}
+	if len(batch) != 1 {
+		t.Fatalf("got %d entries, want 1", len(batch))
+	}
+	// Another deduction lands mid-push and folds into that same entry.
+	if err := EnqueueDelta(db, "account", "acc1", map[string]any{"id": "acc1", "balance": -1.0}); err != nil {
+		t.Fatalf("fold: %v", err)
+	}
+	if err := OutboxAck(db, batch); err != nil {
+		t.Fatalf("ack: %v", err)
+	}
+
+	rest, err := OutboxBatch(db, 100, 0)
+	if err != nil {
+		t.Fatalf("batch after ack: %v", err)
+	}
+	if len(rest) != 1 {
+		t.Fatalf("after ack, buffer = %v, want the −1.0 that folded mid-push", rest)
+	}
+	if v, _ := toFloat(rest[0].Payload["balance"]); v != -1.0 {
+		t.Fatalf("tail = %v, want −1.0 (the unconfirmed remainder)", rest[0].Payload["balance"])
+	}
+	if err := OutboxAck(db, rest); err != nil {
+		t.Fatalf("ack tail: %v", err)
+	}
+	if again, _ := OutboxBatch(db, 100, 0); len(again) != 0 {
+		t.Fatalf("buffer not empty after the tail is confirmed: %v", again)
+	}
+}
+
+// TestOutboxAckKeepsPutFoldedInFlight — the same window for puts. A put is
+// absolute and idempotent, so one edited mid-flight keeps travelling whole
+// (with its newer columns) instead of losing them to the ack.
+func TestOutboxAckKeepsPutFoldedInFlight(t *testing.T) {
+	db, err := Open(t.TempDir() + "/foldput.db")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+	SetOutboxEnabled(true)
+	defer SetOutboxEnabled(false)
+
+	if err := EnqueuePut(db, "provider", "p1", map[string]any{"name": "a"}); err != nil {
+		t.Fatalf("put: %v", err)
+	}
+	batch, err := OutboxBatch(db, 100, 0)
+	if err != nil {
+		t.Fatalf("batch: %v", err)
+	}
+	// The row is renamed while the push is in flight; the write folds in.
+	if err := EnqueuePut(db, "provider", "p1", map[string]any{"name": "b"}); err != nil {
+		t.Fatalf("fold: %v", err)
+	}
+	if err := OutboxAck(db, batch); err != nil {
+		t.Fatalf("ack: %v", err)
+	}
+
+	rest, err := OutboxBatch(db, 100, 0)
+	if err != nil {
+		t.Fatalf("batch after ack: %v", err)
+	}
+	if len(rest) != 1 || rest[0].Payload["name"] != "b" {
+		t.Fatalf("after ack, buffer = %v, want the renamed put (name b)", rest)
+	}
+	if err := OutboxAck(db, rest); err != nil {
+		t.Fatalf("ack again: %v", err)
+	}
+	if again, _ := OutboxBatch(db, 100, 0); len(again) != 0 {
+		t.Fatalf("buffer not empty once the newer put is confirmed: %v", again)
 	}
 }
 
@@ -396,9 +502,7 @@ func TestAccountAdminEditsAreBuffered(t *testing.T) {
 	}
 	// GenericInsert itself buffers a put; clear it so the assertion below is
 	// about the field update.
-	if err := OutboxAck(db, 1<<40); err != nil {
-		t.Fatalf("clear: %v", err)
-	}
+	drain(t, db)
 
 	if err := AccountSetField(db, "acc1", "name", "renamed"); err != nil {
 		t.Fatalf("set field: %v", err)

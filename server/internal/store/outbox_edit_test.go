@@ -115,7 +115,7 @@ func TestReplicaEditThenAckLeavesNothingBehind(t *testing.T) {
 	if len(batch) != 1 {
 		t.Fatalf("batch len = %d, want 1", len(batch))
 	}
-	if err := OutboxAck(db, batch[0].Seq); err != nil {
+	if err := OutboxAck(db, batch); err != nil {
 		t.Fatalf("ack: %v", err)
 	}
 	if again, _ := OutboxBatch(db, 100, 0); len(again) != 0 {

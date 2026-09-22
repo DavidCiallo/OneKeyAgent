@@ -67,7 +67,9 @@ type BucketLogInput struct {
 // Port of ai.session.ts logUsage, minus its per-request TTL sweep (see
 // PurgeExpiredBuckets).
 func BucketLogUsage(db *sql.DB, u BucketLogInput) error {
-	buffer := OutboxOn() && !outboxPaused() && syncDeltaTables["usage_bucket"]
+	// Usage and its buffer record commit together — see the note in account.go
+	// on why money writes must never skip the buffer.
+	buffer := OutboxOn() && syncDeltaTables["usage_bucket"]
 	if buffer {
 		// The sequence cache and the buffered entry must be consistent with the
 		// single transaction below.
