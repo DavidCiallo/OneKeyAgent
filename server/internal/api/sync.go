@@ -91,32 +91,30 @@ func (a *App) syncSnapshot(c *httpx.Ctx) (any, error) {
 	}), nil
 }
 
-// syncBootstrapImport — apply a snapshot locally. Runs with the outbox
-// suppressed, so the rows just received are not immediately queued back.
+// syncBootstrapImport — apply a snapshot locally. The rows are written with
+// plain SQL and never buffered, so nothing is queued back to the main
+// database (and no suppression of unrelated writes is needed — or safe).
 func (a *App) applySnapshot(payload map[string]any) (map[string]int, error) {
 	counts := map[string]int{}
-	err := store.SuppressOutbox(func() error {
-		for _, t := range syncTables {
-			items, _ := payload[t.key].([]any)
-			rows := make([]map[string]any, 0, len(items))
-			for _, it := range items {
-				if m, ok := it.(map[string]any); ok {
-					rows = append(rows, m)
-				}
+	for _, t := range syncTables {
+		items, _ := payload[t.key].([]any)
+		rows := make([]map[string]any, 0, len(items))
+		for _, it := range items {
+			if m, ok := it.(map[string]any); ok {
+				rows = append(rows, m)
 			}
-			if len(rows) == 0 {
-				continue
-			}
-			n, err := store.BatchInsertRows(a.DB, t.table, rows)
-			if err != nil {
-				return fmt.Errorf("bootstrap %s: %w", t.table, err)
-			}
-			counts[t.key] = n
 		}
-		store.InvalidateRefCache()
-		return nil
-	})
-	return counts, err
+		if len(rows) == 0 {
+			continue
+		}
+		n, err := store.BatchInsertRows(a.DB, t.table, rows)
+		if err != nil {
+			return nil, fmt.Errorf("bootstrap %s: %w", t.table, err)
+		}
+		counts[t.key] = n
+	}
+	store.InvalidateRefCache()
+	return counts, nil
 }
 
 // syncPush — apply a batch of a replica's changes. Served by the main node.

@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -108,31 +110,14 @@ func OutboxOn() bool {
 	return outboxEnabled.v
 }
 
-// suppressDepth > 0 while this node is applying data that came *from* the main
-// database (bootstrap import). Buffering those would echo them straight back.
-var suppressMu sync.Mutex
-var suppressDepth int
-
-// SuppressOutbox runs fn with change buffering disabled, for the duration of a
-// bootstrap import. Not safe to nest across goroutines, which is fine: it is
-// only used during single-threaded startup.
-func SuppressOutbox(fn func() error) error {
-	suppressMu.Lock()
-	suppressDepth++
-	suppressMu.Unlock()
-	defer func() {
-		suppressMu.Lock()
-		suppressDepth--
-		suppressMu.Unlock()
-	}()
-	return fn()
-}
-
-func outboxPaused() bool {
-	suppressMu.Lock()
-	defer suppressMu.Unlock()
-	return suppressDepth > 0
-}
+// There used to be a SuppressOutbox switch here — a "don't echo the import"
+// guard wrapped around applying snapshots. It had to go: the snapshot paths
+// write with plain SQL and never enqueue anything, so the guard never
+// suppressed an echo. What it did suppress was every UNRELATED change made
+// while a snapshot was being applied, and those are exactly the changes that
+// must be buffered — a deduction landing inside a refresh window used to
+// commit locally without a delta, and the money would simply never reach the
+// main database.
 
 var outboxSeqMu sync.Mutex
 var outboxSeqCache int64
@@ -190,7 +175,7 @@ func nextOutboxSeqTx(tx *sql.Tx) (int64, error) {
 // keeps the original sequence number so a continuously-edited row can't be
 // starved. Additive columns are dropped: those travel as deltas only.
 func EnqueuePut(db *sql.DB, table, rowID string, payload map[string]any) error {
-	if !OutboxOn() || outboxPaused() || rowID == "" {
+	if !OutboxOn() || rowID == "" {
 		return nil
 	}
 	clean := map[string]any{}
@@ -211,7 +196,7 @@ func EnqueuePut(db *sql.DB, table, rowID string, payload map[string]any) error {
 // rowID is the collapse key (see deltaKeyCols); payload must carry both the key
 // columns and the additive columns.
 func EnqueueDelta(db *sql.DB, table, rowID string, payload map[string]any) error {
-	if !OutboxOn() || outboxPaused() || rowID == "" {
+	if !OutboxOn() || rowID == "" {
 		return nil
 	}
 	for _, k := range deltaKeyCols[table] {
@@ -386,16 +371,165 @@ func OutboxBatch(db *sql.DB, maxRows int, maxBytes int) ([]OutboxEntry, error) {
 	return out, rows.Err()
 }
 
-// OutboxAck — drop entries the main database confirmed, up to and including
-// upToSeq. Entries added after the batch was read have a higher seq and survive.
-func OutboxAck(db *sql.DB, upToSeq int64) error {
-	if upToSeq <= 0 {
+// OutboxAck — drop what the main database confirmed. pushed is the batch that
+// was applied there (its highest sequence is recorded as last_pushed_seq).
+//
+// Entries are not deleted blindly. A change can fold into an entry while its
+// batch is in flight — a deduction for the same account lands mid-push and the
+// buffer merges it into the very entry being pushed — and that fold is NOT
+// part of what the main database absorbed. The old delete-by-seq dropped it
+// silently: the money had been deducted locally and never reported anywhere.
+//
+// So each entry is reduced to its unconfirmed tail instead:
+//
+//   - a delta entry keeps current − pushed per additive column (exactly the
+//     folds made while the batch was in flight) and is dropped when that tail
+//     is zero;
+//   - a put entry is absolute and idempotent: one that changed in flight is
+//     kept whole and simply travels again on the next push.
+//
+// Every buffer write (folds included) serializes on outboxSeqMu, which is held
+// across this whole operation, so no fold can slip in between reading an
+// entry's payload and trimming it.
+func OutboxAck(db *sql.DB, pushed []OutboxEntry) error {
+	if len(pushed) == 0 {
 		return nil
 	}
-	if _, err := db.Exec("DELETE FROM outbox WHERE seq <= ?", upToSeq); err != nil {
+	var upToSeq int64
+	for _, e := range pushed {
+		if e.Seq > upToSeq {
+			upToSeq = e.Seq
+		}
+	}
+
+	outboxSeqMu.Lock()
+	tx, err := db.Begin()
+	if err != nil {
+		outboxSeqMu.Unlock()
 		return err
 	}
+	defer tx.Rollback()
+	for _, e := range pushed {
+		if err := ackEntryTx(tx, e); err != nil {
+			outboxSeqMu.Unlock()
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		outboxSeqMu.Unlock()
+		return err
+	}
+	outboxSeqMu.Unlock()
 	return SetNodeState(db, "last_pushed_seq", fmt.Sprintf("%d", upToSeq))
+}
+
+// ackEntryTx trims one confirmed entry to what the main database did not get
+// to see (see OutboxAck).
+func ackEntryTx(tx *sql.Tx, e OutboxEntry) error {
+	var curJSON string
+	err := tx.QueryRow("SELECT payload FROM outbox WHERE table_name = ? AND row_id = ? AND op = ?",
+		e.Table, e.RowID, e.Op).Scan(&curJSON)
+	if err == sql.ErrNoRows {
+		return nil // already gone (a double ack); nothing to trim
+	}
+	if err != nil {
+		return err
+	}
+	del := "DELETE FROM outbox WHERE table_name = ? AND row_id = ? AND op = ?"
+
+	if e.Op == "delta" {
+		cur := decodePayload(curJSON)
+		tail := map[string]any{}
+		for k, v := range cur {
+			tail[k] = v
+		}
+		settled := true
+		for c := range additiveCols[e.Table] {
+			cv, has := cur[c]
+			if !has {
+				continue // the fold removed nothing for this column
+			}
+			t := subNumeric(cv, e.Payload[c])
+			tail[c] = t
+			if f, ok := toFloat(t); !ok || f > 1e-9 || f < -1e-9 {
+				settled = false
+			}
+		}
+		if settled {
+			_, err := tx.Exec(del, e.Table, e.RowID, e.Op)
+			return err
+		}
+		enc, err := encodePayload(tail)
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec("UPDATE outbox SET payload = ?, update_time = ? WHERE table_name = ? AND row_id = ? AND op = ?",
+			enc, Now(), e.Table, e.RowID, e.Op)
+		return err
+	}
+
+	// A put is absolute: re-sending it is idempotent, so a put that folded in
+	// flight keeps travelling whole. Only an identical one is done with.
+	if payloadEqual(decodePayload(curJSON), e.Payload) {
+		_, err := tx.Exec(del, e.Table, e.RowID, e.Op)
+		return err
+	}
+	return nil
+}
+
+// subNumeric — a minus b, keeping the result integral when both operands were
+// integral (mirrors addNumeric). A non-numeric b is treated as zero.
+func subNumeric(a, b any) any {
+	av, aok := toFloat(a)
+	bv, bok := toFloat(b)
+	if !bok {
+		return a
+	}
+	if !aok {
+		return -bv
+	}
+	ai, aInt := toInt(a)
+	bi, bInt := toInt(b)
+	if aInt && bInt {
+		return ai - bi
+	}
+	return av - bv
+}
+
+// payloadEqual — same keys with equal values. Numeric shapes compare by value
+// (json.Number vs float64 vs int64 are the same number); an unrecognized
+// value shape reports unequal, which only means an entry gets re-sent —
+// harmless, because puts are idempotent.
+func payloadEqual(a, b map[string]any) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, av := range a {
+		bv, has := b[k]
+		if !has || !valEqual(av, bv) {
+			return false
+		}
+	}
+	return true
+}
+
+func valEqual(a, b any) bool {
+	af, aNum := toFloat(a)
+	bf, bNum := toFloat(b)
+	if aNum || bNum {
+		return aNum && bNum && af == bf
+	}
+	switch av := a.(type) {
+	case nil:
+		return b == nil
+	case string:
+		bv, ok := b.(string)
+		return ok && av == bv
+	case bool:
+		bv, ok := b.(bool)
+		return ok && av == bv
+	}
+	return false
 }
 
 // OutboxStats — buffered row count and payload bytes, for the flush threshold.
@@ -647,8 +781,8 @@ var bootstrapTables = [][2]string{
 // (re-importing would roll those back to the main database's older values). A
 // redeploy onto an empty volume has no local state and imports normally.
 //
-// The import runs with the outbox suppressed, so rows arriving from the main
-// database are not queued straight back to it.
+// The import writes with plain SQL (BatchInsertRows), which never touches the
+// buffer, so nothing is queued back to the main database.
 func ImportSnapshot(db *sql.DB, data map[string]any) (map[string]int, error) {
 	if done, err := GetNodeState(db, "bootstrapped"); err != nil {
 		return nil, err
@@ -657,30 +791,24 @@ func ImportSnapshot(db *sql.DB, data map[string]any) (map[string]int, error) {
 	}
 
 	counts := map[string]int{}
-	err := SuppressOutbox(func() error {
-		for _, t := range bootstrapTables {
-			items, _ := data[t[1]].([]any)
-			rows := make([]map[string]any, 0, len(items))
-			for _, it := range items {
-				if m, ok := it.(map[string]any); ok {
-					rows = append(rows, m)
-				}
+	for _, t := range bootstrapTables {
+		items, _ := data[t[1]].([]any)
+		rows := make([]map[string]any, 0, len(items))
+		for _, it := range items {
+			if m, ok := it.(map[string]any); ok {
+				rows = append(rows, m)
 			}
-			if len(rows) == 0 {
-				continue
-			}
-			n, err := BatchInsertRows(db, t[0], rows)
-			if err != nil {
-				return fmt.Errorf("bootstrap %s: %w", t[0], err)
-			}
-			counts[t[1]] = n
 		}
-		InvalidateRefCache()
-		return nil
-	})
-	if err != nil {
-		return nil, err
+		if len(rows) == 0 {
+			continue
+		}
+		n, err := BatchInsertRows(db, t[0], rows)
+		if err != nil {
+			return nil, fmt.Errorf("bootstrap %s: %w", t[0], err)
+		}
+		counts[t[1]] = n
 	}
+	InvalidateRefCache()
 	if err := SetNodeState(db, "bootstrapped", "1"); err != nil {
 		return nil, err
 	}
@@ -699,52 +827,208 @@ func ImportSnapshot(db *sql.DB, data map[string]any) (map[string]int, error) {
 // database's older values, silently erasing every deduction this node has not
 // pushed yet — i.e. it would give away free balance.
 //
-// So the update path here is column-scoped and skips additiveCols entirely:
+// So the update path here is column-scoped:
 //
-//   - balance and the usage counters always keep their local value. They travel
-//     to the main database as deltas, never as absolute values, so the replica's
-//     copy is strictly ahead of the snapshot's and must not be overwritten.
-//   - every other whitelisted column is taken from the snapshot, because those
-//     are admin-owned reference data that the main database is the writer of
-//     record for.
+//   - every non-additive whitelisted column is taken from the snapshot,
+//     because those are admin-owned reference data that the main database is
+//     the writer of record for;
+//   - additive columns (balance, the usage counters) are MERGED — the
+//     snapshot's absolute value plus this node's unpushed deltas — instead of
+//     preserved or overwritten. See additiveMode and upsertPreservingAdditive.
 //   - a row that is absent locally is inserted whole (nothing to preserve).
 //
-// Runs with the outbox suppressed: this data came from the main database, so
-// queuing it back would echo the main database's own state at it.
+// Nothing here enqueues to the buffer: these rows came from the main database,
+// so queuing them back would echo its own state at it.
 func RefreshSnapshot(db *sql.DB, data map[string]any) (map[string]int, error) {
 	counts := map[string]int{}
-	err := SuppressOutbox(func() error {
-		for _, t := range bootstrapTables {
-			items, _ := data[t[1]].([]any)
-			rows := make([]map[string]any, 0, len(items))
-			for _, it := range items {
-				if m, ok := it.(map[string]any); ok {
-					rows = append(rows, m)
-				}
+	for _, t := range bootstrapTables {
+		items, _ := data[t[1]].([]any)
+		rows := make([]map[string]any, 0, len(items))
+		for _, it := range items {
+			if m, ok := it.(map[string]any); ok {
+				rows = append(rows, m)
 			}
-			if len(rows) == 0 {
-				continue
-			}
-			n, err := upsertPreservingAdditive(db, t[0], rows)
-			if err != nil {
-				return fmt.Errorf("refresh %s: %w", t[0], err)
-			}
-			counts[t[1]] = n
 		}
-		InvalidateRefCache()
-		return nil
-	})
-	return counts, err
+		if len(rows) == 0 {
+			continue
+		}
+		n, err := upsertPreservingAdditive(db, t[0], rows)
+		if err != nil {
+			return counts, fmt.Errorf("refresh %s: %w", t[0], err)
+		}
+		counts[t[1]] = n
+	}
+	InvalidateRefCache()
+	return counts, nil
 }
 
-// upsertPreservingAdditive writes snapshot rows without ever touching an
-// additive column on a row that already exists locally.
+// ─────────────────── additive merge ───────────────────
+
+const (
+	modeReconcile = "reconcile"
+	modeSkip      = "skip"
+	modeCopy      = "copy"
+)
+
+// additiveMode — how a main-database snapshot value for an additive column
+// (balance, the usage counters) is combined with this node's local one. Set
+// with SYNC_ADDITIVE_MODE:
+//
+//	reconcile (default) — write snapshot + this node's unpushed deltas.
+//		The snapshot is the main database's absolute value, which by
+//		definition cannot include changes that are still sitting in this
+//		node's buffer; adding the unpushed tail back is what makes the two
+//		sides line up. Unpushed local spend stays charged (unlike "copy"),
+//		and the main database's own spend and top-ups reach this node on
+//		the next refresh (unlike "skip").
+//
+//	skip — leave the local value alone. The behaviour before reconcile:
+//		never refunds unpushed spend, but the replica is permanently
+//		blind to the main database's own balance changes, so its balance
+//		drifts upward from reality and it keeps serving against money the
+//		main database has already spent.
+//
+//	copy — plain overwrite with the snapshot value. UNSAFE: it refunds every
+//		unpushed local deduction (the snapshot is by construction older
+//		than the local value). Kept for A/B comparison during rollout and
+//		as an emergency escape hatch; server/demo_skip_balance.py measures
+//		all three modes side by side.
+var additiveMode = parseAdditiveMode(os.Getenv("SYNC_ADDITIVE_MODE"))
+
+func parseAdditiveMode(v string) string {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case modeSkip:
+		return modeSkip
+	case modeCopy:
+		return modeCopy
+	default:
+		return modeReconcile
+	}
+}
+
+// pendingDeltas — this node's unpushed delta payloads per row, keyed the way
+// deltas collapse (see deltaRowID). The buffer folds per (row, op), so each
+// row contributes at most one payload.
+func pendingDeltas(db *sql.DB, table string) (map[string]map[string]any, error) {
+	rows, err := db.Query(`SELECT row_id, payload FROM outbox WHERE table_name = ? AND op = 'delta'`, table)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]map[string]any{}
+	for rows.Next() {
+		var rowID, payload string
+		if err := rows.Scan(&rowID, &payload); err != nil {
+			return nil, err
+		}
+		out[rowID] = decodePayload(payload)
+	}
+	return out, rows.Err()
+}
+
+// deltaRowID — the buffer's collapse key for a snapshot row: the row id
+// itself, or the natural key its deltas fold under (a usage window).
+func deltaRowID(table string, row map[string]any, id string) string {
+	keys := deltaKeyCols[table]
+	if len(keys) == 0 || keys[0] == "id" {
+		return id
+	}
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		parts = append(parts, fmtKeyVal(row[k]))
+	}
+	return strings.Join(parts, "|")
+}
+
+// fmtKeyVal renders a key column for the collapse key, matching
+// BucketDeltaRowID's formatting (integers stay integral — a bucket_time
+// arriving as 1.0e3 must fold onto "1000", not "1000.000000").
+func fmtKeyVal(v any) string {
+	if s, ok := v.(string); ok {
+		return s
+	}
+	if i, ok := toInt(v); ok {
+		return strconv.FormatInt(i, 10)
+	}
+	if f, ok := toFloat(v); ok {
+		return strconv.FormatFloat(f, 'f', -1, 64)
+	}
+	return fmt.Sprint(v)
+}
+
+// mergedAdditive — the value to write for an additive column: the snapshot's
+// value plus this node's unpushed delta for the row, floored at zero where the
+// main database floors, so the replica's view matches what the main database
+// will compute once the delta lands.
+func mergedAdditive(col string, snapshot any, unpushed map[string]any) any {
+	v := snapshot
+	if d, has := unpushed[col]; has {
+		v = addNumeric(snapshot, d)
+	}
+	if floorAtZeroCols[col] {
+		if f, ok := toFloat(v); ok && f < 0 {
+			return float64(0)
+		}
+	}
+	return v
+}
+
+// rowConflictCols — the unique-index columns an incoming row matches on. Most
+// tables match on id, but rows keyed by something natural (a settings name, a
+// usage window) must match on that: their ids are node-local — the main
+// database's window row and this node's carry different ids for the same
+// window — so an id match would miss the existing row and trip the unique
+// index instead of updating the row this node already has.
+func rowConflictCols(table string, row map[string]any) []string {
+	if cc := putConflictCols[table]; cc != "" {
+		if _, has := row[cc]; has {
+			return []string{cc}
+		}
+	}
+	if keys := deltaKeyCols[table]; len(keys) > 0 && keys[0] != "id" {
+		for _, k := range keys {
+			if _, has := row[k]; !has {
+				return []string{"id"}
+			}
+		}
+		return keys
+	}
+	return []string{"id"}
+}
+
+// upsertPreservingAdditive writes snapshot rows on top of this node's rows.
+//
+// Non-additive columns are admin-owned reference data and take the snapshot's
+// value. Additive columns cannot: the snapshot carries the main database's
+// absolute value, which excludes everything this node recorded but has not
+// pushed yet (it is still in the buffer), so they are merged as
+//
+//	snapshot + unpushed local deltas
+//
+// which keeps unpushed local spend charged while also absorbing the main
+// database's own changes. See additiveMode for the alternatives and why both
+// of them lose money.
 func upsertPreservingAdditive(db *sql.DB, table string, items []map[string]any) (int, error) {
 	cols, ok := updatable[table]
 	if !ok {
 		return 0, fmt.Errorf("unknown table %s", table)
 	}
 	additive := additiveCols[table]
+
+	// Merging reads the buffer's unpushed deltas and then writes the merged
+	// value; the money paths (deduction + buffer fold) hold outboxSeqMu across
+	// their whole transaction, so holding it here keeps those two steps one
+	// consistent view — a deduction can neither slip in between (it would be
+	// overwritten without being counted) nor be counted twice.
+	var pending map[string]map[string]any
+	if len(additive) > 0 && additiveMode != modeSkip {
+		outboxSeqMu.Lock()
+		defer outboxSeqMu.Unlock()
+		var err error
+		if pending, err = pendingDeltas(db, table); err != nil {
+			return 0, err
+		}
+	}
 
 	count := 0
 	for _, item := range items {
@@ -758,33 +1042,35 @@ func upsertPreservingAdditive(db *sql.DB, table string, items []map[string]any) 
 			id = cryptox.Nanoid(6)
 			row["id"] = id
 		}
-
-		// Which columns to write: the whitelist, minus additive ones.
-		write := make([]string, 0, len(cols))
-		for _, c := range cols {
-			if additive[c] {
-				continue
-			}
-			if _, has := row[c]; has {
-				write = append(write, c)
-			}
-		}
+		unpushed := pending[deltaRowID(table, row, id)]
 
 		now := Now()
 		insertCols := []string{"id"}
 		insertArgs := []any{id}
-		for _, c := range write {
-			insertCols = append(insertCols, c)
-			insertArgs = append(insertArgs, row[c])
-		}
-		// Additive columns are only carried by a fresh insert, never an update.
+		sets := []string{}
 		for _, c := range cols {
-			if !additive[c] {
+			v, has := row[c]
+			if !has {
 				continue
 			}
-			if v, has := row[c]; has {
+			if !additive[c] {
 				insertCols = append(insertCols, c)
 				insertArgs = append(insertArgs, v)
+				sets = append(sets, c+" = excluded."+c)
+				continue
+			}
+			// Additive column: the merged value travels on insert; an update
+			// writes it only when this mode lets the column move ("skip" keeps
+			// the local value on an existing row, the pre-reconcile
+			// behaviour).
+			val := v
+			if additiveMode == modeReconcile {
+				val = mergedAdditive(c, v, unpushed)
+			}
+			insertCols = append(insertCols, c)
+			insertArgs = append(insertArgs, val)
+			if additiveMode != modeSkip {
+				sets = append(sets, c+" = excluded."+c)
 			}
 		}
 		for _, c := range []string{"create_time", "update_time", "delete_time"} {
@@ -795,19 +1081,20 @@ func upsertPreservingAdditive(db *sql.DB, table string, items []map[string]any) 
 			insertCols = append(insertCols, c)
 			insertArgs = append(insertArgs, v)
 		}
+		sets = append(sets, "update_time = excluded.update_time")
 		ph := strings.TrimSuffix(strings.Repeat("?,", len(insertCols)), ",")
 
-		// Insert when absent; on conflict update only the non-additive columns,
-		// leaving both the additive counters and delete_time (row lifecycle)
-		// exactly as this node had them.
-		sets := make([]string, 0, len(write))
-		for _, c := range write {
-			sets = append(sets, c+" = excluded."+c)
+		conflict := rowConflictCols(table, row)
+		quoted := make([]string, 0, len(conflict))
+		for _, c := range conflict {
+			quoted = append(quoted, `"`+c+`"`)
 		}
-		sets = append(sets, "update_time = excluded.update_time")
 
-		q := fmt.Sprintf(`INSERT INTO "%s" (%s) VALUES (%s) ON CONFLICT(id) DO UPDATE SET %s`,
-			table, strings.Join(insertCols, ","), ph, strings.Join(sets, ", "))
+		// Insert when absent; on conflict update the whitelisted columns,
+		// leaving both delete_time (row lifecycle) and the node-local id
+		// exactly as this node had them.
+		q := fmt.Sprintf(`INSERT INTO "%s" (%s) VALUES (%s) ON CONFLICT(%s) DO UPDATE SET %s`,
+			table, strings.Join(insertCols, ","), ph, strings.Join(quoted, ", "), strings.Join(sets, ", "))
 		if _, err := db.Exec(q, insertArgs...); err != nil {
 			return count, err
 		}

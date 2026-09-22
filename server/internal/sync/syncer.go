@@ -87,6 +87,12 @@ type Syncer struct {
 	// balance deduction or usage increment would double-count on the main
 	// database. The lock makes the second flush observe an already-trimmed
 	// buffer and no-op.
+	//
+	// Refresh holds it too: balance reconciliation (store.RefreshSnapshot)
+	// pairs the main database's snapshot with this node's unpushed deltas, and
+	// a push ack landing between the snapshot being taken and applied would
+	// make that pair inconsistent — the acknowledged delta counted twice, or
+	// not at all, until the next refresh heals it.
 	flushMu stdsync.Mutex
 }
 
@@ -168,6 +174,10 @@ func (s *Syncer) Bootstrap() error {
 // catalog it was first deployed with. The import preserves additive columns
 // (balances, usage counters) — see store.RefreshSnapshot.
 func (s *Syncer) Refresh() error {
+	// No push may complete while the snapshot travels from the main database
+	// to this node's rows (see flushMu).
+	s.flushMu.Lock()
+	defer s.flushMu.Unlock()
 	req, err := http.NewRequest(http.MethodGet, s.cfg.MainURL+"/api/sync/snapshot", nil)
 	if err != nil {
 		return err
@@ -313,7 +323,9 @@ func (s *Syncer) Flush() error {
 	if err := json.Unmarshal(body, &result); err != nil {
 		return fmt.Errorf("push decode: %w", err)
 	}
-	if err := store.OutboxAck(s.db, result.UpToSeq); err != nil {
+	// Acknowledge exactly the batch that was sent: entries that folded while
+	// it was in flight keep their unconfirmed tail (see store.OutboxAck).
+	if err := store.OutboxAck(s.db, batch); err != nil {
 		return err
 	}
 	fmt.Printf("[Sync] pushed %d changes (up to seq %d)\n", len(batch), result.UpToSeq)
