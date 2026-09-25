@@ -18,9 +18,14 @@ export class ProviderDTO {
     public enable_search?: number;
     public extra_json?: string;
     public enabled: number;
+    public max_context?: number;
+    public daily_quota?: number;
     public create_time: number;
     public update_time: number | null;
     public delete_time: number | null;
+    /** Live routing state (in-memory on the serving node). */    public failures?: number;
+    public cooldown_until?: number;
+    public today_count?: number;
 
     constructor(origin: ProviderEntity) {
         this.id = origin.id;
@@ -39,6 +44,8 @@ export class ProviderDTO {
         this.enable_search = origin.enable_search;
         this.extra_json = origin.extra_json;
         this.enabled = origin.enabled;
+        this.max_context = (origin as any).max_context;
+        this.daily_quota = (origin as any).daily_quota;
         this.create_time = origin.create_time;
         this.update_time = origin.update_time;
         this.delete_time = origin.delete_time;
@@ -61,8 +68,10 @@ export class ProviderCreateBody {
     public enable_search?: number;
     public extra_json?: string;
     public enabled?: number;
+    public max_context?: number;
+    public daily_quota?: number;
 
-    constructor(origin: Pick<ProviderEntity, "model_alias" | "base_url" | "model" | "priority" | "name"> & Partial<Pick<ProviderEntity, "api_key" | "auth_type" | "api_type" | "proxy_url" | "supports_thinking" | "supports_reasoning_effort" | "replay_reasoning" | "enable_search" | "extra_json" | "enabled">>) {
+    constructor(origin: Pick<ProviderEntity, "model_alias" | "base_url" | "model" | "priority" | "name"> & Partial<Pick<ProviderEntity, "api_key" | "auth_type" | "api_type" | "proxy_url" | "supports_thinking" | "supports_reasoning_effort" | "replay_reasoning" | "enable_search" | "extra_json" | "enabled" | "max_context" | "daily_quota">>) {
         if (!origin.model_alias || !origin.base_url || !origin.model || origin.priority === undefined) {
             throw new Error("model_alias, base_url, model and priority are required");
         }
@@ -81,6 +90,8 @@ export class ProviderCreateBody {
         this.enable_search = origin.enable_search;
         this.extra_json = origin.extra_json;
         this.enabled = origin.enabled ?? 1;
+        this.max_context = origin.max_context;
+        this.daily_quota = origin.daily_quota;
     }
 
     static self(unsafe: ProviderCreateBody) {
@@ -104,9 +115,20 @@ export class ProviderUpdateBody {
     public enable_search?: number;
     public extra_json?: string;
     public enabled?: number;
+    public max_context?: number;
+    public daily_quota?: number;
 
     constructor(origin: Partial<ProviderEntity> = {}) {
-        if (!origin.model_alias && origin.priority === undefined && !origin.base_url && !origin.model && !origin.api_key && origin.api_key === undefined && !origin.auth_type && !origin.api_type && !origin.proxy_url && origin.supports_thinking === undefined && origin.supports_reasoning_effort === undefined && origin.replay_reasoning === undefined && origin.enable_search === undefined && origin.extra_json === undefined && origin.enabled === undefined) {
+        // "At least one field" is checked against what actually gets assigned,
+        // so clearing a field to its zero value still counts as an update.
+        const fields = [
+            origin.model_alias, origin.priority, origin.base_url, origin.model,
+            origin.api_key, origin.auth_type, origin.api_type, origin.proxy_url,
+            origin.supports_thinking, origin.supports_reasoning_effort, origin.replay_reasoning,
+            origin.enable_search, origin.extra_json, origin.enabled,
+            origin.max_context, origin.daily_quota,
+        ];
+        if (fields.every(v => v === undefined)) {
             throw new Error("At least one field is required");
         }
         origin.model_alias && (this.model_alias = origin.model_alias);
@@ -124,6 +146,8 @@ export class ProviderUpdateBody {
         origin.enable_search !== undefined && (this.enable_search = origin.enable_search);
         origin.extra_json !== undefined && (this.extra_json = origin.extra_json);
         origin.enabled !== undefined && (this.enabled = origin.enabled);
+        origin.max_context !== undefined && (this.max_context = origin.max_context);
+        origin.daily_quota !== undefined && (this.daily_quota = origin.daily_quota);
     }
 
     static self(unsafe: ProviderUpdateBody) {

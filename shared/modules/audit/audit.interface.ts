@@ -20,7 +20,8 @@ export interface AuditDTO {
     cost: number;
     stream: number;
     err: string;
-    /** What was sent upstream and what came back — failed attempts only. */
+    /** What was sent upstream and what came back, as a field summary: the JSON
+     *  structure with each string leaf previewed — failed attempts only. */
     request_body?: string;
     response_body?: string;
     /** Output tokens per second, derived server-side from tokens/duration. */

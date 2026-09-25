@@ -17,6 +17,8 @@ type ProviderForm = {
     replay_reasoning: number;
     enable_search: number;
     enabled: number;
+    max_context: number;
+    daily_quota: number;
 };
 
 type Props = {
@@ -142,6 +144,24 @@ export function ProviderFormModal({ isOpen, onOpenChange, mode, form, onFormChan
                             value={form.proxy_url || ""}
                             onChange={e => onFormChange({ ...form, proxy_url: e.target.value })}
                         />
+                        {/* Routing limits. Both are "0 = no limit", which is the
+                            default so an unannotated provider behaves as before. */}
+                        <div className="flex flex-row gap-3">
+                            <Input
+                                type="number"
+                                label={locale.MaxContext}
+                                description={locale.MaxContextHint}
+                                value={String(form.max_context ?? 0)}
+                                onChange={e => onFormChange({ ...form, max_context: parseInt(e.target.value) || 0 })}
+                            />
+                            <Input
+                                type="number"
+                                label={locale.DailyQuota}
+                                description={locale.DailyQuotaHint}
+                                value={String(form.daily_quota ?? 0)}
+                                onChange={e => onFormChange({ ...form, daily_quota: parseInt(e.target.value) || 0 })}
+                            />
+                        </div>
                         <Textarea
                             label={locale.ExtraJson}
                             placeholder={'{"provider":{"order":["OpenAI","Anthropic"]},"route":"fallback"}'}

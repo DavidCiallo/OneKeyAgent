@@ -12,7 +12,6 @@
         "ToastParamError": "参数错误，请检查输入",
         "DefaultSelectPlaceholder": "请输入"
     },
-
     "Menu": {
         "Model": "模型管理",
         "Provider": "供应管理",
@@ -25,7 +24,6 @@
         "NoContent": "未授权",
         "Logout": "退出登录"
     },
-
     "ModelPage": {
         "Alias": "别名",
         "Actions": "操作",
@@ -44,7 +42,6 @@
         "CreateModel": "新建模型",
         "Public": "公开"
     },
-
     "ProviderPage": {
         "ModelAlias": "模型别名",
         "ModelAliasPlaceholder": "筛选模型别名",
@@ -77,10 +74,21 @@
         "BatchDisable": "批量禁用",
         "BatchSetProxy": "批量设置代理",
         "Clear": "清除",
+        "SelectAll": "全选",
+        "StatusOn": "启用中",
+        "StatusOff": "已停用",
         "Yes": "是",
-        "No": "否"
+        "No": "否",
+        "MaxContext": "上下文上限",
+        "MaxContextHint": "0 = 不限制。请求超出此值时跳过该供应商。",
+        "DailyQuota": "每日配额",
+        "DailyQuotaHint": "0 = 不限制。每日请求次数，仅存于内存，重启后重置。",
+        "Parked": "已暂停",
+        "QuotaSpent": "配额用尽",
+        "FailStreakHint": "连续失败次数，达到 5 次将暂停该供应商 300 秒。",
+        "Context": "上下文",
+        "Quota": "配额"
     },
-
     "UsagePage": {
         "AccountId": "账号",
         "AccountIdPlaceholder": "筛选账号",
@@ -99,7 +107,6 @@
         "UserUsage": "用户用量",
         "History": "历史记录"
     },
-
     "AuthPage": {
         "Title": "EHEX",
         "LoginSuccess": "登录成功",
@@ -158,7 +165,6 @@
         "NavSignIn": "登录",
         "NavConsole": "控制台"
     },
-
     "AccountPage": {
         "Name": "用户名",
         "NamePlaceholder": "筛选用户名",
@@ -195,12 +201,10 @@
         "GiftCardStatusRedeemed": "已兑换",
         "GiftCardStatusExpired": "已过期"
     },
-
     "NoContentPage": {
         "Title": "未授权",
         "Message": "您暂无页面访问权限，请联系管理员"
     },
-
     "ChatPage": {
         "NewChat": "新建对话",
         "DeleteChat": "删除",
@@ -210,7 +214,6 @@
         "EmptySession": "开始一段新对话",
         "NoSession": "请选择或新建一个对话"
     },
-
     "ProfilePage": {
         "AccountInfo": "账号信息",
         "Name": "用户名",
@@ -235,7 +238,6 @@
         "OutputPrice": "输出价格",
         "TermsLink": "调用时默认您已查看并同意服务条款"
     },
-
     "TopupPage": {
         "CurrentPlan": "当前余额",
         "Balance": "余额",
@@ -260,7 +262,6 @@
         "GiftCardLabel": "兑换",
         "UsageLabel": "消费"
     },
-
     "TermsPage": {
         "Title": "使用条款",
         "Subtitle": "请仔细阅读以下内容",
@@ -275,15 +276,13 @@
         "Section4Body": "1. 平台不对模型生成内容的准确性、完整性或可靠性作任何明示或暗示的保证，用户应自行判断并承担使用风险。\n\n2. 在适用法律允许的最大范围内，平台不对因使用或无法使用本服务所导致的任何间接性、附带性、特殊性、后果性或惩戒性损失承担责任。\n\n3. 平台保留随时修改、暂停或终止服务的权利。重大变更将提前通过合理方式通知用户。",
         "Section5Title": "五、联系我们",
         "Section5Body": "如有任何疑问或需要帮助，请联系管理员，我们重视每一位用户的反馈。\n\n我们始终相信，「朴素的语言蕴含无穷力量，凝聚的智慧也应触手可及」"
-    }
-,
+    },
     "AuditPage": {
         "Title": "请求审计",
         "Success": "成功",
         "Failed": "失败",
-        "AutoRefresh": "自动刷新",
         "Refresh": "刷新",
-        "KeepHint": "每类仅保留最新 {n} 条记录。",
+        "KeepHint": "每类仅保留最新 {n} 条记录；失败的请求会保留 JSON 结构和每个字段的前 64 个字符。",
         "Time": "时间",
         "Account": "账号",
         "Model": "模型",

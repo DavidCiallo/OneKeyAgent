@@ -12,7 +12,6 @@
         "ToastParamError": "パラメータエラー、入力を確認してください",
         "DefaultSelectPlaceholder": "入力してください"
     },
-
     "Menu": {
         "Model": "モデル",
         "Provider": "プロバイダー",
@@ -24,7 +23,6 @@
         "NoContent": "アクセス権限がありません",
         "Logout": "ログアウト"
     },
-
     "ModelPage": {
         "Alias": "エイリアス",
         "Actions": "操作",
@@ -41,7 +39,6 @@
         "CreateModel": "モデルを作成",
         "Public": "公開"
     },
-
     "ProviderPage": {
         "ModelAlias": "モデルエイリアス",
         "ModelAliasPlaceholder": "エイリアスでフィルター",
@@ -72,10 +69,21 @@
         "BatchDisable": "一括無効",
         "BatchSetProxy": "一括プロキシ設定",
         "Clear": "クリア",
+        "SelectAll": "すべて選択",
+        "StatusOn": "有効",
+        "StatusOff": "無効",
         "Yes": "はい",
-        "No": "いいえ"
+        "No": "いいえ",
+        "MaxContext": "コンテキスト上限",
+        "MaxContextHint": "0 = 無制限。これを超えるリクエストはスキップされます。",
+        "DailyQuota": "1日の割り当て",
+        "DailyQuotaHint": "0 = 無制限。1日のリクエスト数（メモリ上のみ、再起動でリセット）。",
+        "Parked": "停止中",
+        "QuotaSpent": "割り当て超過",
+        "FailStreakHint": "連続失敗数。5回で300秒間停止します。",
+        "Context": "コンテキスト",
+        "Quota": "割り当て"
     },
-
     "UsagePage": {
         "AccountId": "アカウント",
         "AccountIdPlaceholder": "アカウントでフィルター",
@@ -94,7 +102,6 @@
         "UserUsage": "ユーザー使用量",
         "History": "履歴"
     },
-
     "AuthPage": {
         "Title": "EHEX",
         "LoginSuccess": "ログイン成功",
@@ -126,7 +133,6 @@
         "VerifyEmailVerifying": "メールを認証中...",
         "BackToLogin": "ログインに戻る"
     },
-
     "HomePage": {
         "MainText": "EHEX",
         "Slogan1": "シンプルな言葉に、",
@@ -154,7 +160,6 @@
         "NavSignIn": "ログイン",
         "NavConsole": "コンソール"
     },
-
     "AccountPage": {
         "Name": "名前",
         "NamePlaceholder": "名前でフィルター",
@@ -191,12 +196,10 @@
         "GiftCardStatusRedeemed": "換金済",
         "GiftCardStatusExpired": "期限切れ"
     },
-
     "NoContentPage": {
         "Title": "アクセス権限がありません",
         "Message": "このページへのアクセス権限がありません。管理者にお問い合わせください。"
     },
-
     "ChatPage": {
         "NewChat": "新しいチャット",
         "DeleteChat": "削除",
@@ -206,7 +209,6 @@
         "EmptySession": "新しい会話を始める",
         "NoSession": "チャットを選択または作成してください"
     },
-
     "ProfilePage": {
         "AccountInfo": "アカウント情報",
         "Name": "名前",
@@ -231,7 +233,6 @@
         "OutputPrice": "出力価格",
         "TermsLink": "APIを使用することで、利用規約に同意したものとみなされます"
     },
-
     "TopupPage": {
         "CurrentPlan": "現在の残高",
         "Balance": "残高",
@@ -256,7 +257,6 @@
         "GiftCardLabel": "交換",
         "UsageLabel": "使用量"
     },
-
     "TermsPage": {
         "Title": "利用規約",
         "Subtitle": "以下の内容をよくお読みください。",
@@ -271,15 +271,13 @@
         "Section4Body": "1. プラットフォームは、モデルが生成するコンテンツの正確性、完全性、信頼性について明示的または黙示的な保証を一切行いません。かかるコンテンツの使用に伴うすべてのリスクはユーザーが負うものとします。\n\n2. 適用される法律で認められる最大限の範囲において、プラットフォームはサービスの使用またはアクセス不能に起因する間接的、付随的、特別、結果的または懲罰的損害について責任を負いません。\n\n3. プラットフォームは、いつでもサービスを変更、停止、または終了する権利を留保します。重要な変更については、合理的な手段により事前に通知します。",
         "Section5Title": "5. お問い合わせ",
         "Section5Body": "ご質問やサポートが必要な場合は、管理者にお問い合わせください。すべてのユーザーからのフィードバックを大切にしています。\n\n「シンプルな言葉に、無限の力が宿る。」"
-    }
-,
+    },
     "AuditPage": {
         "Title": "リクエスト監査",
         "Success": "成功",
         "Failed": "失敗",
-        "AutoRefresh": "自動更新",
         "Refresh": "更新",
-        "KeepHint": "各種類ごとに最新 {n} 件のみ保存します。",
+        "KeepHint": "各種類ごとに最新 {n} 件のみ保存します。失敗したリクエストは JSON 構造と各フィールドの先頭 64 文字を保持します。",
         "Time": "時刻",
         "Account": "アカウント",
         "Model": "モデル",

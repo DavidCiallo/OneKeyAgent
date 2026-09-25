@@ -35,6 +35,9 @@ type Server struct {
 
 	reasoningMu sync.Mutex
 	reasoning   map[string]reasonEntry
+
+	// policy holds the in-memory provider selection state.
+	policy *providerPolicy
 }
 
 func NewServer(db *sql.DB, settings *service.Settings) *Server {
@@ -43,6 +46,7 @@ func NewServer(db *sql.DB, settings *service.Settings) *Server {
 		Settings:  settings,
 		clients:   map[string]*http.Client{},
 		reasoning: map[string]reasonEntry{},
+		policy:    newProviderPolicy(),
 	}
 }
 
@@ -102,18 +106,35 @@ func (s *Server) reasoningCacheSet(key, content string) {
 	}
 }
 
-// ─────────────────── request audit (latest 100 success / 100 failure) ───────────────────
+// retryDelay — pause between attempts against different upstreams.
+func (p *providerPolicy) retryDelay() {
+	p.mu.Lock()
+	d := p.retryDelayMs
+	p.mu.Unlock()
+	if d > 0 {
+		time.Sleep(time.Duration(d) * time.Millisecond)
+	}
+}
+
+// ─────────────────── request audit (latest 10 success / 10 failure) ───────────────────
 
 // maxAuditErr bounds the stored error text so a verbose upstream body can't
 // bloat the table.
 const maxAuditErr = 500
 
-// Body caps for failed attempts. The request keeps the tail of the conversation
-// (that is where tool pairing breaks) and drops the oldest messages instead of
-// cutting mid-JSON; the response is an error document, so a straight cut does.
+// Body caps for failed attempts. Audit bodies are stored as a field summary
+// (see auditBodySummary): the JSON structure survives, each leaf keeps a short
+// preview. These caps bound the result further so a request with very many
+// fields or a very deep tree can't bloat the table.
 const (
-	maxAuditReqBody  = 64 << 10 // 64 KiB
-	maxAuditRespBody = 16 << 10 // 16 KiB
+	maxAuditReqBody   = 16 << 10 // 16 KiB after summarising
+	maxAuditRespBody  = 8 << 10  // 8 KiB after summarising
+	auditFieldPreview = 64       // characters kept per string field
+	auditMaxFields    = 200      // fields kept per body, in document order
+	// How much of a failing upstream response is read off the wire before the
+	// error summary is derived. Independent of the storage cap: the message is
+	// built from this, then summarised down to maxAuditRespBody.
+	maxUpstreamErrRead = 16 << 10
 )
 
 type auditRecord struct {
@@ -418,14 +439,14 @@ func (s *Server) tryProvider(p *store.Provider, body map[string]any) (map[string
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, maxAuditRespBody))
+		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, maxUpstreamErrRead))
 		msg := strings.TrimSpace(string(snippet))
 		fmt.Printf("[AI] upstream %s returned %d (%s): %s\n", p.Name, resp.StatusCode, cfg.url, firstLine(msg, 300))
 		return nil, &upstreamErr{
 			status:   resp.StatusCode,
 			msg:      fmt.Sprintf("upstream http %d: %s", resp.StatusCode, firstLine(msg, 300)),
-			ReqBody:  auditRequestBody(cfg.body, maxAuditReqBody),
-			RespBody: cutWithMarker(msg, maxAuditRespBody),
+			ReqBody:  auditBodySummary(cfg.body, maxAuditReqBody),
+			RespBody: auditBodySummary(msg, maxAuditRespBody),
 		}
 	}
 	var parsed map[string]any
@@ -465,15 +486,15 @@ func (s *Server) tryProviderStream(p *store.Provider, body map[string]any) (io.R
 		return nil, &upstreamErr{msg: err.Error(), ReqBody: cfg.body}
 	}
 	if resp.StatusCode != http.StatusOK {
-		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, maxAuditRespBody))
+		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, maxUpstreamErrRead))
 		msg := strings.TrimSpace(string(snippet))
 		fmt.Printf("[AI] upstream %s returned %d (%s): %s\n", p.Name, resp.StatusCode, cfg.url, firstLine(msg, 300))
 		resp.Body.Close()
 		return nil, &upstreamErr{
 			status:   resp.StatusCode,
 			msg:      fmt.Sprintf("upstream http %d: %s", resp.StatusCode, firstLine(msg, 300)),
-			ReqBody:  auditRequestBody(cfg.body, maxAuditReqBody),
-			RespBody: cutWithMarker(msg, maxAuditRespBody),
+			ReqBody:  auditBodySummary(cfg.body, maxAuditReqBody),
+			RespBody: auditBodySummary(msg, maxAuditRespBody),
 		}
 	}
 	return resp.Body, nil
@@ -491,59 +512,90 @@ func firstLine(s string, max int) string {
 	return s
 }
 
-// auditRequestBody — the request body as sent upstream, sized for the audit
-// trail. Oversized bodies drop their earliest messages first — the tail is
-// where tool pairing breaks — and keep the JSON valid, so the stored document
-// can still be read with a JSON viewer. Falls back to a plain cut when the
-// body is not an object with a message list.
-func auditRequestBody(body string, max int) string {
-	if len(body) <= max {
-		return body
+// auditBodySummary — the request/response body reduced to its JSON structure
+// with every string leaf cut to a short preview. The audit trail exists to show
+// *what shape* of request failed (which fields were set, how many messages,
+// which model), not to archive prompts: a full prompt is large, sensitive, and
+// never re-read. Arrays keep their shape, objects keep their keys, and long
+// strings become "head…[+N chars]".
+//
+// Bodies that do not parse as JSON fall back to a plain head-keep cut.
+func auditBodySummary(body string, max int) string {
+	if body == "" {
+		return ""
 	}
-	var parsed map[string]any
-	if jsonUnmarshal(body, &parsed) != nil || parsed == nil {
-		return cutWithMarker(body, max)
+	var parsed any
+	if json.Unmarshal([]byte(body), &parsed) != nil || parsed == nil {
+		return cutWithMarker(body, auditFieldPreview)
 	}
-	for _, key := range []string{"messages", "contents"} {
-		msgs, ok := parsed[key].([]any)
-		if !ok || len(msgs) < 2 {
-			continue
-		}
-		sizes := make([]int, len(msgs))
-		total := 0
-		for i, m := range msgs {
-			sizes[i] = len(jStringify(m))
-			total += sizes[i]
-		}
-		overhead := len(body) - total
-		dropped := 0
-		for dropped < len(msgs)-1 && overhead+sum(sizes[dropped:]) > max {
-			dropped++
-		}
-		if dropped == 0 {
-			break
-		}
-		parsed[key] = msgs[dropped:]
-		parsed["_audit_truncated"] = fmt.Sprintf("dropped the first %d of %d messages to fit the audit size cap", dropped, len(msgs))
-		out := jStringify(parsed)
-		if len(out) <= max {
-			return out
-		}
-		break
+	budget := auditMaxFields
+	out := jStringify(summarizeJSON(parsed, &budget))
+	if len(out) > max {
+		return cutWithMarker(out, max)
 	}
-	return cutWithMarker(body, max)
+	return out
 }
 
-func sum(xs []int) int {
-	n := 0
-	for _, x := range xs {
-		n += x
+// summarizeJSON walks a decoded JSON value, returning the same structure with
+// string leaves previewed and long arrays collapsed once the field budget runs
+// out.
+func summarizeJSON(v any, budget *int) any {
+	if *budget <= 0 {
+		return "…[more fields withheld]"
 	}
-	return n
+	switch t := v.(type) {
+	case nil, bool, float64:
+		return t
+	case string:
+		*budget--
+		return previewText(t)
+	case []any:
+		*budget--
+		// A long conversation is the common case: keep the first and last few
+		// entries rather than the head only, since pairing breaks at the tail.
+		if len(t) > 8 {
+			out := make([]any, 0, 8)
+			for _, e := range t[:4] {
+				out = append(out, summarizeJSON(e, budget))
+			}
+			out = append(out, fmt.Sprintf("…[%d more items]", len(t)-7))
+			for _, e := range t[len(t)-3:] {
+				out = append(out, summarizeJSON(e, budget))
+			}
+			return out
+		}
+		out := make([]any, 0, len(t))
+		for _, e := range t {
+			out = append(out, summarizeJSON(e, budget))
+		}
+		return out
+	case map[string]any:
+		*budget--
+		out := make(map[string]any, len(t))
+		for k, e := range t {
+			out[k] = summarizeJSON(e, budget)
+		}
+		return out
+	default:
+		return t
+	}
+}
+
+// previewText — a string field cut to the audit preview length, with an
+// explicit marker so a short value is never confused with a truncated one.
+func previewText(s string) string {
+	if len(s) <= auditFieldPreview {
+		return s
+	}
+	cut := auditFieldPreview
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return fmt.Sprintf("%s…[+%d chars]", s[:cut], len(s)-cut)
 }
 
 // cutWithMarker — head-keep truncation with an explicit tail marker, for
-// documents that cannot be rebuilt (non-JSON, or a single message over cap).
+// documents that cannot be rebuilt (non-JSON bodies).
 func cutWithMarker(s string, max int) string {
 	if len(s) <= max {
 		return s
@@ -681,6 +733,10 @@ func (s *Server) ChatCompletionsAt(body map[string]any, accountID, endpoint stri
 	skey := sessionKey(accountID, body)
 	acctName := s.accountName(accountID)
 
+	// Drop upstreams that are parked, out of quota, or too small for this
+	// request; selectProviders falls back to the full list if that empties it.
+	providers = s.policy.selectProviders(providers, requestTokenEstimate(body), true, true)
+
 	for _, provider := range providers {
 		requestBody := map[string]any{}
 		for k, v := range body {
@@ -706,9 +762,14 @@ func (s *Server) ChatCompletionsAt(body map[string]any, accountID, endpoint stri
 				Err:          uerr.msg,
 				RequestBody:  uerr.ReqBody, ResponseBody: uerr.RespBody,
 			})
-			time.Sleep(500 * time.Millisecond)
+			if s.policy.recordFailure(provider.ID) {
+				fmt.Printf("[AI] provider %s parked for %ds after %d consecutive failures\n",
+					provider.Name, s.policy.cooldownMs/1000, s.policy.maxFailures)
+			}
+			s.policy.retryDelay()
 			continue
 		}
+		s.policy.recordSuccess(provider.ID)
 
 		inputPrice, cachePrice, outputPrice, err := service.ModelPrices(s.DB, alias)
 		if err != nil {
@@ -803,6 +864,9 @@ func (s *Server) StartStreamAt(body map[string]any, accountID, endpoint string) 
 	tcID := findLastToolCallID(body)
 	acctName := s.accountName(accountID)
 
+	// Same filters as the non-streaming path.
+	providers = s.policy.selectProviders(providers, requestTokenEstimate(body), true, true)
+
 	for _, provider := range providers {
 		requestBody := map[string]any{}
 		for k, v := range body {
@@ -829,9 +893,14 @@ func (s *Server) StartStreamAt(body map[string]any, accountID, endpoint string) 
 				Stream:       true, Err: uerr.msg,
 				RequestBody: uerr.ReqBody, ResponseBody: uerr.RespBody,
 			})
-			time.Sleep(500 * time.Millisecond)
+			if s.policy.recordFailure(provider.ID) {
+				fmt.Printf("[AI] provider %s parked for %ds after %d consecutive failures\n",
+					provider.Name, s.policy.cooldownMs/1000, s.policy.maxFailures)
+			}
+			s.policy.retryDelay()
 			continue
 		}
+		s.policy.recordSuccess(provider.ID)
 
 		// Convert upstream protocol to OpenAI SSE first (like the TS pipeline).
 		var converted io.Reader

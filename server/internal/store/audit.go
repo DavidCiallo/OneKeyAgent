@@ -7,13 +7,10 @@ import (
 	"onekey/server/internal/cryptox"
 )
 
-// Audit retention: newest N successful and newest N failed requests.
-const AuditKeep = 100
-
-// AuditDetailKeep — how many failed attempts keep their request/response
-// bodies. The bodies are the debugging payload (a full prompt can be large),
-// so older failures keep their summary and error text but lose them.
-const AuditDetailKeep = 10
+// Audit retention: newest N successful and newest N failed requests. Small on
+// purpose — the trail is a debugging aid for what just happened, not a history,
+// and every failed row can carry a prompt.
+const AuditKeep = 10
 
 // auditBodyKey — how much of a stored request body counts as "the same
 // request" for dedupe: the first 1000 characters.
@@ -101,9 +98,6 @@ func AuditInsert(db *sql.DB, a AuditLog) error {
 	if err := auditTrim(db, a.Success); err != nil {
 		return err
 	}
-	if detailed {
-		return auditTrimBodies(db)
-	}
 	return nil
 }
 
@@ -121,17 +115,6 @@ func auditDuplicateBody(db *sql.DB, requestBody, errText string) bool {
 		  AND err = ?
 		LIMIT 1`, auditBodyKey, requestBody, auditBodyKey, errText).Scan(&id)
 	return err == nil
-}
-
-// auditTrimBodies — keep request/response bodies on the newest AuditDetailKeep
-// failures only; older rows keep their summary and error text.
-func auditTrimBodies(db *sql.DB) error {
-	_, err := db.Exec(`UPDATE audit_log SET request_body = '', response_body = ''
-		WHERE success = 0 AND (request_body <> '' OR response_body <> '')
-		  AND id NOT IN (
-			SELECT id FROM audit_log WHERE success = 0
-			ORDER BY ts DESC, rowid DESC LIMIT ?)`, AuditDetailKeep)
-	return err
 }
 
 // auditTrim deletes rows of one outcome beyond the newest AuditKeep.

@@ -12,7 +12,6 @@
         "ToastParamError": "Error de parámetros, revise la entrada",
         "DefaultSelectPlaceholder": "Por favor ingrese"
     },
-
     "Menu": {
         "Model": "Modelo",
         "Provider": "Proveedor",
@@ -24,7 +23,6 @@
         "NoContent": "Sin acceso",
         "Logout": "Cerrar sesión"
     },
-
     "ModelPage": {
         "Alias": "Alias",
         "Actions": "Acciones",
@@ -41,7 +39,6 @@
         "CreateModel": "Crear modelo",
         "Public": "Público"
     },
-
     "ProviderPage": {
         "ModelAlias": "Alias del modelo",
         "ModelAliasPlaceholder": "Filtrar por alias",
@@ -72,10 +69,21 @@
         "BatchDisable": "Deshabilitar lote",
         "BatchSetProxy": "Proxy lote",
         "Clear": "Limpiar",
+        "SelectAll": "Seleccionar todo",
+        "StatusOn": "Habilitado",
+        "StatusOff": "Deshabilitado",
         "Yes": "Sí",
-        "No": "No"
+        "No": "No",
+        "MaxContext": "Contexto máximo",
+        "MaxContextHint": "0 = sin límite. Las solicitudes mayores lo omiten.",
+        "DailyQuota": "Cuota diaria",
+        "DailyQuotaHint": "0 = sin límite. Solicitudes por día, solo en memoria.",
+        "Parked": "Pausado",
+        "QuotaSpent": "Cuota agotada",
+        "FailStreakHint": "Fallos consecutivos; 5 lo pausa durante 300 s.",
+        "Context": "Contexto",
+        "Quota": "Cuota"
     },
-
     "UsagePage": {
         "AccountId": "Cuenta",
         "AccountIdPlaceholder": "Filtrar por cuenta",
@@ -94,7 +102,6 @@
         "UserUsage": "Uso del usuario",
         "History": "Historial"
     },
-
     "AuthPage": {
         "Title": "EHEX",
         "LoginSuccess": "Inicio de sesión exitoso",
@@ -126,7 +133,6 @@
         "VerifyEmailVerifying": "Verificando su correo...",
         "BackToLogin": "Volver al inicio de sesión"
     },
-
     "HomePage": {
         "MainText": "EHEX",
         "Slogan1": "Palabras sencillas,",
@@ -154,7 +160,6 @@
         "NavSignIn": "Iniciar sesión",
         "NavConsole": "Consola"
     },
-
     "AccountPage": {
         "Name": "Nombre",
         "NamePlaceholder": "Filtrar por nombre",
@@ -191,12 +196,10 @@
         "GiftCardStatusRedeemed": "Canjeado",
         "GiftCardStatusExpired": "Expirado"
     },
-
     "NoContentPage": {
         "Title": "Sin acceso",
         "Message": "No tiene permisos para acceder a esta página. Contacte al administrador."
     },
-
     "ChatPage": {
         "NewChat": "Nuevo chat",
         "DeleteChat": "Eliminar",
@@ -206,7 +209,6 @@
         "EmptySession": "Iniciar una nueva conversación",
         "NoSession": "Seleccione o cree un chat"
     },
-
     "ProfilePage": {
         "AccountInfo": "Información de la cuenta",
         "Name": "Nombre",
@@ -231,7 +233,6 @@
         "OutputPrice": "Precio de salida",
         "TermsLink": "Al usar la API, acepta los Términos de Servicio"
     },
-
     "TopupPage": {
         "CurrentPlan": "Saldo actual",
         "Balance": "Saldo",
@@ -256,7 +257,6 @@
         "GiftCardLabel": "Canje",
         "UsageLabel": "Uso"
     },
-
     "TermsPage": {
         "Title": "Acuerdo de usuario",
         "Subtitle": "Por favor lea estos términos cuidadosamente.",
@@ -271,15 +271,13 @@
         "Section4Body": "1. La plataforma no ofrece garantía alguna, expresa o implícita, sobre la precisión, integridad o fiabilidad del contenido generado por modelos. Usted asume todos los riesgos derivados del uso de dicho contenido.\n\n2. En la máxima medida permitida por la ley aplicable, la plataforma no será responsable por daños indirectos, incidentales, especiales, consecuentes o ejemplares derivados del uso o la imposibilidad de acceder al servicio.\n\n3. La plataforma se reserva el derecho de modificar, suspender o interrumpir el servicio en cualquier momento. Los cambios importantes se comunicarán con antelación por medios razonables.",
         "Section5Title": "5. Contáctenos",
         "Section5Body": "Si tiene alguna pregunta o necesita ayuda, contacte al administrador. Valoramos los comentarios de cada usuario.\n\n\"Palabras sencillas, inteligencia profunda.\""
-    }
-,
+    },
     "AuditPage": {
         "Title": "Auditoría de solicitudes",
         "Success": "Correctas",
         "Failed": "Fallidas",
-        "AutoRefresh": "Actualización automática",
         "Refresh": "Actualizar",
-        "KeepHint": "Conserva los últimos {n} registros de cada tipo.",
+        "KeepHint": "Conserva los últimos {n} registros de cada tipo; las solicitudes fallidas conservan la estructura JSON con los primeros 64 caracteres de cada campo.",
         "Time": "Hora",
         "Account": "Cuenta",
         "Model": "Modelo",
