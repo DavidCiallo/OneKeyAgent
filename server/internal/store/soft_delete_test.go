@@ -59,6 +59,55 @@ func TestProviderListExcludesSoftDeleted(t *testing.T) {
 	}
 }
 
+// TestProviderModelAliasesExcludesSoftDeleted — the alias picker feeds a
+// filter that is now mandatory and defaults to the first entry. A leftover
+// alias from a deleted provider would be the default selection and render an
+// empty page, so aliases must come from live rows only.
+func TestProviderModelAliasesExcludesSoftDeleted(t *testing.T) {
+	db, err := Open(t.TempDir() + "/aliases.db")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+	InvalidateRefCache()
+
+	insert := func(alias, name string) string {
+		stored, err := GenericInsert(db, "provider", map[string]any{
+			"model_alias": alias, "priority": 1, "name": name,
+			"base_url": "http://x", "model": "m", "enabled": 1,
+		})
+		if err != nil {
+			t.Fatalf("insert %s: %v", name, err)
+		}
+		return stored["id"].(string)
+	}
+	insert("zeta", "live-zeta")
+	insert("alpha", "live-alpha")
+	insert("beta", "live-beta-one")
+	insert("beta", "live-beta-two")
+	insert("", "live-no-alias")
+	ghost := insert("aaa-ghost", "dropped")
+
+	if err := GenericSoftDelete(db, "provider", ghost); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+
+	aliases, err := ProviderModelAliases(db)
+	if err != nil {
+		t.Fatalf("aliases: %v", err)
+	}
+	// Sorted, de-duplicated, and without the deleted provider's alias.
+	want := []string{"alpha", "beta", "zeta"}
+	if len(aliases) != len(want) {
+		t.Fatalf("aliases = %v, want %v", aliases, want)
+	}
+	for i := range want {
+		if aliases[i] != want[i] {
+			t.Fatalf("aliases = %v, want %v", aliases, want)
+		}
+	}
+}
+
 // TestModelRestoreOrInsertRevives — re-creating a deleted alias brings the row
 // back. It used to clear nothing, so the follow-up read still saw it deleted
 // and the create API returned "not found" forever.

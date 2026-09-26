@@ -17,6 +17,10 @@ export interface ProviderEntity extends BaseEntity {
     enable_search?: number;
     extra_json?: string;
     enabled: number;
+    /** Context window in tokens; 0 = unlimited. */
+    max_context?: number;
+    /** Requests per local day; 0 = unlimited, in-memory. */
+    daily_quota?: number;
     create_time: number;
     update_time: number;
     delete_time: number | null;

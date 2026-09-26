@@ -74,6 +74,10 @@ var tables = []tableDef{
 		{"enable_search", "INTEGER"},
 		{"extra_json", "TEXT"},
 		{"enabled", "INTEGER NOT NULL DEFAULT 1"},
+		// max_context — upstream context window in tokens; 0 = unlimited.
+		{"max_context", "INTEGER NOT NULL DEFAULT 0"},
+		// daily_quota — requests allowed per local day; 0 = unlimited, in-memory.
+		{"daily_quota", "INTEGER NOT NULL DEFAULT 0"},
 		{"create_time", "INTEGER NOT NULL DEFAULT 0"},
 		{"update_time", "INTEGER"},
 		{"delete_time", "INTEGER"},
@@ -173,7 +177,8 @@ var tables = []tableDef{
 		{"err", "TEXT NOT NULL DEFAULT ''"},
 		// Failed attempts carry what was sent upstream and what came back, so a
 		// reject (a 400 about tool messages, say) can be debugged from the row.
-		// Cleared again once a newer attempt supersedes them (AuditDetailKeep).
+		// Bodies are a field summary now, bounded at write time; there is no
+		// second retention window to age them out of.
 		// NOT NULL DEFAULT '' matters: a plain TEXT upgrade would leave NULL in
 		// every pre-existing row, and the audit list scan rejects NULL strings.
 		{"request_body", "TEXT NOT NULL DEFAULT ''"},
@@ -267,6 +272,9 @@ func Open(path string) (*sql.DB, error) {
 	if err := backfillAuditBodies(db); err != nil {
 		return nil, err
 	}
+	if err := purgeLegacyAuditBodies(db); err != nil {
+		return nil, err
+	}
 	for _, stmt := range indexes {
 		if _, err := db.Exec(stmt); err != nil {
 			return nil, fmt.Errorf("index: %w", err)
@@ -286,6 +294,18 @@ func Open(path string) (*sql.DB, error) {
 func backfillAuditBodies(db *sql.DB) error {
 	_, err := db.Exec(`UPDATE audit_log SET request_body = '', response_body = ''
 		WHERE request_body IS NULL OR response_body IS NULL`)
+	return err
+}
+
+// purgeLegacyAuditBodies — drop stored audit bodies left by earlier builds.
+// Those builds kept whole prompts (up to 64 KiB) on the newest failures, and a
+// database upgraded in place would otherwise carry that text indefinitely:
+// new rows store a field summary instead, and retention only trims by count.
+// Clearing them at startup is what makes the smaller-retention change apply to
+// data that already exists.
+func purgeLegacyAuditBodies(db *sql.DB) error {
+	_, err := db.Exec(`UPDATE audit_log SET request_body = '', response_body = ''
+		WHERE request_body <> '' OR response_body <> ''`)
 	return err
 }
 

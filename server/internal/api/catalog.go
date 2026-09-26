@@ -140,7 +140,13 @@ func (a *App) providerList(c *httpx.Ctx) (any, error) {
 	}
 	dtos := make([]map[string]any, 0, len(list))
 	for _, p := range list {
-		dtos = append(dtos, p.DTO())
+		dto := p.DTO()
+		// Live routing state (in-memory, per-process).
+		snap := a.AI.PolicySnapshot(p.ID)
+		dto["failures"] = snap.Failures
+		dto["cooldown_until"] = snap.CooldownUntil
+		dto["today_count"] = snap.TodayCount
+		dtos = append(dtos, dto)
 	}
 	return map[string]any{"list": dtos, "total": total}, nil
 }

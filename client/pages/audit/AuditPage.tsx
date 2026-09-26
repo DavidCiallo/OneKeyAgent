@@ -38,13 +38,22 @@ function statusColor(code: number): "success" | "warning" | "danger" | "default"
     return "default";
 }
 
+/** Bodies are stored as a field summary: JSON shape with short previews. Pretty
+ *  printing it makes the structure readable instead of one long line. */
+function prettyBody(body: string): string {
+    try {
+        return JSON.stringify(JSON.parse(body), null, 2);
+    } catch {
+        return body;
+    }
+}
+
 export default function AuditPage() {
     const locale = Locale("AuditPage");
     const [tab, setTab] = useState<Outcome>("success");
     const [list, setList] = useState<AuditDTO[]>([]);
-    const [keep, setKeep] = useState(100);
+    const [keep, setKeep] = useState(10);
     const [loading, setLoading] = useState(true);
-    const [autoRefresh, setAutoRefresh] = useState(true);
 
     const fetchList = useCallback(async (showSpinner: boolean) => {
         if (showSpinner) setLoading(true);
@@ -56,19 +65,11 @@ export default function AuditPage() {
         if (showSpinner) setLoading(false);
     }, []);
 
+    // Loaded once, then only on demand: the page no longer polls. An admin
+    // reading a failure should not have the row move under them mid-scroll.
     useEffect(() => {
         fetchList(true);
     }, [fetchList]);
-
-    // Live view: poll while the tab is visible so an in-flight debug session
-    // shows new attempts without a manual refresh.
-    useEffect(() => {
-        if (!autoRefresh) return;
-        const timer = setInterval(() => {
-            if (document.visibilityState === "visible") fetchList(false);
-        }, 5000);
-        return () => clearInterval(timer);
-    }, [autoRefresh, fetchList]);
 
     const { successRows, failedRows } = useMemo(() => ({
         successRows: list.filter(r => r.success === 1),
@@ -104,14 +105,6 @@ export default function AuditPage() {
                         <Tab key="failed" title={`${locale.Failed || "Failed"} (${failedRows.length})`} />
                     </Tabs>
                     <div className="flex flex-row items-center gap-3">
-                        <label className="flex flex-row items-center gap-1 text-sm text-gray-600 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={autoRefresh}
-                                onChange={(e) => setAutoRefresh(e.target.checked)}
-                            />
-                            {locale.AutoRefresh || "Auto refresh"}
-                        </label>
                         <Button size="sm" variant="flat" isLoading={loading} onPress={() => fetchList(true)}>
                             {locale.Refresh || "Refresh"}
                         </Button>
@@ -187,14 +180,14 @@ export default function AuditPage() {
                                                 <div className="flex flex-col gap-3">
                                                     {r.request_body && (
                                                         <div>
-                                                            <p className="text-xs font-medium text-gray-500 mb-1">{locale.RequestBody || "请求参数（提示词）"}</p>
-                                                            <pre className="text-xs bg-white border border-gray-200 rounded p-2 max-h-72 overflow-auto whitespace-pre-wrap break-all">{r.request_body}</pre>
+                                                            <p className="text-xs font-medium text-gray-500 mb-1">{locale.RequestBody || "请求参数（结构 + 字段预览）"}</p>
+                                                            <pre className="text-xs bg-white border border-gray-200 rounded p-2 max-h-72 overflow-auto whitespace-pre-wrap break-all">{prettyBody(r.request_body)}</pre>
                                                         </div>
                                                     )}
                                                     {r.response_body && (
                                                         <div>
                                                             <p className="text-xs font-medium text-gray-500 mb-1">{locale.ResponseBody || "返回结果"}</p>
-                                                            <pre className="text-xs bg-white border border-gray-200 rounded p-2 max-h-72 overflow-auto whitespace-pre-wrap break-all">{r.response_body}</pre>
+                                                            <pre className="text-xs bg-white border border-gray-200 rounded p-2 max-h-72 overflow-auto whitespace-pre-wrap break-all">{prettyBody(r.response_body)}</pre>
                                                         </div>
                                                     )}
                                                 </div>

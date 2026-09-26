@@ -8,7 +8,7 @@ import (
 
 // ─────────────────────────── audit controller ───────────────────────────
 
-// auditList — newest 100 successful + newest 100 failed relay attempts.
+// auditList — newest 10 successful + newest 10 failed relay attempts.
 // Admin-only: rows carry per-account activity across the whole instance.
 func (a *App) auditList(c *httpx.Ctx) (any, error) {
 	if _, err := service.RequireAdmin(a.DB, c.Auth); err != nil {
@@ -28,8 +28,8 @@ func (a *App) auditList(c *httpx.Ctx) (any, error) {
 			"duration_ms": r.DurationMs, "input_tokens": r.InputTokens,
 			"cached_input_tokens": r.CachedInputTokens, "output_tokens": r.OutputTokens,
 			"cost": r.Cost, "stream": r.Stream, "err": r.Err,
-			// Only failed upstream attempts carry bodies; success rows are
-			// summary-only so the trail doesn't fill up with prompts.
+			// Only failed upstream attempts carry bodies, and those are stored
+			// as a field summary (structure + short previews), not full text.
 			"request_body": r.RequestBody, "response_body": r.ResponseBody,
 			"tps": throughput(r.OutputTokens, r.DurationMs),
 		})

@@ -12,7 +12,6 @@
         "ToastParamError": "Parameter error, please check input",
         "DefaultSelectPlaceholder": "Please enter"
     },
-
     "Menu": {
         "Model": "Model",
         "Provider": "Provider",
@@ -25,7 +24,6 @@
         "NoContent": "No Content",
         "Logout": "Logout"
     },
-
     "ModelPage": {
         "Alias": "Alias",
         "Actions": "Actions",
@@ -41,7 +39,6 @@
         "InputPrice": "Input Price",
         "OutputPrice": "Output Price"
     },
-
     "ProviderPage": {
         "ModelAlias": "Model Alias",
         "ModelAliasPlaceholder": "Filter by model alias",
@@ -74,10 +71,19 @@
         "BatchDisable": "Batch Disable",
         "BatchSetProxy": "Batch Set Proxy",
         "Clear": "Clear",
+        "SelectAll": "Select all",
+        "StatusOn": "Enabled",
+        "StatusOff": "Disabled",
         "Yes": "Yes",
-        "No": "No"
+        "No": "No",
+        "MaxContext": "Max context",
+        "DailyQuota": "Daily quota",
+        "Parked": "Parked",
+        "QuotaSpent": "Quota spent",
+        "FailStreakHint": "Consecutive failures; 5 parks this provider for 300s.",
+        "Context": "Context",
+        "Quota": "Quota"
     },
-
     "UsagePage": {
         "AccountId": "Account",
         "AccountIdPlaceholder": "Filter by account",
@@ -96,7 +102,6 @@
         "UserUsage": "User Usage",
         "History": "History"
     },
-
     "AuthPage": {
         "Title": "EHEX",
         "LoginSuccess": "Login successful",
@@ -128,7 +133,6 @@
         "VerifyEmailVerifying": "Verifying your email...",
         "BackToLogin": "Back to Login"
     },
-
     "HomePage": {
         "MainText": "EHEX",
         "Slogan1": "Plain words,",
@@ -156,7 +160,6 @@
         "NavSignIn": "Sign in",
         "NavConsole": "Console"
     },
-
     "AccountPage": {
         "Name": "Name",
         "NamePlaceholder": "Filter by name",
@@ -194,12 +197,10 @@
         "GiftCardStatusExpired": "Expired",
         "GiftCardLoading": "Loading..."
     },
-
     "NoContentPage": {
         "Title": "No Content",
         "Message": "You don't have any permissions yet, please contact the administrator"
     },
-
     "ChatPage": {
         "NewChat": "New Chat",
         "DeleteChat": "Delete",
@@ -209,7 +210,6 @@
         "EmptySession": "Start a new conversation",
         "NoSession": "Select or create a chat"
     },
-
     "ProfilePage": {
         "AccountInfo": "Account Info",
         "Name": "Name",
@@ -234,7 +234,6 @@
         "OutputPrice": "Output Price",
         "TermsLink": "By using the API, you agree to the Terms of Service"
     },
-
     "TopupPage": {
         "CurrentPlan": "Current Balance",
         "Balance": "Balance",
@@ -259,7 +258,6 @@
         "GiftCardLabel": "Redeem",
         "UsageLabel": "Cost"
     },
-
     "TermsPage": {
         "Title": "User Agreement",
         "Subtitle": "Please read these terms carefully.",
@@ -274,15 +272,13 @@
         "Section4Body": "1. The platform provides no warranty, express or implied, regarding the accuracy, completeness, or reliability of model-generated content. You assume all risks associated with the use of such content.\n\n2. To the maximum extent permitted by applicable law, the platform shall not be liable for any indirect, incidental, special, consequential, or exemplary damages arising from your use of or inability to access the service.\n\n3. The platform reserves the right to modify, suspend, or discontinue the service at any time. Material changes will be communicated through reasonable means in advance.",
         "Section5Title": "5. Contact Us",
         "Section5Body": "If you have any questions or need assistance, please contact the administrator. We value every user's feedback.\n\n\"Plain words, profound intelligence.\""
-    }
-,
+    },
     "AuditPage": {
         "Title": "Audit",
         "Success": "Success",
         "Failed": "Failed",
-        "AutoRefresh": "Auto refresh",
         "Refresh": "Refresh",
-        "KeepHint": "Keeps the latest {n} records per outcome.",
+        "KeepHint": "Keeps the latest {n} records per outcome; failed requests keep the JSON structure with the first 64 characters of each field.",
         "Time": "Time",
         "Account": "Account",
         "Model": "Model",

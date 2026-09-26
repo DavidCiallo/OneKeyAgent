@@ -17,6 +17,8 @@ type ProviderForm = {
     replay_reasoning: number;
     enable_search: number;
     enabled: number;
+    max_context: number;
+    daily_quota: number;
 };
 
 type Props = {
@@ -61,40 +63,46 @@ export function ProviderFormModal({ isOpen, onOpenChange, mode, form, onFormChan
                             onChange={e => onFormChange({ ...form, name: e.target.value })}
                             isRequired
                         />
-                        <Input
-                            label={locale.BaseURL}
-                            value={form.base_url}
-                            onChange={e => onFormChange({ ...form, base_url: e.target.value })}
-                            isRequired
-                        />
-                        <Input
-                            label={locale.Model}
-                            value={form.model}
-                            onChange={e => onFormChange({ ...form, model: e.target.value })}
-                            isRequired
-                        />
+                        <div className="flex flex-row gap-3">
+                            <Input
+                                label={locale.BaseURL}
+                                value={form.base_url}
+                                onChange={e => onFormChange({ ...form, base_url: e.target.value })}
+                                isRequired
+                                className="flex-[3]"
+                            />
+                            <Input
+                                label={locale.Model}
+                                value={form.model}
+                                onChange={e => onFormChange({ ...form, model: e.target.value })}
+                                isRequired
+                                className="flex-[2]"
+                            />
+                        </div>
                         <Input
                             label={locale.ApiKey}
                             value={form.api_key || ""}
                             onChange={e => onFormChange({ ...form, api_key: e.target.value })}
                         />
-                        <Select
-                            label={locale.AuthType}
-                            selectedKeys={[form.auth_type]}
-                            onChange={e => onFormChange({ ...form, auth_type: e.target.value })}
-                        >
-                            <SelectItem key="bearer">Bearer</SelectItem>
-                            <SelectItem key="custom">Custom</SelectItem>
-                        </Select>
-                        <Select
-                            label={locale.ApiType}
-                            selectedKeys={[form.api_type]}
-                            onChange={e => onFormChange({ ...form, api_type: e.target.value })}
-                        >
-                            <SelectItem key="openai">OpenAI</SelectItem>
-                            <SelectItem key="anthropic">Anthropic</SelectItem>
-                            <SelectItem key="gemini">Gemini</SelectItem>
-                        </Select>
+                        <div className="flex flex-row gap-3">
+                            <Select
+                                label={locale.AuthType}
+                                selectedKeys={[form.auth_type]}
+                                onChange={e => onFormChange({ ...form, auth_type: e.target.value })}
+                            >
+                                <SelectItem key="bearer">Bearer</SelectItem>
+                                <SelectItem key="custom">Custom</SelectItem>
+                            </Select>
+                            <Select
+                                label={locale.ApiType}
+                                selectedKeys={[form.api_type]}
+                                onChange={e => onFormChange({ ...form, api_type: e.target.value })}
+                            >
+                                <SelectItem key="openai">OpenAI</SelectItem>
+                                <SelectItem key="anthropic">Anthropic</SelectItem>
+                                <SelectItem key="gemini">Gemini</SelectItem>
+                            </Select>
+                        </div>
                         <div className="flex flex-row items-center gap-4 flex-wrap">
                             <div className="flex flex-row items-center gap-1.5">
                                 <span className="text-sm whitespace-nowrap">{locale.Search}</span>
@@ -142,6 +150,20 @@ export function ProviderFormModal({ isOpen, onOpenChange, mode, form, onFormChan
                             value={form.proxy_url || ""}
                             onChange={e => onFormChange({ ...form, proxy_url: e.target.value })}
                         />
+                        <div className="flex flex-row gap-3">
+                            <Input
+                                type="number"
+                                label={locale.MaxContext}
+                                value={String(form.max_context ?? 0)}
+                                onChange={e => onFormChange({ ...form, max_context: parseInt(e.target.value) || 0 })}
+                            />
+                            <Input
+                                type="number"
+                                label={locale.DailyQuota}
+                                value={String(form.daily_quota ?? 0)}
+                                onChange={e => onFormChange({ ...form, daily_quota: parseInt(e.target.value) || 0 })}
+                            />
+                        </div>
                         <Textarea
                             label={locale.ExtraJson}
                             placeholder={'{"provider":{"order":["OpenAI","Anthropic"]},"route":"fallback"}'}

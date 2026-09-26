@@ -12,7 +12,6 @@
         "ToastParamError": "Lỗi tham số, vui lòng kiểm tra đầu vào",
         "DefaultSelectPlaceholder": "Vui lòng nhập"
     },
-
     "Menu": {
         "Model": "Mô hình",
         "Provider": "Nhà cung cấp",
@@ -24,7 +23,6 @@
         "NoContent": "Không có nội dung",
         "Logout": "Đăng xuất"
     },
-
     "ModelPage": {
         "Alias": "Bí danh",
         "Actions": "Thao tác",
@@ -38,7 +36,6 @@
         "CreateModel": "Tạo mô hình",
         "Public": "Công khai"
     },
-
     "ProviderPage": {
         "ModelAlias": "Bí danh mô hình",
         "ModelAliasPlaceholder": "Lọc theo bí danh mô hình",
@@ -69,10 +66,19 @@
         "BatchDisable": "Tắt hàng loạt",
         "BatchSetProxy": "Proxy hàng loạt",
         "Clear": "Xóa",
+        "SelectAll": "Chọn tất cả",
+        "StatusOn": "Đang bật",
+        "StatusOff": "Đã tắt",
         "Yes": "Có",
-        "No": "Không"
+        "No": "Không",
+        "MaxContext": "Giới hạn ngữ cảnh",
+        "DailyQuota": "Hạn mức hàng ngày",
+        "Parked": "Tạm dừng",
+        "QuotaSpent": "Hết hạn mức",
+        "FailStreakHint": "Số lần lỗi liên tiếp; 5 lần sẽ tạm dừng 300 giây.",
+        "Context": "Ngữ cảnh",
+        "Quota": "Hạn mức"
     },
-
     "UsagePage": {
         "AccountId": "Tài khoản",
         "AccountIdPlaceholder": "Lọc theo tài khoản",
@@ -91,7 +97,6 @@
         "UserUsage": "Sử dụng của người dùng",
         "History": "Lịch sử"
     },
-
     "AuthPage": {
         "Title": "EHEX",
         "LoginSuccess": "Đăng nhập thành công",
@@ -123,7 +128,6 @@
         "VerifyEmailVerifying": "Đang xác thực email...",
         "BackToLogin": "Quay lại đăng nhập"
     },
-
     "HomePage": {
         "MainText": "EHEX",
         "Slogan1": "Ngôn từ giản dị,",
@@ -151,7 +155,6 @@
         "NavSignIn": "Đăng nhập",
         "NavConsole": "Bảng điều khiển"
     },
-
     "AccountPage": {
         "Name": "Tên",
         "NamePlaceholder": "Lọc theo tên",
@@ -188,12 +191,10 @@
         "GiftCardStatusRedeemed": "Đã đổi",
         "GiftCardStatusExpired": "Hết hạn"
     },
-
     "NoContentPage": {
         "Title": "Không có nội dung",
         "Message": "Bạn chưa có quyền nào, vui lòng liên hệ quản trị viên"
     },
-
     "ChatPage": {
         "NewChat": "Trò chuyện mới",
         "DeleteChat": "Xóa",
@@ -203,7 +204,6 @@
         "EmptySession": "Bắt đầu cuộc trò chuyện mới",
         "NoSession": "Chọn hoặc tạo cuộc trò chuyện"
     },
-
     "ProfilePage": {
         "AccountInfo": "Thông tin tài khoản",
         "Name": "Tên",
@@ -228,7 +228,6 @@
         "OutputPrice": "Giá đầu ra",
         "TermsLink": "Bằng cách sử dụng API, bạn đồng ý với Điều khoản dịch vụ"
     },
-
     "TopupPage": {
         "CurrentPlan": "Số dư hiện tại",
         "Balance": "Số dư",
@@ -253,7 +252,6 @@
         "GiftCardLabel": "Đổi",
         "UsageLabel": "Sử dụng"
     },
-
     "TermsPage": {
         "Title": "Thỏa thuận người dùng",
         "Subtitle": "Vui lòng đọc kỹ các điều khoản.",
@@ -268,15 +266,13 @@
         "Section4Body": "1. Nền tảng không bảo đảm, dù rõ ràng hay ngụ ý, về tính chính xác, đầy đủ hoặc độ tin cậy của nội dung do mô hình tạo ra. Bạn tự chịu mọi rủi ro liên quan đến việc sử dụng nội dung đó.\n\n2. Trong phạm vi tối đa được pháp luật áp dụng cho phép, nền tảng không chịu trách nhiệm đối với bất kỳ thiệt hại gián tiếp, ngẫu nhiên, đặc biệt, do hậu quả hoặc mang tính chất răn đe nào phát sinh từ việc sử dụng hoặc không thể truy cập dịch vụ.\n\n3. Nền tảng bảo lưu quyền sửa đổi, tạm ngừng hoặc chấm dứt dịch vụ bất cứ lúc nào. Các thay đổi quan trọng sẽ được thông báo trước bằng các phương tiện hợp lý.",
         "Section5Title": "5. Liên hệ",
         "Section5Body": "Nếu bạn có bất kỳ câu hỏi hoặc cần trợ giúp, vui lòng liên hệ quản trị viên. Chúng tôi trân trọng mọi phản hồi từ người dùng.\n\n\"Ngôn từ giản dị, trí tuệ sâu sắc.\""
-    }
-,
+    },
     "AuditPage": {
         "Title": "Kiểm toán yêu cầu",
         "Success": "Thành công",
         "Failed": "Thất bại",
-        "AutoRefresh": "Tự động làm mới",
         "Refresh": "Làm mới",
-        "KeepHint": "Chỉ lưu {n} bản ghi mới nhất cho mỗi loại.",
+        "KeepHint": "Chỉ lưu {n} bản ghi mới nhất cho mỗi loại; yêu cầu thất bại giữ nguyên cấu trúc JSON với 64 ký tự đầu của mỗi trường.",
         "Time": "Thời gian",
         "Account": "Tài khoản",
         "Model": "Mô hình",

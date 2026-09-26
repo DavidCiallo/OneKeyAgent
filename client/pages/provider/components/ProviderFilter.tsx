@@ -1,4 +1,4 @@
-import { Select, SelectItem, Button } from "@heroui/react";
+import { Select, SelectItem, Button, Checkbox } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
 
 type Props = {
@@ -7,6 +7,8 @@ type Props = {
     onAdd: () => void;
     modelAliasOptions: string[];
     selectedCount: number;
+    allSelected: boolean;
+    onToggleSelectAll: () => void;
     onBatchEnable: () => void;
     onBatchDisable: () => void;
     onBatchThinkingOn: () => void;
@@ -15,13 +17,15 @@ type Props = {
     onClearSelection: () => void;
 };
 
-export function ProviderFilter({ filterModelAlias, onModelAliasChange, onAdd, modelAliasOptions, selectedCount, onBatchEnable, onBatchDisable, onBatchThinkingOn, onBatchThinkingOff, onBatchProxy, onClearSelection }: Props) {
+export function ProviderFilter({ filterModelAlias, onModelAliasChange, onAdd, modelAliasOptions, selectedCount, allSelected, onToggleSelectAll, onBatchEnable, onBatchDisable, onBatchThinkingOn, onBatchThinkingOff, onBatchProxy, onClearSelection }: Props) {
     const locale = Locale("ProviderPage");
     const common = Locale("Common");
 
     return (
         <div className="px-4 flex flex-row gap-3 justify-between items-end flex-wrap">
-            <div className="flex flex-row gap-2">
+            <div className="flex flex-row gap-3 items-end">
+                {/* No "no filter" entry: the page is organised per alias, so an
+                    alias is always selected (the page lands on the first one). */}
                 <Select
                     label={locale.ModelAlias}
                     placeholder={locale.ModelAliasPlaceholder}
@@ -29,12 +33,21 @@ export function ProviderFilter({ filterModelAlias, onModelAliasChange, onAdd, mo
                     onChange={e => onModelAliasChange(e.target.value)}
                     className="w-60"
                     size="sm"
+                    isDisabled={modelAliasOptions.length === 0}
                 >
-                    <SelectItem key="">{locale.NoFilter}</SelectItem>
                     {modelAliasOptions.map((alias) => (
                         <SelectItem key={alias}>{alias}</SelectItem>
                     ))}
                 </Select>
+                <div className="flex flex-row items-center gap-1.5 pb-2">
+                    <Checkbox
+                        size="sm"
+                        isSelected={allSelected}
+                        onChange={onToggleSelectAll}
+                        aria-label={locale.SelectAll}
+                    />
+                    <span className="text-xs text-default-500 whitespace-nowrap">{locale.SelectAll}</span>
+                </div>
             </div>
             {selectedCount > 0 ? (
                 <div className="flex items-center gap-2">

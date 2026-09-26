@@ -1,70 +1,107 @@
 package ai
 
 import (
-	"unicode/utf8"
 	"encoding/json"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
-// TestAuditRequestBodyKeepsTail — an oversized request body loses its earliest
-// messages, not the newest ones: tool pairing breaks at the tail, and the
-// stored document must stay valid JSON so it can be read with a viewer.
-func TestAuditRequestBodyKeepsTail(t *testing.T) {
-	old := func(s string) map[string]any {
-		return map[string]any{"role": "user", "content": strings.Repeat(s, 5000)}
-	}
+// TestAuditBodySummaryKeepsStructure — the stored body keeps the JSON shape
+// (keys, message count) while every long string is cut to a short preview. The
+// trail answers "what kind of request failed", not "what exactly was said".
+func TestAuditBodySummaryKeepsStructure(t *testing.T) {
+	long := strings.Repeat("prompt-", 2000) // far beyond the preview length
 	body := jStringify(map[string]any{
 		"model": "deepseek-chat",
 		"messages": []any{
-			old("old-1-"), old("old-2-"), old("old-3-"),
+			map[string]any{"role": "user", "content": long},
 			map[string]any{"role": "assistant", "tool_calls": []any{
 				map[string]any{"id": "t1", "type": "function"},
 			}},
 			map[string]any{"role": "tool", "tool_call_id": "t1", "content": "tail-result"},
 		},
 	})
-	if len(body) <= maxAuditReqBody {
-		t.Fatalf("test body is only %d bytes; raise message sizes", len(body))
+
+	got := auditBodySummary(body, maxAuditReqBody)
+	if len(got) >= len(body) {
+		t.Fatalf("summary is %d bytes vs body %d — nothing was cut", len(got), len(body))
+	}
+	if len(got) > maxAuditReqBody {
+		t.Fatalf("summary is %d bytes, want <= %d", len(got), maxAuditReqBody)
 	}
 
-	got := auditRequestBody(body, maxAuditReqBody)
-	if len(got) > maxAuditReqBody {
-		t.Fatalf("compacted body is %d bytes, want <= %d", len(got), maxAuditReqBody)
-	}
 	var parsed map[string]any
 	if err := json.Unmarshal([]byte(got), &parsed); err != nil {
-		t.Fatalf("compacted body is not valid JSON: %v\n%s", err, got[:200])
+		t.Fatalf("summary is not valid JSON: %v\n%.200s", err, got)
 	}
-	if _, ok := parsed["_audit_truncated"]; !ok {
-		t.Fatalf("compacted body lacks the truncation marker")
+	// Structure survives: model, the message list, and each message's keys.
+	if parsed["model"] != "deepseek-chat" {
+		t.Fatalf("model key lost: %v", parsed["model"])
 	}
+	msgs, ok := parsed["messages"].([]any)
+	if !ok || len(msgs) != 3 {
+		t.Fatalf("messages lost their shape: %#v", parsed["messages"])
+	}
+	first, _ := msgs[0].(map[string]any)
+	if first["role"] != "user" {
+		t.Fatalf("message role lost: %#v", first)
+	}
+	content, _ := first["content"].(string)
+	if len(content) > auditFieldPreview+len("…[+ chars]")+20 {
+		t.Fatalf("long field was not previewed: %d chars", len(content))
+	}
+	if !strings.Contains(content, "…[+") {
+		t.Fatalf("preview lacks its truncation marker: %q", content)
+	}
+	// The tool-call structure is exactly what a 400 about tool pairing needs.
+	if !strings.Contains(got, `"tool_calls"`) || !strings.Contains(got, `"tool_call_id"`) {
+		t.Fatalf("tool structure lost from the summary: %s", got)
+	}
+	// Short fields come through whole.
 	if !strings.Contains(got, "tail-result") {
-		t.Fatalf("compacted body lost the newest message — the tail is the part worth keeping")
-	}
-	if strings.Contains(got, "old-1-") {
-		t.Fatalf("compacted body kept the oldest message; the head should go first")
-	}
-	if !strings.Contains(got, `"tool_calls"`) {
-		t.Fatalf("compacted body lost the assistant tool_calls")
+		t.Fatalf("short value was altered: %s", got)
 	}
 }
 
-// TestAuditRequestBodyPassthroughAndFallback — small bodies are untouched and
-// non-JSON bodies get a plain marked cut rather than being dropped.
-func TestAuditRequestBodyPassthroughAndFallback(t *testing.T) {
-	small := `{"model":"m","messages":[{"role":"user","content":"hi"}]}`
-	if got := auditRequestBody(small, maxAuditReqBody); got != small {
-		t.Fatalf("small body was rewritten: %s", got)
+// TestAuditBodySummaryCutsLongArrays — a long message list keeps its head and
+// tail with an explicit count in between, rather than silently dropping the
+// middle.
+func TestAuditBodySummaryCutsLongArrays(t *testing.T) {
+	msgs := make([]any, 0, 30)
+	for i := 0; i < 30; i++ {
+		msgs = append(msgs, map[string]any{"role": "user", "content": jStringify(i)})
 	}
+	body := jStringify(map[string]any{"model": "m", "messages": msgs})
 
-	raw := "[" + strings.Repeat("x", maxAuditReqBody+10) + "]"
-	got := auditRequestBody(raw, 64)
-	if !strings.HasSuffix(got, "[truncated]") {
-		t.Fatalf("non-JSON body missing the truncation marker: %q", got[len(got)-30:])
+	got := auditBodySummary(body, maxAuditReqBody)
+	if !strings.Contains(got, "more items") {
+		t.Fatalf("long array was not collapsed with a count: %s", got)
 	}
-	if len(got) > 64+len("\n…[truncated]") {
-		t.Fatalf("cut body is %d bytes, want <= cap+marker", len(got))
+	// Head and tail both survive.
+	for _, want := range []string{`"content":"0"`, `"content":"29"`} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("summary lost %s: %s", want, got)
+		}
+	}
+	if strings.Contains(got, `"content":"15"`) {
+		t.Fatalf("middle of a long array should be collapsed: %s", got)
+	}
+}
+
+// TestAuditBodySummaryFallback — a body that is not JSON still gets a bounded,
+// marked cut rather than being stored whole or dropped.
+func TestAuditBodySummaryFallback(t *testing.T) {
+	if got := auditBodySummary("", maxAuditReqBody); got != "" {
+		t.Fatalf("empty body became %q", got)
+	}
+	raw := "upstream exploded: " + strings.Repeat("x", 5000)
+	got := auditBodySummary(raw, maxAuditReqBody)
+	if !strings.HasSuffix(got, "[truncated]") {
+		t.Fatalf("non-JSON body missing the truncation marker: %.40q", got)
+	}
+	if len(got) > auditFieldPreview+len("\n…[truncated]") {
+		t.Fatalf("non-JSON body was not cut to the preview length: %d bytes", len(got))
 	}
 }
 
@@ -79,5 +116,26 @@ func TestCutWithMarkerRespectsRunes(t *testing.T) {
 	head := strings.TrimSuffix(got, "\n…[truncated]")
 	if !utf8.ValidString(head) {
 		t.Fatalf("cut split a rune: %q", head[len(head)-6:])
+	}
+}
+
+// TestPreviewTextRespectsRunes — a field preview must also land on a rune
+// boundary, and must stay untouched when it already fits.
+func TestPreviewTextRespectsRunes(t *testing.T) {
+	short := "hello"
+	if got := previewText(short); got != short {
+		t.Fatalf("short field was rewritten: %q", got)
+	}
+	long := strings.Repeat("好", 100)
+	got := previewText(long)
+	head := strings.SplitN(got, "…[+", 2)[0]
+	if !utf8.ValidString(head) {
+		t.Fatalf("preview split a rune: %q", head)
+	}
+	if len(head) > auditFieldPreview {
+		t.Fatalf("preview head is %d bytes, want <= %d", len(head), auditFieldPreview)
+	}
+	if !strings.Contains(got, "[+") {
+		t.Fatalf("preview lacks the size marker: %q", got)
 	}
 }

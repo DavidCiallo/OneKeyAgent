@@ -12,7 +12,6 @@
         "ToastParamError": "Erro de parâmetro, verifique a entrada",
         "DefaultSelectPlaceholder": "Por favor, insira"
     },
-
     "Menu": {
         "Model": "Modelo",
         "Provider": "Provedor",
@@ -24,7 +23,6 @@
         "NoContent": "Sem acesso",
         "Logout": "Sair"
     },
-
     "ModelPage": {
         "Alias": "Apelido",
         "Actions": "Ações",
@@ -41,7 +39,6 @@
         "CreateModel": "Criar modelo",
         "Public": "Público"
     },
-
     "ProviderPage": {
         "ModelAlias": "Apelido do modelo",
         "ModelAliasPlaceholder": "Filtrar por apelido",
@@ -72,10 +69,19 @@
         "BatchDisable": "Desativar lote",
         "BatchSetProxy": "Proxy lote",
         "Clear": "Limpar",
+        "SelectAll": "Selecionar tudo",
+        "StatusOn": "Ativado",
+        "StatusOff": "Desativado",
         "Yes": "Sim",
-        "No": "Não"
+        "No": "Não",
+        "MaxContext": "Contexto máximo",
+        "DailyQuota": "Cota diária",
+        "Parked": "Pausado",
+        "QuotaSpent": "Cota esgotada",
+        "FailStreakHint": "Falhas consecutivas; 5 o pausa por 300s.",
+        "Context": "Contexto",
+        "Quota": "Cota"
     },
-
     "UsagePage": {
         "AccountId": "Conta",
         "AccountIdPlaceholder": "Filtrar por conta",
@@ -94,7 +100,6 @@
         "UserUsage": "Uso do usuário",
         "History": "Histórico"
     },
-
     "AuthPage": {
         "Title": "EHEX",
         "LoginSuccess": "Login bem-sucedido",
@@ -126,7 +131,6 @@
         "VerifyEmailVerifying": "Verificando seu e-mail...",
         "BackToLogin": "Voltar ao login"
     },
-
     "HomePage": {
         "MainText": "EHEX",
         "Slogan1": "Palavras simples,",
@@ -154,7 +158,6 @@
         "NavSignIn": "Entrar",
         "NavConsole": "Console"
     },
-
     "AccountPage": {
         "Name": "Nome",
         "NamePlaceholder": "Filtrar por nome",
@@ -191,12 +194,10 @@
         "GiftCardStatusRedeemed": "Resgatado",
         "GiftCardStatusExpired": "Expirado"
     },
-
     "NoContentPage": {
         "Title": "Sem acesso",
         "Message": "Você não tem permissão para acessar esta página. Contate o administrador."
     },
-
     "ChatPage": {
         "NewChat": "Novo chat",
         "DeleteChat": "Excluir",
@@ -206,7 +207,6 @@
         "EmptySession": "Iniciar uma nova conversa",
         "NoSession": "Selecione ou crie um chat"
     },
-
     "ProfilePage": {
         "AccountInfo": "Informações da conta",
         "Name": "Nome",
@@ -231,7 +231,6 @@
         "OutputPrice": "Preço de saída",
         "TermsLink": "Ao usar a API, você concorda com os Termos de Serviço"
     },
-
     "TopupPage": {
         "CurrentPlan": "Saldo atual",
         "Balance": "Saldo",
@@ -256,7 +255,6 @@
         "GiftCardLabel": "Resgatar",
         "UsageLabel": "Uso"
     },
-
     "TermsPage": {
         "Title": "Acordo do usuário",
         "Subtitle": "Por favor, leia estes termos com atenção.",
@@ -271,15 +269,13 @@
         "Section4Body": "1. A plataforma não oferece garantia, expressa ou implícita, quanto à precisão, integridade ou confiabilidade do conteúdo gerado por modelos. Você assume todos os riscos associados ao uso de tal conteúdo.\n\n2. Na máxima extensão permitida pela lei aplicável, a plataforma não será responsável por quaisquer danos indiretos, incidentais, especiais, consequenciais ou exemplares decorrentes do uso ou da impossibilidade de acesso ao serviço.\n\n3. A plataforma reserva-se o direito de modificar, suspender ou descontinuar o serviço a qualquer momento. Alterações materiais serão comunicadas com antecedência por meios razoáveis.",
         "Section5Title": "5. Fale conosco",
         "Section5Body": "Se você tiver alguma dúvida ou precisar de ajuda, contate o administrador. Valorizamos o feedback de cada usuário.\n\n\"Palavras simples, inteligência profunda.\""
-    }
-,
+    },
     "AuditPage": {
         "Title": "Auditoria de requisições",
         "Success": "Sucesso",
         "Failed": "Falhas",
-        "AutoRefresh": "Atualização automática",
         "Refresh": "Atualizar",
-        "KeepHint": "Mantém os últimos {n} registros de cada tipo.",
+        "KeepHint": "Mantém os últimos {n} registros de cada tipo; requisições com falha mantêm a estrutura JSON com os primeiros 64 caracteres de cada campo.",
         "Time": "Hora",
         "Account": "Conta",
         "Model": "Modelo",

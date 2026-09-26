@@ -123,7 +123,7 @@ func ModelWhere(db *sql.DB, cond string, args []any) ([]*Model, error) {
 
 // ─────────────────────────── Provider ───────────────────────────
 
-const providerCols = "id,model_alias,priority,name,base_url,model,api_key,auth_type,api_type,proxy_url,supports_thinking,supports_reasoning_effort,replay_reasoning,enable_search,extra_json,enabled,create_time,update_time,delete_time"
+const providerCols = "id,model_alias,priority,name,base_url,model,api_key,auth_type,api_type,proxy_url,supports_thinking,supports_reasoning_effort,replay_reasoning,enable_search,extra_json,enabled,max_context,daily_quota,create_time,update_time,delete_time"
 
 type Provider struct {
 	ID                     string  `json:"id"`
@@ -142,9 +142,13 @@ type Provider struct {
 	EnableSearch           *int64  `json:"enable_search"`
 	ExtraJSON              *string `json:"extra_json"`
 	Enabled                int64   `json:"enabled"`
-	CreateTime             int64   `json:"create_time"`
-	UpdateTime             *int64  `json:"update_time"`
-	DeleteTime             *int64  `json:"delete_time"`
+	// MaxContext — declared context window; 0 = unlimited.
+	MaxContext int64 `json:"max_context"`
+	// DailyQuota — requests per local day; 0 = unlimited.
+	DailyQuota int64 `json:"daily_quota"`
+	CreateTime int64  `json:"create_time"`
+	UpdateTime *int64 `json:"update_time"`
+	DeleteTime *int64 `json:"delete_time"`
 }
 
 func scanProvider(row interface{ Scan(...any) error }) (*Provider, error) {
@@ -152,7 +156,7 @@ func scanProvider(row interface{ Scan(...any) error }) (*Provider, error) {
 	err := row.Scan(&p.ID, &p.ModelAlias, &p.Priority, &p.Name, &p.BaseURL, &p.Model,
 		&p.ApiKey, &p.AuthType, &p.ApiType, &p.ProxyURL,
 		&p.SupportsThinking, &p.SupportsReasoningEffort, &p.ReplayReasoning, &p.EnableSearch,
-		&p.ExtraJSON, &p.Enabled, &p.CreateTime, &p.UpdateTime, &p.DeleteTime)
+		&p.ExtraJSON, &p.Enabled, &p.MaxContext, &p.DailyQuota, &p.CreateTime, &p.UpdateTime, &p.DeleteTime)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -168,7 +172,8 @@ func (p *Provider) DTO() map[string]any {
 		"base_url": p.BaseURL, "model": p.Model, "api_key": p.ApiKey, "auth_type": p.AuthType,
 		"api_type": p.ApiType, "proxy_url": p.ProxyURL, "supports_thinking": p.SupportsThinking,
 		"supports_reasoning_effort": p.SupportsReasoningEffort, "replay_reasoning": p.ReplayReasoning,
-		"enable_search": p.EnableSearch, "extra_json": p.ExtraJSON, "enabled": p.Enabled, "create_time": p.CreateTime,
+		"enable_search": p.EnableSearch, "extra_json": p.ExtraJSON, "enabled": p.Enabled,
+		"max_context": p.MaxContext, "daily_quota": p.DailyQuota, "create_time": p.CreateTime,
 		"update_time": p.UpdateTime, "delete_time": p.DeleteTime,
 	}
 }
@@ -309,26 +314,27 @@ func shuffleEqualPriority(list []*Provider) {
 	}
 }
 
+// ProviderModelAliases — the alias picker behind the provider page. The page
+// filters by exactly one alias and now lands on the first one by default, so a
+// soft-deleted provider's alias must not be offered: picking it can only ever
+// render an empty chain. Sorted here (not in the caller) because the picker
+// reads as a list of chains.
 func ProviderModelAliases(db *sql.DB) ([]string, error) {
-	all, err := ProviderAllIgnoreDelete(db)
+	rows, err := db.Query("SELECT DISTINCT model_alias FROM provider" +
+		" WHERE delete_time IS NULL AND model_alias <> '' ORDER BY model_alias ASC")
 	if err != nil {
 		return nil, err
 	}
-	seen := map[string]bool{}
-	var out []string
-	for _, p := range all {
-		if p.ModelAlias == "" || seen[p.ModelAlias] {
-			continue
+	defer rows.Close()
+	out := []string{}
+	for rows.Next() {
+		var alias string
+		if err := rows.Scan(&alias); err != nil {
+			return nil, err
 		}
-		seen[p.ModelAlias] = true
-		out = append(out, p.ModelAlias)
+		out = append(out, alias)
 	}
-	for i := 1; i < len(out); i++ {
-		for j := i; j > 0 && out[j] < out[j-1]; j-- {
-			out[j], out[j-1] = out[j-1], out[j]
-		}
-	}
-	return out, nil
+	return out, rows.Err()
 }
 
 func ProviderUpdatePriority(db *sql.DB, id string, delta int64) error {

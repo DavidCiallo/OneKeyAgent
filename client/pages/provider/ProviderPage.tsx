@@ -5,7 +5,7 @@ import { providerApi } from "../../api/instance";
 import { Locale } from "../../methods/locale";
 import { useDisclosure } from "@heroui/react";
 import { ProviderFilter } from "./components/ProviderFilter";
-import { ProviderTable } from "./components/ProviderTable";
+import { ProviderCardGrid } from "./components/ProviderCardGrid";
 import { ProviderPagination } from "./components/ProviderPagination";
 import { ProviderFormModal } from "./components/ProviderFormModal";
 import { ProviderBatchModal } from "./components/ProviderBatchModal";
@@ -26,7 +26,17 @@ type ProviderForm = {
     replay_reasoning: number;
     enable_search: number;
     enabled: number;
+    max_context: number;
+    daily_quota: number;
 };
+
+// 0 = no limit for both composite fields.
+const emptyForm = (): ProviderForm => ({
+    model_alias: "", priority: 1, name: "", base_url: "", model: "",
+    auth_type: "bearer", api_type: "openai", extra_json: "",
+    supports_thinking: 0, supports_reasoning_effort: 0, replay_reasoning: 0,
+    enable_search: 0, enabled: 1, max_context: 0, daily_quota: 0,
+});
 
 export default function ProviderPage() {
 
@@ -39,15 +49,48 @@ export default function ProviderPage() {
     const { isOpen: isFormOpen, onOpen: onFormOpen, onClose: onFormClose, onOpenChange: onFormOpenChange } = useDisclosure();
     const [formMode, setFormMode] = useState<"create" | "edit">("create");
     const [editId, setEditId] = useState<string>("");
-    const [form, setForm] = useState<ProviderForm>({ model_alias: "", priority: 1, name: "", base_url: "", model: "", auth_type: "bearer", api_type: "openai", extra_json: "", supports_thinking: 0, supports_reasoning_effort: 0, replay_reasoning: 0, enable_search: 0, enabled: 1 });
+    const [form, setForm] = useState<ProviderForm>(emptyForm());
 
     // Multi-select state
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const { isOpen: isBatchOpen, onOpen: onBatchOpen, onClose: onBatchClose, onOpenChange: onBatchOpenChange } = useDisclosure();
 
+    // The page is organised per model alias: the filter is mandatory and the
+    // list starts on the first alias instead of an empty "all providers" view.
+    const [modelAliasOptions, setModelAliasOptions] = useState<string[]>([]);
+    const [aliasLoaded, setAliasLoaded] = useState(false);
+
+    // Reloaded after every write: creating, renaming or deleting a provider can
+    // add an alias, empty one out, or drop the last one — and a picker offering
+    // a chain with nothing in it renders as a blank page. `select` forces the
+    // view onto a specific alias (the one just written to); otherwise the
+    // current selection is kept while it still exists.
+    const loadAliases = useCallback(async (select?: string) => {
+        const res: any = await providerApi.modelaliases({});
+        if (res.success && Array.isArray(res.data)) {
+            setModelAliasOptions(res.data);
+            setFilterModelAlias(prev => select || (prev && res.data.includes(prev) ? prev : res.data[0] || ""));
+        }
+        setAliasLoaded(true);
+    }, []);
+
+    useEffect(() => {
+        loadAliases();
+    }, [loadAliases]);
+
+    // Switching alias drops the selection: it is scoped to the chain on screen,
+    // and a batch action on rows the admin can no longer see is a trap.
+    const handleAliasChange = (v: string) => {
+        setFilterModelAlias(v);
+        setSelectedIds(new Set());
+        setPage(1);
+    };
+
+    // Fetch only once an alias is settled, so the first request already carries
+    // the filter instead of firing an unfiltered one.
     const fetchList = useCallback(async (p: number) => {
-        const filter: Record<string, string | number> = {};
-        if (filterModelAlias) filter.model_alias = filterModelAlias;
+        if (!filterModelAlias) return;
+        const filter: Record<string, string | number> = { model_alias: filterModelAlias };
 
         const res = await providerApi.list({ page: p, filter });
         if (res.success && res.data) {
@@ -57,21 +100,16 @@ export default function ProviderPage() {
     }, [filterModelAlias]);
 
     useEffect(() => {
+        if (!aliasLoaded) return;
         fetchList(page);
-    }, [page, fetchList]);
-
-    // Fetch model_aliases for filter dropdown (from all providers, not just current page)
-    const [modelAliasOptions, setModelAliasOptions] = useState<string[]>([]);
-    useEffect(() => {
-        providerApi.modelaliases({}).then((res: any) => {
-            if (res.success && Array.isArray(res.data)) setModelAliasOptions(res.data);
-        });
-    }, []);
+    }, [page, fetchList, aliasLoaded]);
 
     // Sort by model_alias ASC first, then by priority ASC
     const sortedList = useMemo(() => {
         return [...list].sort((a, b) => a.model_alias.localeCompare(b.model_alias) || a.priority - b.priority);
     }, [list]);
+
+    const allSelected = sortedList.length > 0 && sortedList.every(item => selectedIds.has(item.id));
 
     const handleMoveUp = async (id: string) => {
         const res = await providerApi.updatepriority({ id, delta: -1 });
@@ -83,9 +121,16 @@ export default function ProviderPage() {
         if (res.success) fetchList(page);
     };
 
+    // A new provider joins the chain currently on screen: alias and position
+    // are pre-filled from what the admin is looking at.
+    const nextPriority = useMemo(() => {
+        const highest = sortedList.reduce((max, item) => Math.max(max, item.priority), 0);
+        return Math.min(highest + 1, 5);
+    }, [sortedList]);
+
     const openCreate = () => {
         setFormMode("create");
-        setForm({ model_alias: "", priority: 1, name: "", base_url: "", model: "", auth_type: "bearer", api_type: "openai", extra_json: "", supports_thinking: 0, supports_reasoning_effort: 0, replay_reasoning: 0, enable_search: 0, enabled: 1 });
+        setForm({ ...emptyForm(), model_alias: filterModelAlias, priority: nextPriority });
         onFormOpen();
     };
 
@@ -107,6 +152,8 @@ export default function ProviderPage() {
                 enable_search: item.enable_search ?? 0,
                 extra_json: item.extra_json || undefined,
                 enabled: item.enabled,
+                max_context: item.max_context ?? 0,
+                daily_quota: item.daily_quota ?? 0,
             },
         });
         if (res.success) {
@@ -133,6 +180,8 @@ export default function ProviderPage() {
             replay_reasoning: item.replay_reasoning ?? 0,
             enable_search: item.enable_search ?? 0,
             enabled: item.enabled,
+            max_context: item.max_context ?? 0,
+            daily_quota: item.daily_quota ?? 0,
         });
         onFormOpen();
     };
@@ -156,12 +205,18 @@ export default function ProviderPage() {
                     enable_search: form.enable_search,
                     extra_json: form.extra_json || undefined,
                     enabled: form.enabled,
+                    max_context: form.max_context,
+                    daily_quota: form.daily_quota,
                 },
             });
             if (res.success) {
                 onFormClose();
-                fetchList(1);
+                // Land on the chain that was just written to, and pick up an
+                // alias this create may have introduced.
+                await loadAliases(form.model_alias);
+                setSelectedIds(new Set());
                 setPage(1);
+                if (form.model_alias === filterModelAlias) fetchList(1);
             }
         } else {
             const res = await providerApi.update({
@@ -182,10 +237,15 @@ export default function ProviderPage() {
                     enable_search: form.enable_search !== undefined ? form.enable_search : undefined,
                     extra_json: form.extra_json !== undefined ? form.extra_json : undefined,
                     enabled: form.enabled !== undefined ? form.enabled : undefined,
+                    max_context: form.max_context !== undefined ? form.max_context : undefined,
+                    daily_quota: form.daily_quota !== undefined ? form.daily_quota : undefined,
                 },
             });
             if (res.success) {
                 onFormClose();
+                // An edit can move a provider to a different alias, which may
+                // leave the chain on screen empty or drop it entirely.
+                await loadAliases(form.model_alias);
                 fetchList(page);
             }
         }
@@ -194,6 +254,8 @@ export default function ProviderPage() {
     const handleDelete = async (id: string) => {
         const res = await providerApi.delete({ id });
         if (res.success) {
+            // The last provider of a chain may have just gone.
+            await loadAliases();
             fetchList(page);
         }
     };
@@ -257,10 +319,12 @@ export default function ProviderPage() {
             <div className="p-8 flex flex-col gap-4 flex-1 overflow-hidden">
                 <ProviderFilter
                     filterModelAlias={filterModelAlias}
-                    onModelAliasChange={v => { setFilterModelAlias(v); setPage(1); }}
+                    onModelAliasChange={handleAliasChange}
                     onAdd={openCreate}
                     modelAliasOptions={modelAliasOptions}
                     selectedCount={selectedIds.size}
+                    allSelected={allSelected}
+                    onToggleSelectAll={toggleSelectAll}
                     onBatchEnable={() => handleBatchEnable(1)}
                     onBatchDisable={() => handleBatchEnable(0)}
                     onBatchThinkingOn={() => handleBatchThinking(1)}
@@ -269,7 +333,7 @@ export default function ProviderPage() {
                     onClearSelection={clearSelection}
                 />
 
-                <ProviderTable
+                <ProviderCardGrid
                     list={sortedList}
                     onEdit={openEdit}
                     onCopy={handleCopy}
@@ -278,7 +342,6 @@ export default function ProviderPage() {
                     onMoveDown={(item) => handleMoveDown(item.id)}
                     selectedIds={selectedIds}
                     onToggleSelect={toggleSelect}
-                    onToggleSelectAll={toggleSelectAll}
                 />
 
                 <ProviderPagination page={page} total={total} onChange={setPage} />
