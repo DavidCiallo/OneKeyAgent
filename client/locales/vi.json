@@ -77,7 +77,10 @@
         "QuotaSpent": "Hết hạn mức",
         "FailStreakHint": "Số lần lỗi liên tiếp; 5 lần sẽ tạm dừng 300 giây.",
         "Context": "Ngữ cảnh",
-        "Quota": "Hạn mức"
+        "Quota": "Hạn mức",
+        "ActiveFrom": "Hiệu lực từ",
+        "ActiveTo": "Hiệu lực đến",
+        "OutsideWindow": "Ngoài khung giờ hoạt động; yêu cầu sẽ bỏ qua nhà cung cấp này."
     },
     "UsagePage": {
         "AccountId": "Tài khoản",

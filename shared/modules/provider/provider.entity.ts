@@ -21,6 +21,9 @@ export interface ProviderEntity extends BaseEntity {
     max_context?: number;
     /** Requests per local day; 0 = unlimited, in-memory. */
     daily_quota?: number;
+    /** Minutes past routing-local midnight; both 0 = any time. */
+    active_from?: number;
+    active_to?: number;
     create_time: number;
     update_time: number;
     delete_time: number | null;

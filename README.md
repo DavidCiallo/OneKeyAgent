@@ -103,6 +103,7 @@ The server reads configuration from environment variables (see `.env.example`).
 | `NOWPAYMENTS_API_KEY` | NowPayments API key for crypto payments | — |
 | `IPN_CALLBACK_URL` | Instant Payment Notification callback URL | — |
 | `SHOW_HOME_PAGE` | Set to `0` to disable the home page; `/home` then redirects to the login page, or to the signed-in account's own page | `1` |
+| `ROUTING_TIMEZONE` | Zone used for provider active windows and the daily request counters | `Asia/Shanghai` |
 
 ---
 

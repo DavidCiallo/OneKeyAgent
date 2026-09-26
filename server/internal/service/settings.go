@@ -16,6 +16,12 @@ import (
 
 // ─────────────────────────── Settings ───────────────────────────
 
+// DefaultRoutingTimezone — the clock used for provider active windows and for
+// the per-day request counters. It is deliberately independent of the
+// container's TZ (the compose file leaves that at UTC): an operator writing
+// "00:00-08:00" means their own midnight, not 08:00 Beijing.
+const DefaultRoutingTimezone = "Asia/Shanghai"
+
 // settingKeys: key → env fallback (settings.service.ts).
 var settingKeys = [][2]string{
 	{"nowpayments_api_key", "NOWPAYMENTS_API_KEY"},
@@ -29,6 +35,7 @@ var settingKeys = [][2]string{
 	{"daily_register_limit", "DAILY_REGISTER_LIMIT"},
 	{"fallback_model_alias", "FALLBACK_MODEL_ALIAS"},
 	{"show_home_page", "SHOW_HOME_PAGE"},
+	{"routing_timezone", "ROUTING_TIMEZONE"},
 }
 
 var settingDefaults = map[string]string{
@@ -36,6 +43,7 @@ var settingDefaults = map[string]string{
 	"daily_register_limit":  "5",
 	"fallback_model_alias":  "",
 	"show_home_page":        "1",
+	"routing_timezone":      DefaultRoutingTimezone,
 }
 
 type Settings struct {

@@ -18,6 +18,7 @@ const FIELD_LABELS: Record<string, string> = {
     daily_register_limit: "Daily Registration Limit",
     fallback_model_alias: "Fallback Model Alias",
     show_home_page: "Show Home Page",
+    routing_timezone: "Routing Timezone",
 };
 
 export default function SettingsPage() {

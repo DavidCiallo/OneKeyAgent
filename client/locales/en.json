@@ -82,7 +82,10 @@
         "QuotaSpent": "Quota spent",
         "FailStreakHint": "Consecutive failures; 5 parks this provider for 300s.",
         "Context": "Context",
-        "Quota": "Quota"
+        "Quota": "Quota",
+        "ActiveFrom": "Active from",
+        "ActiveTo": "Active to",
+        "OutsideWindow": "Outside its active window; requests skip this provider."
     },
     "UsagePage": {
         "AccountId": "Account",

@@ -28,6 +28,8 @@ type ProviderForm = {
     enabled: number;
     max_context: number;
     daily_quota: number;
+    active_from: string;
+    active_to: string;
 };
 
 // 0 = no limit for both composite fields.
@@ -36,7 +38,23 @@ const emptyForm = (): ProviderForm => ({
     auth_type: "bearer", api_type: "openai", extra_json: "",
     supports_thinking: 0, supports_reasoning_effort: 0, replay_reasoning: 0,
     enable_search: 0, enabled: 1, max_context: 0, daily_quota: 0,
+    active_from: "", active_to: "",
 });
+
+// Minutes past local midnight, stored as an "HH:MM" string for <input type="time">.
+// Both ends empty (or equal) mean the provider is always available.
+const minutesToTime = (v?: number): string => {
+    const n = Number(v || 0);
+    if (!n) return "";
+    const h = Math.floor(n / 60) % 24;
+    return `${String(h).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`;
+};
+
+const timeToMinutes = (v: string): number => {
+    if (!v) return 0;
+    const [h, m] = v.split(":").map(Number);
+    return (h || 0) * 60 + (m || 0);
+};
 
 export default function ProviderPage() {
 
@@ -154,6 +172,8 @@ export default function ProviderPage() {
                 enabled: item.enabled,
                 max_context: item.max_context ?? 0,
                 daily_quota: item.daily_quota ?? 0,
+                active_from: item.active_from ?? 0,
+                active_to: item.active_to ?? 0,
             },
         });
         if (res.success) {
@@ -182,6 +202,8 @@ export default function ProviderPage() {
             enabled: item.enabled,
             max_context: item.max_context ?? 0,
             daily_quota: item.daily_quota ?? 0,
+            active_from: minutesToTime(item.active_from),
+            active_to: minutesToTime(item.active_to),
         });
         onFormOpen();
     };
@@ -207,6 +229,8 @@ export default function ProviderPage() {
                     enabled: form.enabled,
                     max_context: form.max_context,
                     daily_quota: form.daily_quota,
+                    active_from: timeToMinutes(form.active_from),
+                    active_to: timeToMinutes(form.active_to),
                 },
             });
             if (res.success) {
@@ -239,6 +263,8 @@ export default function ProviderPage() {
                     enabled: form.enabled !== undefined ? form.enabled : undefined,
                     max_context: form.max_context !== undefined ? form.max_context : undefined,
                     daily_quota: form.daily_quota !== undefined ? form.daily_quota : undefined,
+                    active_from: timeToMinutes(form.active_from),
+                    active_to: timeToMinutes(form.active_to),
                 },
             });
             if (res.success) {
