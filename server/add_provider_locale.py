@@ -58,6 +58,28 @@ KEYS = {
         "pt-BR": "Cota", "ru": "Квота",
         "th": "โควต้า", "vi": "Hạn mức",
     },
+    "ActiveFrom": {
+        "cn": "生效起", "en": "Active from",
+        "es": "Activo desde", "ja": "開始時刻",
+        "pt-BR": "Ativo a partir de", "ru": "Активен с",
+        "th": "เริ่มใช้งาน", "vi": "Hiệu lực từ",
+    },
+    "ActiveTo": {
+        "cn": "生效止", "en": "Active to",
+        "es": "Activo hasta", "ja": "終了時刻",
+        "pt-BR": "Ativo até", "ru": "Активен до",
+        "th": "สิ้นสุดการใช้งาน", "vi": "Hiệu lực đến",
+    },
+    "OutsideWindow": {
+        "cn": "当前不在生效时段，请求会跳过该供应商。",
+        "en": "Outside its active window; requests skip this provider.",
+        "es": "Fuera de su franja activa; las peticiones lo omiten.",
+        "ja": "現在は有効時間外のため、リクエストではスキップされます。",
+        "pt-BR": "Fora da janela ativa; as requisições o ignoram.",
+        "ru": "Вне активного окна; запросы его пропускают.",
+        "th": "อยู่นอกช่วงเวลาที่ใช้งาน คำขอจะข้ามผู้ให้บริการรายนี้",
+        "vi": "Ngoài khung giờ hoạt động; yêu cầu sẽ bỏ qua nhà cung cấp này.",
+    },
 }
 
 

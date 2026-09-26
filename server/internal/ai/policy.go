@@ -5,37 +5,80 @@ import (
 	"sync"
 	"time"
 
+	"onekey/server/internal/service"
 	"onekey/server/internal/store"
 )
 
 // Provider selection policy: in-memory, per-process filters applied on top of
-// the priority order — failure cooldown, daily quota, context size.
+// the priority order — failure cooldown, daily quota, context size, active
+// window.
 //
 // They are preferences, not gates: when every candidate is filtered out the
 // original order is used, since trying a parked upstream beats failing outright.
 type providerPolicy struct {
 	mu sync.Mutex
 
+	// settings carries routing_timezone; nil in tests that do not care.
+	settings *service.Settings
+
 	failures      map[string]int
 	cooldownUntil map[string]int64
 	dailyCount    map[string]int
-	// dailyKey is the local calendar day the counters belong to.
+	// dailyKey is the routing-clock calendar day the counters belong to.
 	dailyKey string
+
+	// loc caches the zone parsed for locName, so a settings read does not hit
+	// the timezone database on every request.
+	locName string
+	loc     *time.Location
+
+	// nowFn is time.Now; tests pin it to check a window.
+	nowFn func() time.Time
 
 	maxFailures  int
 	cooldownMs   int64
 	retryDelayMs int64
 }
 
-func newProviderPolicy() *providerPolicy {
+func newProviderPolicy(settings *service.Settings) *providerPolicy {
 	return &providerPolicy{
+		settings:      settings,
 		failures:      map[string]int{},
 		cooldownUntil: map[string]int64{},
 		dailyCount:    map[string]int{},
+		nowFn:         time.Now,
 		maxFailures:   policyMaxFailures,
 		cooldownMs:    policyCooldownMs,
 		retryDelayMs:  policyRetryDelayMs,
 	}
+}
+
+// routingNow — the clock every active window and day boundary is read on. One
+// clock for both, so an operator never has to think in two timezones.
+func (p *providerPolicy) routingNow() time.Time {
+	return p.nowFn().In(p.routingLocation())
+}
+
+func (p *providerPolicy) routingLocation() *time.Location {
+	name := service.DefaultRoutingTimezone
+	if p.settings != nil {
+		if v := strings.TrimSpace(p.settings.Get("routing_timezone")); v != "" {
+			name = v
+		}
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.locName == name && p.loc != nil {
+		return p.loc
+	}
+	loc, err := time.LoadLocation(name)
+	if err != nil {
+		// An unknown zone must not take routing down. UTC is a loud fallback:
+		// every window is then hours off and immediately visible.
+		loc = time.UTC
+	}
+	p.locName, p.loc = name, loc
+	return loc
 }
 
 // Five consecutive failures park an upstream for five minutes.
@@ -45,7 +88,7 @@ const (
 	policyRetryDelayMs = 500
 )
 
-// dayKey — the local calendar day.
+// dayKey — the calendar day on the routing clock.
 func dayKey(now time.Time) string {
 	return now.Format("2006-01-02")
 }
@@ -60,9 +103,28 @@ func (p *providerPolicy) rollDayLocked(now time.Time) {
 	}
 }
 
+// windowCovers — active_from/active_to are minutes past routing-local midnight.
+// Equal ends mean no window at all, which covers the both-zero default; a
+// from==to window would otherwise make a provider permanently unreachable and
+// read as an outage rather than a typo. from > to wraps past midnight, so
+// 22:00-02:00 is one window, not an empty one.
+func windowCovers(from, to int64, minute int) bool {
+	if from == to {
+		return true
+	}
+	if from < to {
+		return int64(minute) >= from && int64(minute) < to
+	}
+	return int64(minute) >= from || int64(minute) < to
+}
+
+func minuteOfDay(t time.Time) int {
+	return t.Hour()*60 + t.Minute()
+}
+
 // eligible reports whether a provider passes the cooldown and quota filters.
-func (p *providerPolicy) eligible(providerID string, dailyQuota int64, cooldownOK bool, quotaOK bool) (bool, string) {
-	now := time.Now()
+// now must already be on the routing clock.
+func (p *providerPolicy) eligible(providerID string, dailyQuota int64, now time.Time, cooldownOK, quotaOK bool) (bool, string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.rollDayLocked(now)
@@ -83,7 +145,7 @@ func (p *providerPolicy) eligible(providerID string, dailyQuota int64, cooldownO
 
 // recordSuccess clears the failure streak and counts one request.
 func (p *providerPolicy) recordSuccess(providerID string) {
-	now := time.Now()
+	now := p.routingNow()
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.rollDayLocked(now)
@@ -95,7 +157,7 @@ func (p *providerPolicy) recordSuccess(providerID string) {
 // recordFailure counts a consecutive failure and parks the provider at the
 // threshold. Returns true when this failure tripped the cooldown.
 func (p *providerPolicy) recordFailure(providerID string) bool {
-	now := time.Now()
+	now := p.routingNow()
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.rollDayLocked(now)
@@ -112,26 +174,36 @@ type policySnapshot struct {
 	Failures      int   `json:"failures"`
 	CooldownUntil int64 `json:"cooldown_until"`
 	TodayCount    int   `json:"today_count"`
+	InWindow      bool  `json:"in_window"`
 }
 
 // Snapshot reports one provider's policy state for the admin UI.
-func (p *providerPolicy) Snapshot(providerID string) policySnapshot {
-	now := time.Now()
+func (p *providerPolicy) Snapshot(pr *store.Provider) policySnapshot {
+	now := p.routingNow()
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	out := policySnapshot{Failures: p.failures[providerID]}
-	if until, ok := p.cooldownUntil[providerID]; ok && now.UnixMilli() < until {
+	out := policySnapshot{
+		Failures: p.failures[pr.ID],
+		InWindow: windowCovers(pr.ActiveFrom, pr.ActiveTo, minuteOfDay(now)),
+	}
+	if until, ok := p.cooldownUntil[pr.ID]; ok && now.UnixMilli() < until {
 		out.CooldownUntil = until
 	}
 	if p.dailyKey == dayKey(now) {
-		out.TodayCount = p.dailyCount[providerID]
+		out.TodayCount = p.dailyCount[pr.ID]
 	}
 	return out
 }
 
+// policyDay — the routing clock's current calendar day, used by tests to show
+// that the day boundary really does move with the zone.
+func (p *providerPolicy) policyDay() string {
+	return dayKey(p.routingNow())
+}
+
 // PolicySnapshot — the Server-level accessor used by the admin API.
-func (s *Server) PolicySnapshot(providerID string) policySnapshot {
-	return s.policy.Snapshot(providerID)
+func (s *Server) PolicySnapshot(pr *store.Provider) policySnapshot {
+	return s.policy.Snapshot(pr)
 }
 
 // ─────────────────────────── context size ───────────────────────────
@@ -194,9 +266,10 @@ func fitsContext(declaredTokens int64, requestTokens int) bool {
 
 // ─────────────────────────── selection ───────────────────────────
 
-// selectProviders filters a priority-ordered candidate list. When every
-// candidate is filtered out the original list is returned, since trying a
-// parked upstream beats failing the request.
+// selectProviders filters a priority-ordered candidate list by active window,
+// context size, cooldown and daily quota. When every candidate is filtered out
+// the original list is returned, since trying a parked upstream beats failing
+// the request — which also means a window is a preference, not a gate.
 func (p *providerPolicy) selectProviders(
 	providers []*store.Provider,
 	requestedTokens int,
@@ -207,12 +280,18 @@ func (p *providerPolicy) selectProviders(
 		return providers
 	}
 
+	local := p.routingNow()
+	minute := minuteOfDay(local)
+
 	kept := make([]*store.Provider, 0, len(providers))
 	for _, pr := range providers {
 		if !fitsContext(pr.MaxContext, requestedTokens) {
 			continue
 		}
-		if ok, _ := p.eligible(pr.ID, pr.DailyQuota, cooldownOK, quotaOK); !ok {
+		if !windowCovers(pr.ActiveFrom, pr.ActiveTo, minute) {
+			continue
+		}
+		if ok, _ := p.eligible(pr.ID, pr.DailyQuota, local, cooldownOK, quotaOK); !ok {
 			continue
 		}
 		kept = append(kept, pr)

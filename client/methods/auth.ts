@@ -72,3 +72,18 @@ export function clearAuthData() {
     localStorage.removeItem("user_is_admin");
     localStorage.removeItem("user_roles");
 }
+
+// Read synchronously: the server injects it before the bundle runs, so routing
+// can decide without waiting a round trip.
+export function showHomePage(): boolean {
+    return window.__APP_CONFIG__?.show_home_page !== false;
+}
+
+// Where a signed-in account lands: an admin goes to its console, anyone else to
+// the first menu they can actually open. Sending them to a fixed page would
+// drop a user without that menu on /nocontent.
+export function getDefaultRoute(): string {
+    if (isAdmin()) return "/account";
+    const menuRole = getRoles().find(r => r.type === "menu");
+    return menuRole ? `/${menuRole.name}` : "/nocontent";
+}

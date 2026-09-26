@@ -19,6 +19,8 @@ type ProviderForm = {
     enabled: number;
     max_context: number;
     daily_quota: number;
+    active_from: string;
+    active_to: string;
 };
 
 type Props = {
@@ -162,6 +164,20 @@ export function ProviderFormModal({ isOpen, onOpenChange, mode, form, onFormChan
                                 label={locale.DailyQuota}
                                 value={String(form.daily_quota ?? 0)}
                                 onChange={e => onFormChange({ ...form, daily_quota: parseInt(e.target.value) || 0 })}
+                            />
+                        </div>
+                        <div className="flex flex-row gap-3">
+                            <Input
+                                type="time"
+                                label={locale.ActiveFrom}
+                                value={form.active_from}
+                                onChange={e => onFormChange({ ...form, active_from: e.target.value })}
+                            />
+                            <Input
+                                type="time"
+                                label={locale.ActiveTo}
+                                value={form.active_to}
+                                onChange={e => onFormChange({ ...form, active_to: e.target.value })}
                             />
                         </div>
                         <Textarea

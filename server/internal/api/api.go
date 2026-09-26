@@ -2,9 +2,13 @@
 package api
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/json"
 	"net/http"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"onekey/server/internal/ai"
 	"onekey/server/internal/httpx"
@@ -172,14 +176,70 @@ func (a *App) serveStatic(w http.ResponseWriter, r *http.Request) {
 		httpx.TextStatus(w, http.StatusForbidden, "Forbidden")
 		return
 	}
+	if filepath.Base(target) == "index.html" {
+		a.serveIndex(w)
+		return
+	}
 	if fileExists(target) {
 		http.ServeFile(w, r, target)
 		return
 	}
 	if !hasPrefix(pathName, "/api") {
 		// SPA fallback
-		http.ServeFile(w, r, joinPath(a.staticDir, "/index.html"))
+		a.serveIndex(w)
 		return
 	}
 	httpx.TextStatus(w, http.StatusNotFound, "Not Found")
+}
+
+// serveIndex — index.html with the boot config injected. The SPA reads the flag
+// while its modules initialise, which a fetch could not do without delaying the
+// first paint of every page load to answer a question about one route.
+// Settings are read per request, so /api/settings/list already reports the
+// effective value and changing it applies to the next page load.
+func (a *App) serveIndex(w http.ResponseWriter) {
+	raw, err := os.ReadFile(joinPath(a.staticDir, "/index.html"))
+	if err != nil {
+		httpx.TextStatus(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// The body varies with settings, so it must not be cached by URL alone.
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write(injectBootConfig(raw, a.bootConfig()))
+}
+
+func (a *App) bootConfig() map[string]any {
+	return map[string]any{
+		"show_home_page": boolSetting(a.Settings.Get("show_home_page")),
+	}
+}
+
+// boolSetting — 0/1 is what the settings page and .env carry. "false" is
+// accepted too, so the older spelling cannot silently read as ON.
+func boolSetting(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "0", "false":
+		return false
+	}
+	return true
+}
+
+// injectBootConfig — window.__APP_CONFIG__ immediately before </head>.
+// json.Marshal escapes <, > and &, so no value can close the script tag early.
+func injectBootConfig(raw []byte, cfg map[string]any) []byte {
+	payload, err := json.Marshal(cfg)
+	if err != nil {
+		return raw
+	}
+	tag := []byte("<script>window.__APP_CONFIG__=" + string(payload) + ";</script>")
+	if i := bytes.Index(raw, []byte("</head>")); i >= 0 {
+		out := make([]byte, 0, len(raw)+len(tag))
+		out = append(out, raw[:i]...)
+		out = append(out, tag...)
+		return append(out, raw[i:]...)
+	}
+	// No </head> to anchor on: prepend instead. The bundle's scripts are
+	// deferred, so they still run after this one.
+	return append(tag, raw...)
 }

@@ -114,6 +114,27 @@ function HealthChip({ item, locale }: { item: ProviderDTO; locale: any }) {
     return null;
 }
 
+// active_from/active_to are minutes past routing-local midnight; equal or zero
+// means no window. Off-window is a warning rather than a danger: it is a
+// deliberate schedule, not a fault.
+function WindowChip({ item, locale }: { item: ProviderDTO; locale: any }) {
+    const from = item.active_from || 0;
+    const to = item.active_to || 0;
+    if (from === to) return null;
+
+    const clock = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+    const label = `${clock(from)}-${clock(to)}`;
+    const off = item.in_window === false;
+
+    return (
+        <Tooltip content={off ? locale.OutsideWindow : label}>
+            <Chip size="sm" variant={off ? "flat" : "bordered"} color={off ? "warning" : "default"} className="shrink-0">
+                {label}
+            </Chip>
+        </Tooltip>
+    );
+}
+
 export function ProviderCardGrid({ list, onEdit, onCopy, onDelete, onMoveUp, onMoveDown, selectedIds, onToggleSelect }: Props) {
     const locale = Locale("ProviderPage");
 
@@ -219,6 +240,7 @@ export function ProviderCardGrid({ list, onEdit, onCopy, onDelete, onMoveUp, onM
                                     {locale.Quota} {item.today_count || 0}/{humanCount(item.daily_quota)}
                                 </Chip>
                             ) : null}
+                            <WindowChip item={item} locale={locale} />
                         </div>
                     </div>
                 ))}

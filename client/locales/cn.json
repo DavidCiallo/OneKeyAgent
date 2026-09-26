@@ -85,7 +85,10 @@
         "QuotaSpent": "配额用尽",
         "FailStreakHint": "连续失败次数，达到 5 次将暂停该供应商 300 秒。",
         "Context": "上下文",
-        "Quota": "配额"
+        "Quota": "配额",
+        "ActiveFrom": "生效起",
+        "ActiveTo": "生效止",
+        "OutsideWindow": "当前不在生效时段，请求会跳过该供应商。"
     },
     "UsagePage": {
         "AccountId": "账号",

@@ -40,8 +40,27 @@ SECRET=xxx SERVER_PORT=3300 SQLITE_PATH=data/onekey.db STATIC_DIR=../dist ./bin/
 `ADMIN_NAME/EMAIL/PASSWORD`、`TG_BOT_API_BASE_URL`、`NOWPAYMENTS_API_KEY`、
 `IPN_SECRET`、`IPN_CALLBACK_URL`、`RESEND_API_KEY`、`EMAIL_FROM`、
 `ALLOWED_REGISTER_DOMAINS`、`CLIENT_URL`、`ENABLE_RECHARGE`、
-`DAILY_REGISTER_LIMIT`、`FALLBACK_MODEL_ALIAS`。
+`DAILY_REGISTER_LIMIT`、`FALLBACK_MODEL_ALIAS`、`SHOW_HOME_PAGE`、`ROUTING_TIMEZONE`。
 新增：`SQLITE_PATH`（默认 `data/onekey.db`）、`STATIC_DIR`（默认 `./dist` 或 `../dist`）。
+
+`SHOW_HOME_PAGE=0` 关闭首页：服务端把该标记注入 `index.html`（`window.__APP_CONFIG__`），
+前端在渲染前同步读取，`/home` 与未知路径改跳登录页；已登录则跳到该账号的默认页面。
+该值同时是可在后台设置的配置项，改动在下次页面加载时生效。
+
+## 供应商生效时段（峰谷路由）
+
+供应商可填 `active_from` / `active_to`（界面上是两个时间输入框，留空 = 不限），
+表示该上游只在当地这段时间内参与路由 —— 典型用法是白天走便宜的、凌晨走快的。
+
+- **时区**：按 `ROUTING_TIMEZONE`（默认 `Asia/Shanghai`）算，**不是**按容器 TZ。
+  容器里 TZ 通常是 UTC，若依赖系统时区，填 `00:00-08:00` 实际会落在北京时间 08:00-16:00。
+- **跨午夜**：`active_from > active_to` 视为跨越午夜的单个时段，`22:00-02:00` 是一段而非空集。
+- **起含止不含**：`00:00-08:00` 包含 00:00，不包含 08:00。
+- **两端相同（含都为 0）= 不限时段**。若把 `from == to` 当作空时段，填错一次就会让该上游
+  永久不可用，看起来像故障而不是笔误 —— 所以按"不限"处理。
+- **是偏好不是闸门**：如果按时段过滤后没有候选了，仍会按原优先级顺序使用全部候选，
+  否则一个时段配置就能让请求直接失败。与其他筛选条件（上下文、配额、冷却）语义一致。
+- 每日配额的自然日同样按 `ROUTING_TIMEZONE` 计算，两个功能共用一个时钟。
 
 ## 数据迁移（JSONL → SQLite）
 

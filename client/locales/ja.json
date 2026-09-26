@@ -80,7 +80,10 @@
         "QuotaSpent": "割り当て超過",
         "FailStreakHint": "連続失敗数。5回で300秒間停止します。",
         "Context": "コンテキスト",
-        "Quota": "割り当て"
+        "Quota": "割り当て",
+        "ActiveFrom": "開始時刻",
+        "ActiveTo": "終了時刻",
+        "OutsideWindow": "現在は有効時間外のため、リクエストではスキップされます。"
     },
     "UsagePage": {
         "AccountId": "アカウント",
