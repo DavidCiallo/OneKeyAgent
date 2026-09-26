@@ -1,6 +1,6 @@
 import { Header } from "../../components/header/Header";
 import { useEffect, useMemo, useState, useCallback, Fragment } from "react";
-import { AuditDTO } from "../../../shared/modules/audit/audit.interface";
+import { AuditDTO, AuditDetailDTO } from "../../../shared/modules/audit/audit.interface";
 import { auditApi } from "../../api/instance";
 import { Locale } from "../../methods/locale";
 import { Button, Chip, Tab, Tabs } from "@heroui/react";
@@ -61,6 +61,10 @@ export default function AuditPage() {
         if (res.success && res.data) {
             setList(res.data.list);
             setKeep(res.data.keep);
+            // The rows may have been trimmed away, so any body already fetched
+            // could belong to a row that is no longer on screen.
+            setDetails({});
+            setExpanded(new Set());
         }
         if (showSpinner) setLoading(false);
     }, []);
@@ -78,18 +82,31 @@ export default function AuditPage() {
 
     const rows = tab === "success" ? successRows : failedRows;
 
-    // Failed attempts that still carry their request/response bodies can be
-    // expanded inline; bodies age out with the newest-10 detail window.
+    // The list carries no bodies, so a failed attempt that still has one is
+    // fetched on first expand and cached until the next refresh.
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
-    const toggleDetail = (id: string) => {
-        setExpanded(prev => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-        });
+    const [details, setDetails] = useState<Record<string, AuditDetailDTO>>({});
+    const [detailLoading, setDetailLoading] = useState<string>("");
+
+    const toggleDetail = async (id: string) => {
+        if (expanded.has(id)) {
+            setExpanded(prev => {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+            });
+            return;
+        }
+        setExpanded(prev => new Set(prev).add(id));
+        if (details[id]) return;
+        setDetailLoading(id);
+        const res = await auditApi.detail({ id });
+        if (res.success && res.data) {
+            setDetails(prev => ({ ...prev, [id]: res.data }));
+        }
+        setDetailLoading(prev => (prev === id ? "" : prev));
     };
-    const hasDetail = (r: AuditDTO) => !!(r.request_body || r.response_body);
+    const hasDetail = (r: AuditDTO) => !!r.has_detail;
 
     return (
         <div className="max-w-screen flex flex-col h-screen">
@@ -177,20 +194,24 @@ export default function AuditPage() {
                                     {tab === "failed" && expanded.has(r.id) && (
                                         <tr className="border-t border-gray-100 bg-gray-50/60">
                                             <td colSpan={11} className="px-4 py-3">
-                                                <div className="flex flex-col gap-3">
-                                                    {r.request_body && (
-                                                        <div>
-                                                            <p className="text-xs font-medium text-gray-500 mb-1">{locale.RequestBody || "请求参数（结构 + 字段预览）"}</p>
-                                                            <pre className="text-xs bg-white border border-gray-200 rounded p-2 max-h-72 overflow-auto whitespace-pre-wrap break-all">{prettyBody(r.request_body)}</pre>
-                                                        </div>
-                                                    )}
-                                                    {r.response_body && (
-                                                        <div>
-                                                            <p className="text-xs font-medium text-gray-500 mb-1">{locale.ResponseBody || "返回结果"}</p>
-                                                            <pre className="text-xs bg-white border border-gray-200 rounded p-2 max-h-72 overflow-auto whitespace-pre-wrap break-all">{prettyBody(r.response_body)}</pre>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                {detailLoading === r.id ? (
+                                                    <p className="text-xs text-gray-400">Loading...</p>
+                                                ) : (
+                                                    <div className="flex flex-col gap-3">
+                                                        {details[r.id]?.request_body && (
+                                                            <div>
+                                                                <p className="text-xs font-medium text-gray-500 mb-1">{locale.RequestBody || "请求参数（结构 + 字段预览）"}</p>
+                                                                <pre className="text-xs bg-white border border-gray-200 rounded p-2 max-h-72 overflow-auto whitespace-pre-wrap break-all">{prettyBody(details[r.id].request_body)}</pre>
+                                                            </div>
+                                                        )}
+                                                        {details[r.id]?.response_body && (
+                                                            <div>
+                                                                <p className="text-xs font-medium text-gray-500 mb-1">{locale.ResponseBody || "返回结果"}</p>
+                                                                <pre className="text-xs bg-white border border-gray-200 rounded p-2 max-h-72 overflow-auto whitespace-pre-wrap break-all">{prettyBody(details[r.id].response_body)}</pre>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </td>
                                         </tr>
                                     )}

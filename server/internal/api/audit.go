@@ -1,6 +1,8 @@
 package api
 
 import (
+	"fmt"
+
 	"onekey/server/internal/httpx"
 	"onekey/server/internal/service"
 	"onekey/server/internal/store"
@@ -8,8 +10,9 @@ import (
 
 // ─────────────────────────── audit controller ───────────────────────────
 
-// auditList — newest 10 successful + newest 10 failed relay attempts.
-// Admin-only: rows carry per-account activity across the whole instance.
+// auditList — newest 10 successful + newest 10 failed relay attempts, without
+// their bodies. Admin-only: rows carry per-account activity across the whole
+// instance.
 func (a *App) auditList(c *httpx.Ctx) (any, error) {
 	if _, err := service.RequireAdmin(a.DB, c.Auth); err != nil {
 		return nil, err
@@ -28,13 +31,38 @@ func (a *App) auditList(c *httpx.Ctx) (any, error) {
 			"duration_ms": r.DurationMs, "input_tokens": r.InputTokens,
 			"cached_input_tokens": r.CachedInputTokens, "output_tokens": r.OutputTokens,
 			"cost": r.Cost, "stream": r.Stream, "err": r.Err,
-			// Only failed upstream attempts carry bodies, and those are stored
-			// as a field summary (structure + short previews), not full text.
-			"request_body": r.RequestBody, "response_body": r.ResponseBody,
-			"tps": throughput(r.OutputTokens, r.DurationMs),
+			// The bodies stay on the row until one is opened: they are the
+			// largest field by far, and a list that carries them all is what
+			// made this endpoint slow.
+			"has_detail": r.HasDetail,
+			"tps":        throughput(r.OutputTokens, r.DurationMs),
 		})
 	}
 	return map[string]any{"list": list, "keep": store.AuditKeep}, nil
+}
+
+// auditDetail — the stored request/response summary for one attempt, read when
+// an admin expands that row.
+func (a *App) auditDetail(c *httpx.Ctx) (any, error) {
+	if _, err := service.RequireAdmin(a.DB, c.Auth); err != nil {
+		return nil, err
+	}
+	id := c.Str("id")
+	if id == "" {
+		return nil, fmt.Errorf("miss params")
+	}
+	row, err := store.AuditDetail(a.DB, id)
+	if err == store.ErrNotFound {
+		return nil, fmt.Errorf("audit row not found")
+	}
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"id":            row.ID,
+		"request_body":  row.RequestBody,
+		"response_body": row.ResponseBody,
+	}, nil
 }
 
 // throughput — output tokens per second, derived here rather than stored so a

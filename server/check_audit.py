@@ -5,9 +5,10 @@ actual relay path, then verifies what got stored:
 
   1. successful and failed attempts are both recorded
   2. retention holds the newest 10 of each outcome
-  3. a failed row's request body keeps the JSON structure with every long
+  3. the list carries no bodies — only a has_detail flag — and the bodies are
+     fetched per row from /api/audit/detail, admin-only
+  4. a failed row's request body keeps the JSON structure with every long
      string cut to a short preview
-  4. the audit API does not hand the client anything unbounded
   5. provider routing policy: failure cooldown, daily quota, context filter
 
 Run: python server/check_audit.py
@@ -204,45 +205,82 @@ def main():
         check("both outcomes recorded", len(oks) > 0 and len(bads) > 0,
               f"ok={len(oks)} bad={len(bads)}")
 
-        print("\n3. body summary shape")
-        with_body = [r for r in bads if r.get("request_body")]
-        check("failed rows carry a request body", len(with_body) > 0, f"{len(with_body)} rows")
-        if with_body:
-            body = with_body[0]["request_body"]
-            try:
-                parsed = json.loads(body)
-                check("stored body is valid JSON", True)
-            except Exception as e:
-                check("stored body is valid JSON", False, str(e))
-                parsed = None
-            if parsed is not None:
-                # The relay rewrites model to the upstream name, so the stored
-                # body carries that — the point is the key survived at all.
-                check("structure kept (model key)", parsed.get("model") == "m",
-                      str(parsed.get("model")))
-                msgs = parsed.get("messages")
-                check("messages kept as a list", isinstance(msgs, list) and len(msgs) >= 1,
-                      f"{type(msgs).__name__}")
-                if isinstance(msgs, list) and msgs:
-                    content = (msgs[0] or {}).get("content")
-                    check("long field previewed, not stored whole",
-                          isinstance(content, str) and len(content) < 200,
-                          f"{len(content) if isinstance(content, str) else '?'} chars")
-                    check("preview carries a truncation marker",
-                          isinstance(content, str) and "…[+" in content, repr(content)[:80])
-                # No stored field may run away: the whole point of the change.
-                check("whole body is small", len(body) < 16000, f"{len(body)} bytes")
-            resp = with_body[0].get("response_body") or ""
-            check("failed rows carry a response body", bool(resp), f"{len(resp)} bytes")
-            if resp:
-                check("response body bounded", len(resp) < 9000, f"{len(resp)} bytes")
+        print("\n3. the list carries no bodies")
+        check("every row reports has_detail",
+              all("has_detail" in r for r in rows), f"{len(rows)} rows")
+        check("no row ships a request body",
+              all("request_body" not in r for r in rows), "")
+        check("no row ships a response body",
+              all("response_body" not in r for r in rows), "")
+        detailable = [r for r in bads if r.get("has_detail")]
+        check("failed rows advertise a body to fetch", len(detailable) > 0, f"{len(detailable)} rows")
 
-        print("\n4. response stays bounded")
+        print("\n4. detail is fetched per row")
+        detail = post("/api/audit/detail", {"id": detailable[0]["id"]}) if detailable else {}
+        check("detail succeeds for an advertised row", detail.get("success"), str(detail)[:160])
+        body = (detail.get("data") or {}).get("request_body") or ""
+        check("detail carries the request body", bool(body), f"{len(body)} bytes")
+        try:
+            parsed = json.loads(body)
+            check("stored body is valid JSON", True)
+        except Exception as e:
+            check("stored body is valid JSON", False, str(e))
+            parsed = None
+        if parsed is not None:
+            # The relay rewrites model to the upstream name, so the stored
+            # body carries that — the point is the key survived at all.
+            check("structure kept (model key)", parsed.get("model") == "m",
+                  str(parsed.get("model")))
+            msgs = parsed.get("messages")
+            check("messages kept as a list", isinstance(msgs, list) and len(msgs) >= 1,
+                  f"{type(msgs).__name__}")
+            if isinstance(msgs, list) and msgs:
+                content = (msgs[0] or {}).get("content")
+                check("long field previewed, not stored whole",
+                      isinstance(content, str) and len(content) < 200,
+                      f"{len(content) if isinstance(content, str) else '?'} chars")
+                check("preview carries a truncation marker",
+                      isinstance(content, str) and "…[+" in content, repr(content)[:80])
+            # No stored field may run away: the whole point of the summary.
+            check("whole body is small", len(body) < 16000, f"{len(body)} bytes")
+        resp = (detail.get("data") or {}).get("response_body") or ""
+        check("detail carries the response body", bool(resp), f"{len(resp)} bytes")
+        check("response body bounded", len(resp) < 9000, f"{len(resp)} bytes")
+
+        # An id retention already trimmed away is a plain failure, not a server
+        # error: the list an admin is holding can be a refresh behind.
+        missing = post("/api/audit/detail", {"id": "does-not-exist"})
+        check("detail rejects an unknown id", not missing.get("success"), str(missing)[:120])
+
+        # Bodies are per-account activity, so a non-admin must not reach them.
+        nonadmin = post("/api/account/create", {"account": {
+            "name": "viewer", "email": "viewer@example.com", "password": "viewer123@",
+            "is_admin": 0}})
+        check("non-admin account created", nonadmin.get("success"), str(nonadmin)[:120])
+        if nonadmin.get("success") and detailable:
+            admin_token = TOKEN["value"]
+            login2 = post("/api/auth/login", {"identify": {
+                "email": "viewer@example.com", "password": "viewer123@"}})
+            TOKEN["value"] = (login2.get("data") or {}).get("token", "")
+            denied = post("/api/audit/detail", {"id": detailable[0]["id"]})
+            check("non-admin cannot read a detail", not denied.get("success"), str(denied)[:120])
+            denied_list = post("/api/audit/list", {})
+            check("non-admin cannot read the list", not denied_list.get("success"),
+                  str(denied_list)[:120])
+            TOKEN["value"] = admin_token
+
+        print("\n5. what leaving the bodies out saves")
         biggest = max((len(r.get("request_body") or "") + len(r.get("response_body") or ""))
                       for r in rows) if rows else 0
-        check("no row stores a full prompt", biggest < 24000, f"largest {biggest} bytes")
+        check("no row ships a body in the list", biggest == 0, f"largest {biggest} bytes")
+        withheld = 0
+        for r in detailable:
+            dd = post("/api/audit/detail", {"id": r["id"]}).get("data") or {}
+            withheld += len(dd.get("request_body") or "") + len(dd.get("response_body") or "")
+        print(f"        bodies withheld from the list: {withheld} bytes across {len(detailable)} rows")
+        check("withholding them is worth it", withheld > 1000, f"{withheld} bytes")
 
-        print("\n5. routing policy")
+        print("\n6. routing policy")
         # A second alias with one healthy and one broken provider, so the
         # policy has something to route around.
         post("/api/model/create", {"model": {"alias": "policy-alias", "input_price": 1.0,
