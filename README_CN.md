@@ -102,6 +102,7 @@ bun run serve    # 启动服务（server/app/index.ts）
 | `TG_BOT_API_BASE_URL` | Telegram Bot API 地址（如 `https://api.telegram.org/bot<token>`） | — |
 | `NOWPAYMENTS_API_KEY` | NowPayments API Key（加密支付） | — |
 | `IPN_CALLBACK_URL` | 即时支付通知（IPN）回调地址 | — |
+| `SHOW_HOME_PAGE` | 设为 `0` 关闭首页；`/home` 将跳转到登录页，已登录则跳转到该账号的默认页面 | `1` |
 
 ---
 

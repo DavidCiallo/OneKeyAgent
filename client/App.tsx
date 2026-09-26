@@ -5,7 +5,7 @@ import { JSX, useEffect } from "react";
 import AuthPage from "./pages/auth/AuthPage";
 import VerifyPage from "./pages/auth/VerifyPage";
 import HomePage from "./pages/home/HomePage";
-import { AuthStatus, clearAuthData, getAuthStatus, setUserInfo } from "./methods/auth";
+import { AuthStatus, clearAuthData, getAuthStatus, getDefaultRoute, setUserInfo, showHomePage } from "./methods/auth";
 import ModelPage from "./pages/model/ModelPage";
 import ProviderPage from "./pages/provider/ProviderPage";
 import UsagePage from "./pages/usage/UsagePage";
@@ -73,10 +73,17 @@ const TitleUpdater = () => {
     return null;
 };
 
+// Where /home and unknown paths land when the home page is switched off: the
+// login page, or the page the account would have reached by logging in.
+const Fallback = () => {
+    if (showHomePage()) return <Navigate to="/home" replace />;
+    return <Navigate to={getAuthStatus() === AuthStatus.AUTH ? getDefaultRoute() : "/auth"} replace />;
+};
+
 const AppRoutes = () => {
     return (
         <Routes>
-            <Route path="/home" element={<HomePage />} />
+            <Route path="/home" element={showHomePage() ? <HomePage /> : <Fallback />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/verify" element={<VerifyPage />} />
             <Route path="/terms" element={<TermsPage />} />
@@ -91,7 +98,7 @@ const AppRoutes = () => {
                 <Route path="/settings" element={<ProtectedRoute name="settings"><SettingsPage /></ProtectedRoute>} />
                 <Route path="/audit" element={<ProtectedRoute name="audit"><AuditPage /></ProtectedRoute>} />
             </Route>
-            <Route path="*" element={<Navigate to="/home" replace />} />
+            <Route path="*" element={<Fallback />} />
         </Routes>
     );
 };
