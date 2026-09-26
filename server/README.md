@@ -40,8 +40,12 @@ SECRET=xxx SERVER_PORT=3300 SQLITE_PATH=data/onekey.db STATIC_DIR=../dist ./bin/
 `ADMIN_NAME/EMAIL/PASSWORD`、`TG_BOT_API_BASE_URL`、`NOWPAYMENTS_API_KEY`、
 `IPN_SECRET`、`IPN_CALLBACK_URL`、`RESEND_API_KEY`、`EMAIL_FROM`、
 `ALLOWED_REGISTER_DOMAINS`、`CLIENT_URL`、`ENABLE_RECHARGE`、
-`DAILY_REGISTER_LIMIT`、`FALLBACK_MODEL_ALIAS`。
+`DAILY_REGISTER_LIMIT`、`FALLBACK_MODEL_ALIAS`、`SHOW_HOME_PAGE`。
 新增：`SQLITE_PATH`（默认 `data/onekey.db`）、`STATIC_DIR`（默认 `./dist` 或 `../dist`）。
+
+`SHOW_HOME_PAGE=0` 关闭首页：服务端把该标记注入 `index.html`（`window.__APP_CONFIG__`），
+前端在渲染前同步读取，`/home` 与未知路径改跳登录页；已登录则跳到该账号的默认页面。
+该值同时是可在后台设置的配置项，改动在下次页面加载时生效。
 
 ## 数据迁移（JSONL → SQLite）
 

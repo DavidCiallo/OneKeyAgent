@@ -28,12 +28,14 @@ var settingKeys = [][2]string{
 	{"enable_recharge", "ENABLE_RECHARGE"},
 	{"daily_register_limit", "DAILY_REGISTER_LIMIT"},
 	{"fallback_model_alias", "FALLBACK_MODEL_ALIAS"},
+	{"show_home_page", "SHOW_HOME_PAGE"},
 }
 
 var settingDefaults = map[string]string{
 	"enable_recharge":       "true",
 	"daily_register_limit":  "5",
 	"fallback_model_alias":  "",
+	"show_home_page":        "1",
 }
 
 type Settings struct {

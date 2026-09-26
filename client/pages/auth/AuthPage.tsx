@@ -5,19 +5,10 @@ import { Button, Input, Form, Select, SelectItem } from "@heroui/react";
 import { authApi } from "../../api/instance";
 import { useNavigate } from "react-router-dom";
 import { toast } from "../../methods/notify";
-import { setAuthStatus, setUserInfo } from "../../methods/auth";
+import { getDefaultRoute, setAuthStatus, setUserInfo } from "../../methods/auth";
 import { Locale } from "../../methods/locale";
 import { useAuth } from "../../methods/auth-context";
 import NeuralLogo from "../home/components/NeuralLogo";
-
-function getDefaultRoute(is_admin?: number, roles?: { name: string; type: string }[]): string {
-    if (is_admin) return "/account";
-    if (roles && roles.length > 0) {
-        const menuRole = roles.find(r => r.type === "menu");
-        if (menuRole) return `/${menuRole.name}`;
-    }
-    return "/nocontent";
-}
 
 export default function Component() {
     const navigate = useNavigate();
@@ -57,7 +48,7 @@ export default function Component() {
         setAuthStatus({ access_token: token, expires_in: 60 * 60 * 24 * 3 });
         setUserInfo({ email: email.toString(), is_admin: data!.is_admin, roles: data!.roles });
         setAuthInfo({ is_admin: data!.is_admin, roles: data!.roles });
-        navigate(getDefaultRoute(data!.is_admin, data!.roles));
+        navigate(getDefaultRoute());
     };
 
     const handleRegister = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -84,7 +75,7 @@ export default function Component() {
         setAuthStatus({ access_token: data.token, expires_in: 60 * 60 * 24 * 3 });
         setUserInfo({ email: emailStr, is_admin: data.is_admin, roles: data.roles });
         setAuthInfo({ is_admin: data.is_admin, roles: data.roles });
-        navigate(getDefaultRoute(data.is_admin, data.roles));
+        navigate(getDefaultRoute());
     };
 
     return (
