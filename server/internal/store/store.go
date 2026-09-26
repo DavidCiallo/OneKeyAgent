@@ -297,16 +297,33 @@ func backfillAuditBodies(db *sql.DB) error {
 	return err
 }
 
-// purgeLegacyAuditBodies — drop stored audit bodies left by earlier builds.
-// Those builds kept whole prompts (up to 64 KiB) on the newest failures, and a
-// database upgraded in place would otherwise carry that text indefinitely:
-// new rows store a field summary instead, and retention only trims by count.
-// Clearing them at startup is what makes the smaller-retention change apply to
-// data that already exists.
+// auditBodiesPurgedKey — node_state flag for the one-off legacy body purge.
+const auditBodiesPurgedKey = "audit_bodies_purged"
+
+// purgeLegacyAuditBodies — drop stored audit bodies left by earlier builds,
+// once. Those builds kept whole prompts (up to 64 KiB) on the newest failures,
+// and a database upgraded in place would otherwise carry that text
+// indefinitely: new rows store a field summary instead, and retention only
+// trims by count. Clearing them is what makes the smaller-retention change
+// apply to data that already exists.
+//
+// The node_state guard is load-bearing: the statement cannot tell a legacy row
+// from a current one — it matches every row that has a body. Unguarded it ran
+// on every startup, so each restart wiped the bodies the current build had just
+// written, leaving the audit page with nothing to show when a row is expanded.
 func purgeLegacyAuditBodies(db *sql.DB) error {
-	_, err := db.Exec(`UPDATE audit_log SET request_body = '', response_body = ''
-		WHERE request_body <> '' OR response_body <> ''`)
-	return err
+	purged, err := GetNodeState(db, auditBodiesPurgedKey)
+	if err != nil {
+		return err
+	}
+	if purged != "" {
+		return nil
+	}
+	if _, err := db.Exec(`UPDATE audit_log SET request_body = '', response_body = ''
+		WHERE request_body <> '' OR response_body <> ''`); err != nil {
+		return err
+	}
+	return SetNodeState(db, auditBodiesPurgedKey, "1")
 }
 
 // dedupeBucketRows merges usage_bucket rows that share a window, keeping the
