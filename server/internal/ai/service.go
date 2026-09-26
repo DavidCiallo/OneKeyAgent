@@ -46,7 +46,7 @@ func NewServer(db *sql.DB, settings *service.Settings) *Server {
 		Settings:  settings,
 		clients:   map[string]*http.Client{},
 		reasoning: map[string]reasonEntry{},
-		policy:    newProviderPolicy(),
+		policy:    newProviderPolicy(settings),
 	}
 }
 

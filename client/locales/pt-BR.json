@@ -80,7 +80,10 @@
         "QuotaSpent": "Cota esgotada",
         "FailStreakHint": "Falhas consecutivas; 5 o pausa por 300s.",
         "Context": "Contexto",
-        "Quota": "Cota"
+        "Quota": "Cota",
+        "ActiveFrom": "Ativo a partir de",
+        "ActiveTo": "Ativo até",
+        "OutsideWindow": "Fora da janela ativa; as requisições o ignoram."
     },
     "UsagePage": {
         "AccountId": "Conta",
