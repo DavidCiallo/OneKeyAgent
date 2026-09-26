@@ -18,31 +18,11 @@ KEYS = {
         "pt-BR": "Contexto máximo", "ru": "Лимит контекста",
         "th": "ขีดจำกัดบริบท", "vi": "Giới hạn ngữ cảnh",
     },
-    "MaxContextHint": {
-        "cn": "0 = 不限制。请求超出此值时跳过该供应商。",
-        "en": "0 = no limit. Requests above this skip this provider.",
-        "es": "0 = sin límite. Las solicitudes mayores lo omiten.",
-        "ja": "0 = 無制限。これを超えるリクエストはスキップされます。",
-        "pt-BR": "0 = sem limite. Requisições maiores o ignoram.",
-        "ru": "0 = без ограничений. Большие запросы пропускают его.",
-        "th": "0 = ไม่จำกัด คำขอที่ใหญ่กว่าจะข้ามผู้ให้บริการนี้",
-        "vi": "0 = không giới hạn. Yêu cầu lớn hơn sẽ bỏ qua.",
-    },
     "DailyQuota": {
         "cn": "每日配额", "en": "Daily quota",
         "es": "Cuota diaria", "ja": "1日の割り当て",
         "pt-BR": "Cota diária", "ru": "Дневная квота",
         "th": "โควต้ารายวัน", "vi": "Hạn mức hàng ngày",
-    },
-    "DailyQuotaHint": {
-        "cn": "0 = 不限制。每日请求次数，仅存于内存，重启后重置。",
-        "en": "0 = no limit. Requests per day, in memory only — resets on restart.",
-        "es": "0 = sin límite. Solicitudes por día, solo en memoria.",
-        "ja": "0 = 無制限。1日のリクエスト数（メモリ上のみ、再起動でリセット）。",
-        "pt-BR": "0 = sem limite. Requisições por dia, apenas em memória.",
-        "ru": "0 = без ограничений. Запросов в день, только в памяти.",
-        "th": "0 = ไม่จำกัด จำนวนคำขอต่อวัน เก็บในหน่วยความจำเท่านั้น",
-        "vi": "0 = không giới hạn. Số yêu cầu mỗi ngày, chỉ trong bộ nhớ.",
     },
     "Parked": {
         "cn": "已暂停", "en": "Parked",
@@ -93,17 +73,21 @@ def main():
         if page is None:
             print(f"{name}: no ProviderPage, skipped")
             continue
-        added = []
+        added, updated = [], []
         for key, texts in KEYS.items():
-            if key in page:
-                continue
             text = texts.get(lang) or texts["en"]
+            if key in page:
+                if page[key] != text:
+                    page[key] = text
+                    updated.append(key)
+                continue
             page[key] = text
             added.append(key)
         with io.open(path, "w", encoding="utf-8", newline="\n") as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
             f.write("\n")
-        print(f"{name}: +{len(added)} keys")
+        note = f"+{len(added)} keys" if not updated else f"~{len(updated)} updated"
+        print(f"{name}: {note}")
 
 
 if __name__ == "__main__":
