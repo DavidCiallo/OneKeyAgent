@@ -14,6 +14,10 @@ const RANGES: Range[] = ["1h", "12h", "48h"];
  *  longer one repeats rather than rendering nothing. */
 const COLORS = ["#006FEE", "#17C964", "#F5A524", "#F31260", "#7828C8", "#09b6a2", "#9353D3", "#d4621e"];
 
+/** How many empty slots in a row still repeat the last measured value. The
+ *  next one is a third slot with no data, and that point reads as zero. */
+const MAX_CARRIED_SLOTS = 2;
+
 function pad(n: number) {
     return String(n).padStart(2, "0");
 }
@@ -55,25 +59,34 @@ export function AuditTpsChart() {
     // recharts wants one row per x value with a key per line, so the per-point
     // provider maps are flattened by provider name.
     //
-    // A slot with no traffic carries the previous value forward instead of
-    // leaving a hole, so a quiet minute draws as a flat line rather than as a
-    // break the reader has to interpret. Slots before a provider's first
-    // measurement stay empty: there is nothing to carry yet, and the line
-    // should start where the traffic does.
+    // A slot with no traffic carries the previous value forward, so a quiet
+    // minute draws as a flat line rather than as a break the reader has to
+    // interpret. The carry stops at MAX_CARRIED_SLOTS: once three slots in a row
+    // have nothing, the point drops to zero, because a provider that has been
+    // silent that long is not serving and repeating its old speed would draw a
+    // line for traffic that is not happening. Slots before a provider's first
+    // measurement stay empty either way: there is nothing to carry yet, and a
+    // line should start where the traffic does.
     const data = useMemo(() => {
         if (!result) return [];
         const carried: Record<string, number> = {};
+        const emptyRun: Record<string, number> = {};
         return result.points.map((p) => {
             const row: Record<string, number | string> = { tick: tick(p.ts, range) };
             const values = metric === "tps" ? p.tps : p.ttft;
             for (const provider of result.providers) {
+                const key = provider.name || provider.id;
                 const v = values[provider.id];
                 if (typeof v === "number") {
                     carried[provider.id] = v;
+                    emptyRun[provider.id] = 0;
+                    row[key] = v;
+                    continue;
                 }
-                if (carried[provider.id] !== undefined) {
-                    row[provider.name || provider.id] = carried[provider.id];
-                }
+                if (carried[provider.id] === undefined) continue;
+                const run = (emptyRun[provider.id] ?? 0) + 1;
+                emptyRun[provider.id] = run;
+                row[key] = run <= MAX_CARRIED_SLOTS ? carried[provider.id] : 0;
             }
             return row;
         });
@@ -89,8 +102,8 @@ export function AuditTpsChart() {
                     <span className="font-medium text-sm">{locale.Throughput || "Throughput"}</span>
                     <span className="text-xs text-gray-400">
                         {metric === "tps"
-                            ? (locale.TpsHint || "output tokens per second of generation, first-token wait excluded, thinking included; a slot with no traffic repeats the last value")
-                            : (locale.TtftHint || "average wait for the first token, thinking included, streaming requests only; a slot with no traffic repeats the last value")}
+                            ? (locale.TpsHint || "output tokens per second of generation, first-token wait excluded, thinking included; a slot with no traffic repeats the last value, and three in a row read as zero")
+                            : (locale.TtftHint || "average wait for the first token, thinking included, streaming requests only; a slot with no traffic repeats the last value, and three in a row read as zero")}
                     </span>
                 </div>
                 <div className="flex flex-row items-center gap-2">
