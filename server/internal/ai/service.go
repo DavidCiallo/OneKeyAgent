@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -985,6 +986,17 @@ func (s *Server) StartStreamAt(body map[string]any, accountID, endpoint string) 
 			cost := service.CalculateCost(rawInput, cachedInput, rawOutput, inputPrice, cachePrice, outputPrice)
 			duration := elapsedMs(started)
 			ttft := ttftMs(started, sc.FirstTokenAt, duration)
+			if rateDebugOn && pacer.active() {
+				// What the ceiling saw and what it did. est is the budget it
+				// paced against; reported_out is what the provider billed, which
+				// is what the audit divides by — when est is far below it, the
+				// stream was paced as if it carried fewer tokens than it did.
+				fmt.Printf("[Rate] provider=%s cap=%.0f/tps frames=%d est=%d chars=%d deltas=%d "+
+					"reported_out=%d usage=%v slept=%dms gen=%dms ttft=%dms\n",
+					provider.Name, pacer.rate, pacer.frames, sc.outputTokensEstimate(),
+					sc.OutputChars, sc.OutputDeltas, rawOutput, sc.Usage != nil,
+					pacer.slept.Milliseconds(), duration-ttft, ttft)
+			}
 			service.Settle(s.DB, service.UsageLog{
 				AccountID: accountID, ModelAlias: alias, ProviderID: provider.ID,
 				InputTokens: rawInput, CachedInputTokens: cachedInput, OutputTokens: rawOutput,
@@ -1021,7 +1033,17 @@ type streamPacer struct {
 	rate float64
 	// origin is when the first token appeared, which is where the budget starts.
 	origin time.Time
+	// frames and slept are what the ceiling actually did, kept for the
+	// RATE_DEBUG line: frames is how many pieces the stream was paced in, and
+	// slept is how long it was held back in total.
+	frames int
+	slept  time.Duration
 }
+
+// rateDebugOn — RATE_DEBUG=1 prints one line per paced stream: what the ceiling
+// saw and what it did. Off by default, and the only way to tell why a ceiling
+// did or did not bite on a real upstream.
+var rateDebugOn = os.Getenv("RATE_DEBUG") != ""
 
 // delay reports how long to hold back a stream that has produced `tokens` so far
 // by `now`. Zero means send it immediately.
@@ -1087,11 +1109,13 @@ func meteredCopy(dst io.Writer, src io.Reader, sc *meteredScanner, pacer *stream
 				// is about one token, which is fine enough to spread a burst.
 				for _, frame := range splitFrames(chunk) {
 					sc.feed(frame)
+					pacer.frames++
 					// Sleeping here, before the client sees the frame, is what
 					// makes the stream slower for the caller as well as for the
 					// meter.
 					if wait := pacer.delay(sc.outputTokensEstimate(), time.Now()); wait > 0 {
 						time.Sleep(wait)
+						pacer.slept += wait
 					}
 					if _, werr := dst.Write(frame); werr != nil {
 						return
