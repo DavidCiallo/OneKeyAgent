@@ -23,8 +23,9 @@ func TestMeteredCopyPacesASingleBurst(t *testing.T) {
 	// shape a bursting upstream has on the wire.
 	var out bytes.Buffer
 	sc := &meteredScanner{}
+	pacer := &streamPacer{rate: 100}
 	start := time.Now()
-	meteredCopy(&out, bytes.NewReader(body), sc, &streamPacer{rate: 100})
+	meteredCopy(&out, bytes.NewReader(body), sc, pacer)
 	elapsed := time.Since(start)
 
 	if out.String() != string(body) {
@@ -32,6 +33,13 @@ func TestMeteredCopyPacesASingleBurst(t *testing.T) {
 	}
 	if got := sc.outputTokensEstimate(); got != tokens {
 		t.Fatalf("estimate = %d, want %d", got, tokens)
+	}
+	// The burst has to be broken up for the budget to be spent at all.
+	if pacer.frames <= 1 {
+		t.Fatalf("paced in %d piece(s): the burst went out in one write", pacer.frames)
+	}
+	if pacer.slept < 1900*time.Millisecond {
+		t.Fatalf("held back only %v of the 2s budget", pacer.slept)
 	}
 	// 200 tokens at 100 t/s is two seconds of budget.
 	if elapsed < 1900*time.Millisecond {
