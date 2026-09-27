@@ -45,7 +45,8 @@ type AuditLog struct {
 	Endpoint          string  `json:"endpoint"`
 	StatusCode        int64   `json:"status_code"`
 	DurationMs        int64   `json:"duration_ms"`
-	// TtftMs — time to first content token. 0 when it was not measurable, which
+	// TtftMs — time to the first token of any kind, thinking included. 0 when it
+	// was not measurable, which
 	// is the non-streaming path and streams that produced no content.
 	TtftMs            int64   `json:"ttft_ms"`
 	InputTokens       int64   `json:"input_tokens"`

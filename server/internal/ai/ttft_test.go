@@ -5,25 +5,25 @@ import (
 	"time"
 )
 
-// TestScannerStampsFirstContentOnly — time to first token has to be the first
-// *content*, and it must be stamped once. The opening chunk of an OpenAI stream
-// carries only the role, and treating that as the first token would report a
-// fast model for every provider.
-func TestScannerStampsFirstContentOnly(t *testing.T) {
+// TestScannerStampsFirstToken — time to first token has to be the first *token*,
+// and it must be stamped once. The opening chunk of an OpenAI stream carries
+// only the role, and treating that as the first token would report a fast model
+// for every provider.
+func TestScannerStampsFirstToken(t *testing.T) {
 	var sc meteredScanner
 
 	sc.feed([]byte("data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}\n\n"))
-	if sc.FirstContentAt != 0 {
-		t.Fatalf("a role-only chunk stamped a first token: %d", sc.FirstContentAt)
+	if sc.FirstTokenAt != 0 {
+		t.Fatalf("a role-only chunk stamped a first token: %d", sc.FirstTokenAt)
 	}
 
 	sc.feed([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"\"}}]}\n\n"))
-	if sc.FirstContentAt != 0 {
-		t.Fatalf("an empty content delta stamped a first token: %d", sc.FirstContentAt)
+	if sc.FirstTokenAt != 0 {
+		t.Fatalf("an empty content delta stamped a first token: %d", sc.FirstTokenAt)
 	}
 
 	sc.feed([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"Hel\"}}]}\n\n"))
-	first := sc.FirstContentAt
+	first := sc.FirstTokenAt
 	if first == 0 {
 		t.Fatal("the first content delta was not stamped")
 	}
@@ -35,11 +35,57 @@ func TestScannerStampsFirstContentOnly(t *testing.T) {
 	// toward the end of the response.
 	time.Sleep(3 * time.Millisecond)
 	sc.feed([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"lo\"}}]}\n\n"))
-	if sc.FirstContentAt != first {
-		t.Fatalf("the stamp moved: %d then %d", first, sc.FirstContentAt)
+	if sc.FirstTokenAt != first {
+		t.Fatalf("the stamp moved: %d then %d", first, sc.FirstTokenAt)
 	}
 	if sc.EstimatedChars != 5 {
 		t.Fatalf("EstimatedChars = %d, want 5", sc.EstimatedChars)
+	}
+}
+
+// TestScannerStampsThinking — a thinking model streams its thinking first, and
+// the provider bills it inside completion_tokens. Starting the clock at the
+// first visible token instead would divide the whole output by the visible tail
+// alone and report a rate no model can reach.
+func TestScannerStampsThinking(t *testing.T) {
+	var sc meteredScanner
+
+	sc.feed([]byte("data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"let me\"}}]}\n\n"))
+	if sc.FirstTokenAt == 0 {
+		t.Fatal("a reasoning delta did not start the clock")
+	}
+	// Thinking is not visible content, so it must not inflate the content
+	// estimate the usage check is based on.
+	if sc.EstimatedChars != 0 {
+		t.Fatalf("EstimatedChars = %d, want 0 — thinking is not content", sc.EstimatedChars)
+	}
+
+	// An empty reasoning delta carries no token.
+	var empty meteredScanner
+	empty.feed([]byte("data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"\"}}]}\n\n"))
+	if empty.FirstTokenAt != 0 {
+		t.Fatalf("an empty reasoning delta stamped a first token: %d", empty.FirstTokenAt)
+	}
+
+	// And the clock still belongs to the thinking when content follows.
+	before := sc.FirstTokenAt
+	time.Sleep(3 * time.Millisecond)
+	sc.feed([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"answer\"}}]}\n\n"))
+	if sc.FirstTokenAt != before {
+		t.Fatalf("the content delta moved the stamp: %d then %d", before, sc.FirstTokenAt)
+	}
+	if sc.EstimatedChars != 6 {
+		t.Fatalf("EstimatedChars = %d, want 6", sc.EstimatedChars)
+	}
+}
+
+// TestScannerStampsThinkingWhenNotCapturing — the stamp must not depend on the
+// reasoning capture being switched on, which is a per-provider replay setting.
+func TestScannerStampsThinkingWhenNotCapturing(t *testing.T) {
+	sc := &meteredScanner{Reasoning: nil}
+	sc.feed([]byte("data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"hmm\"}}]}\n\n"))
+	if sc.FirstTokenAt == 0 {
+		t.Fatal("thinking did not start the clock without capture enabled")
 	}
 }
 
@@ -48,7 +94,7 @@ func TestScannerStampsFirstContentOnly(t *testing.T) {
 func TestScannerStampsLegacyTextField(t *testing.T) {
 	var sc meteredScanner
 	sc.feed([]byte("data: {\"choices\":[{\"text\":\"hi\"}]}\n\n"))
-	if sc.FirstContentAt == 0 {
+	if sc.FirstTokenAt == 0 {
 		t.Fatal("a legacy text delta was not stamped")
 	}
 	if sc.EstimatedChars != 2 {

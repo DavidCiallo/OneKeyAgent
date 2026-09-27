@@ -62,7 +62,8 @@ type BucketLogInput struct {
 	CachedInputTokens int64
 	OutputTokens      int64
 	Cost              float64
-	// DurationMs / TtftMs — wall time and time to first content token for this
+	// DurationMs / TtftMs — wall time and time to the first token of any kind
+	// (thinking included) for this
 	// request. Summed into the window so it can report throughput; TtftMs is 0
 	// on the non-streaming path, where there is no first token to time.
 	DurationMs int64

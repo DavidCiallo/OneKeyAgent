@@ -148,8 +148,8 @@ type auditRecord struct {
 	Success      bool
 	StatusCode   int
 	DurationMs   int64
-	// TtftMs — time to first content token; 0 when it was not measurable
-	// (non-streaming, or the stream produced no content).
+	// TtftMs — time to the first token of any kind, thinking included; 0 when it
+	// was not measurable (non-streaming, or the stream emitted nothing).
 	TtftMs       int64
 	InputTokens  int64
 	CachedInput  int64
@@ -209,7 +209,8 @@ func elapsedMs(start time.Time) int64 {
 	return d
 }
 
-// ttftMs — time to first content token, clamped into [0, duration].
+// ttftMs — time to the first token of any kind, thinking included, clamped into
+// [0, duration].
 //
 // firstAt is 0 when no content ever arrived (a stream that failed mid-flight,
 // or a reasoning-only response with no visible text), and the whole duration is
@@ -980,7 +981,7 @@ func (s *Server) StartStreamAt(body map[string]any, accountID, endpoint string) 
 			cachedInput := service.ExtractCachedTokens(sc.Usage)
 			cost := service.CalculateCost(rawInput, cachedInput, rawOutput, inputPrice, cachePrice, outputPrice)
 			duration := elapsedMs(started)
-			ttft := ttftMs(started, sc.FirstContentAt, duration)
+			ttft := ttftMs(started, sc.FirstTokenAt, duration)
 			service.Settle(s.DB, service.UsageLog{
 				AccountID: accountID, ModelAlias: alias, ProviderID: provider.ID,
 				InputTokens: rawInput, CachedInputTokens: cachedInput, OutputTokens: rawOutput,
@@ -991,8 +992,8 @@ func (s *Server) StartStreamAt(body map[string]any, accountID, endpoint string) 
 				AccountID: accountID, AccountName: acctName, ModelAlias: alias,
 				ProviderID: provider.ID, ProviderName: provider.Name, ApiType: provider.ApiTypeStr(),
 				Endpoint: endpoint, Success: true, StatusCode: 200, DurationMs: duration,
-				TtftMs:       ttft,
-				InputTokens:  rawInput, CachedInput: cachedInput, OutputTokens: rawOutput, Cost: cost,
+				TtftMs:      ttft,
+				InputTokens: rawInput, CachedInput: cachedInput, OutputTokens: rawOutput, Cost: cost,
 				Stream: true,
 			})
 			pw.Close()

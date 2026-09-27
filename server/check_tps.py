@@ -1,14 +1,16 @@
 """Throughput check — first-token latency is measured, and TPS excludes it.
 
 Starts a real gateway against a stub upstream that streams SSE with a deliberate
-think before its first content chunk, so the two timing numbers are separable:
+think before its first output, so the two timing numbers are separable:
 
   1. a streaming request records ttft_ms, and it lands near the stub's think time
   2. the audit row's tps is computed over generation only — strictly above
-     output/duration, which is what including the think time would give
+     output/duration, which is what including the wait would give
   3. a non-streaming request records no ttft (there is no first token to time)
-  4. /api/audit/tps returns a per-provider series with both numbers
-  5. the range selector is honoured, an unknown range falls back, and a
+  4. a thinking model's thinking starts the clock, so tps covers the thinking
+     rather than just the visible tail it precedes
+  5. /api/audit/tps returns a per-provider series with both numbers
+  6. the range selector is honoured, an unknown range falls back, and a
      non-admin is refused
 
 Run: python server/check_tps.py
@@ -32,9 +34,14 @@ UPSTREAM_PORT = 3317
 BASE = f"http://127.0.0.1:{PORT}"
 UPSTREAM = f"http://127.0.0.1:{UPSTREAM_PORT}"
 
-# How long the stub thinks before its first content token. Long enough to be
+# How long the stub thinks before its first output. Long enough to be
 # unmistakable, short enough to keep the check quick.
 THINK = 0.4
+# A visible tail after a thinking model's thinking, so the two possible clocks
+# give different answers instead of the tail being instantaneous: with the clock
+# at the thinking, tps is the full-span rate; at the first visible token, it
+# would be the tail rate, several times higher.
+TAIL = 0.15
 # What the stub reports as output tokens; only used to make TPS a readable
 # number rather than a fraction.
 OUT_TOKENS = 200
@@ -89,12 +96,35 @@ class Upstream(BaseHTTPRequestHandler):
             parsed = json.loads(raw)
         except Exception:
             parsed = {}
+        # The prompt decides which stream the stub plays, so the whole request
+        # has to be searchable, not just the parsed content.
+        try:
+            text = json.dumps(parsed)
+        except Exception:
+            text = raw.decode(errors="replace")
 
         if parsed.get("stream"):
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
+            if "think-" in text:
+                # A thinking model: its first output is the thinking, sent at
+                # once, and the visible text only starts after the same think
+                # delay. The clock has to start here — the provider bills this
+                # thinking inside completion_tokens.
+                self._frame({"choices": [{"index": 0, "delta": {"reasoning_content": "let me think"}}]})
+                time.sleep(THINK)
+                for part in ["Hello", " there", " world"]:
+                    self._frame({"choices": [{"index": 0, "delta": {"content": part}}]})
+                    time.sleep(TAIL / 3)
+                self._frame({
+                    "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+                    "usage": {"prompt_tokens": 5, "completion_tokens": OUT_TOKENS,
+                              "total_tokens": 5 + OUT_TOKENS},
+                })
+                self._frame("[DONE]")
+                return
             self._frame({"choices": [{"index": 0, "delta": {"role": "assistant"}}]})
             time.sleep(THINK)
             self._frame({"choices": [{"index": 0, "delta": {"content": "Hello"}}]})
@@ -265,12 +295,50 @@ def main():
             with_ttft = [p for p in (d.get("points") or []) if (p.get("ttft") or {}).get(pids[0])]
             check("and reports no ttft average", len(with_ttft) == 0, f"{len(with_ttft)} points")
 
-        print("\n4. the series endpoint")
+        print("\n4. a thinking model's thinking starts the clock")
+        # Same stub, same think delay before the visible text — but this one
+        # emits its thinking immediately. If the clock waited for the first
+        # visible token, ttft and tps would come out exactly as they do above.
+        post("/api/model/create", {"model": {
+            "alias": "think-alias", "input_price": 1.0, "output_price": 1.0, "is_public": 1}})
+        post("/api/provider/create", {"provider": {
+            "model_alias": "think-alias", "priority": 1, "name": "thinker",
+            "base_url": UPSTREAM, "model": "m", "api_key": "k",
+            "auth_type": "bearer", "api_type": "openai", "enabled": 1,
+        }})
+        code = relay(True, api_key, "think-one", alias="think-alias")
+        check("thinking relay succeeded", code == 200, f"code={code}")
+        rows = (post("/api/audit/list", {}).get("data") or {}).get("list", [])
+        mine = [r for r in rows if r.get("model_alias") == "think-alias"]
+        check("the thinking attempt is recorded", len(mine) >= 1, f"{len(mine)} rows")
+        if mine:
+            row = mine[0]
+            ttft = row.get("ttft_ms") or 0
+            duration = row.get("duration_ms") or 0
+            out = row.get("output_tokens") or 0
+            tps = row.get("tps") or 0
+            # The thinking frame is the first thing on the wire, so the wait is
+            # the round trip, not the think time.
+            check("ttft lands on the thinking, not on the visible text",
+                  ttft < THINK * 1000 * 0.6,
+                  f"ttft_ms={ttft}, content only starts at ~{int(THINK * 1000)}ms")
+            # tps is over the span the provider was producing output for, so it
+            # sits near output/duration instead of near output/visible-tail.
+            naive = out / (duration / 1000)
+            check("tps covers the thinking span, not just the visible tail",
+                  tps < naive * 1.5,
+                  f"tps={tps} full-span={round(naive)} "
+                  f"visible-tail-only would be ~{round(out / max(duration - THINK * 1000, 1) * 1000)}")
+            check("ttft is a small part of the request", ttft < duration / 3,
+                  f"ttft={ttft} of {duration}")
+
+        print("\n5. the series endpoint")
         series = post("/api/audit/tps", {"range": "1h"})
         check("series request succeeded", series.get("success"), str(series)[:160])
         allp = series.get("data") or {}
         names = sorted(p.get("name") for p in (allp.get("providers") or []))
-        check("both providers appear in the series", names == ["plain", "streamer"], str(names))
+        check("every provider with traffic appears in the series",
+              names == ["plain", "streamer", "thinker"], str(names))
         check("the series covers the requested range", allp.get("range") == "1h",
               f"range={allp.get('range')} granularity={allp.get('granularity')}")
 
@@ -303,7 +371,7 @@ def main():
             check("idle slots are omitted rather than zero", len(empty) > 0,
                   f"{len(empty)} idle slots of {len(points)}")
 
-        print("\n5. ranges and access")
+        print("\n6. ranges and access")
         for rng, count, gran in [("12h", 720, "1m"), ("48h", 48, "60m")]:
             d = post("/api/audit/tps", {"range": rng}).get("data") or {}
             check(f"{rng} uses {gran} with {count} points",

@@ -14,8 +14,9 @@ export interface AuditDTO {
     endpoint: string;
     status_code: number;
     duration_ms: number;
-    /** Time to first content token; 0 when it was not measurable, which is the
-     *  non-streaming path and streams that produced no content. */
+    /** Time to the first token of any kind, thinking included; 0 when it was not
+     *  measurable, which is the non-streaming path and streams that emitted
+     *  nothing. */
     ttft_ms: number;
     input_tokens: number;
     cached_input_tokens: number;
