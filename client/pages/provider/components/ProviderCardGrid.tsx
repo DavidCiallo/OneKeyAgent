@@ -117,21 +117,58 @@ function HealthChip({ item, locale }: { item: ProviderDTO; locale: any }) {
 // active_from/active_to are minutes past routing-local midnight; equal or zero
 // means no window. Off-window is a warning rather than a danger: it is a
 // deliberate schedule, not a fault.
-function WindowChip({ item, locale }: { item: ProviderDTO; locale: any }) {
+// LimitRow — the four sizing/limit values on one unbreakable line: context
+// window, hourly quota (used/limit), stream rate cap, active window. They are
+// kept together so the card does not scatter them across wraps; a value is only
+// shown when it is set, and the ones that can trip (quota spent, off-window)
+// still turn warning-coloured.
+function LimitRow({ item, locale }: { item: ProviderDTO; locale: any }) {
+    const parts: ReactNode[] = [];
+
+    if (item.max_context) {
+        parts.push(<span key="ctx" className="shrink-0">{locale.Context} {humanCount(item.max_context)}</span>);
+    }
+    if (item.daily_quota) {
+        const spent = (item.today_count || 0) >= item.daily_quota;
+        parts.push(
+            <Tooltip key="quota" content={`${item.today_count}/${item.daily_quota}`}>
+                <span className={`shrink-0 ${spent ? "text-warning" : ""}`}>
+                    {locale.Quota} {item.today_count || 0}/{humanCount(item.daily_quota)}
+                </span>
+            </Tooltip>
+        );
+    }
+    if (item.max_tps) {
+        parts.push(
+            <Tooltip key="tps" content={locale.MaxTpsHint}>
+                <span className="shrink-0 text-warning">{locale.MaxTps} {item.max_tps} t/s</span>
+            </Tooltip>
+        );
+    }
+
+    // Active window, inline rather than its own chip.
     const from = item.active_from || 0;
     const to = item.active_to || 0;
-    if (from === to) return null;
+    if (from !== to) {
+        const clock = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+        const off = item.in_window === false;
+        parts.push(
+            <Tooltip key="win" content={off ? locale.OutsideWindow : `${clock(from)}-${clock(to)}`}>
+                <span className={`shrink-0 ${off ? "text-warning" : ""}`}>{clock(from)}-{clock(to)}</span>
+            </Tooltip>
+        );
+    }
 
-    const clock = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-    const label = `${clock(from)}-${clock(to)}`;
-    const off = item.in_window === false;
-
+    if (parts.length === 0) return null;
     return (
-        <Tooltip content={off ? locale.OutsideWindow : label}>
-            <Chip size="sm" variant={off ? "flat" : "bordered"} color={off ? "warning" : "default"} className="shrink-0">
-                {label}
-            </Chip>
-        </Tooltip>
+        <div className="flex items-center gap-1.5 text-xs whitespace-nowrap shrink-0">
+            {parts.map((p, i) => (
+                <span key={i} className="flex items-center gap-1.5">
+                    {i > 0 && <span className="text-default-200">·</span>}
+                    {p}
+                </span>
+            ))}
+        </div>
     );
 }
 
@@ -230,22 +267,7 @@ export function ProviderCardGrid({ list, onEdit, onCopy, onDelete, onMoveUp, onM
 
                             <span className="text-default-200 mx-1">|</span>
                             <HealthChip item={item} locale={locale} />
-                            {item.max_context ? (
-                                <Chip size="sm" variant="bordered" className="shrink-0">
-                                    {locale.Context} {humanCount(item.max_context)}
-                                </Chip>
-                            ) : null}
-                            {item.daily_quota ? (
-                                <Chip size="sm" variant="bordered" className="shrink-0">
-                                    {locale.Quota} {item.today_count || 0}/{humanCount(item.daily_quota)}
-                                </Chip>
-                            ) : null}
-                            {item.max_tps ? (
-                                <Chip size="sm" variant="bordered" className="shrink-0" color="warning">
-                                    {locale.MaxTps} {item.max_tps} t/s
-                                </Chip>
-                            ) : null}
-                            <WindowChip item={item} locale={locale} />
+                            <LimitRow item={item} locale={locale} />
                         </div>
                     </div>
                 ))}
