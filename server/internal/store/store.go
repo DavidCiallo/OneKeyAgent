@@ -184,8 +184,9 @@ var tables = []tableDef{
 		{"endpoint", "TEXT NOT NULL DEFAULT ''"},
 		{"status_code", "INTEGER NOT NULL DEFAULT 0"},
 		{"duration_ms", "INTEGER NOT NULL DEFAULT 0"},
-		// Time to first content token; 0 on the non-streaming path, where there
-		// is no first token to time — the response arrives whole.
+		// Time to the first token of any kind, thinking included; 0 on the
+		// non-streaming path, where there is no first token to time — the
+		// response arrives whole.
 		{"ttft_ms", "INTEGER NOT NULL DEFAULT 0"},
 		{"input_tokens", "INTEGER NOT NULL DEFAULT 0"},
 		{"cached_input_tokens", "INTEGER NOT NULL DEFAULT 0"},

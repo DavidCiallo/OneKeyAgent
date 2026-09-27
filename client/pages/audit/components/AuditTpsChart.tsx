@@ -77,8 +77,8 @@ export function AuditTpsChart() {
                     <span className="font-medium text-sm">{locale.Throughput || "Throughput"}</span>
                     <span className="text-xs text-gray-400">
                         {metric === "tps"
-                            ? (locale.TpsHint || "output tokens per second of generation, first token excluded")
-                            : (locale.TtftHint || "average wait for the first token, streaming requests only")}
+                            ? (locale.TpsHint || "output tokens per second of generation, first-token wait excluded, thinking included")
+                            : (locale.TtftHint || "average wait for the first token, thinking included, streaming requests only")}
                     </span>
                 </div>
                 <div className="flex flex-row items-center gap-2">

@@ -70,14 +70,20 @@ func (a *App) auditDetail(c *httpx.Ctx) (any, error) {
 // throughput — output tokens per second of generation, derived here rather than
 // stored so a later change to the formula applies to existing rows too.
 //
-// The first-token wait is taken out: a provider that thinks for two seconds and
-// then streams quickly is not a slow provider, and counting the think time as
-// generation would hide exactly the difference the number exists to show. When
-// there is no first-token measurement (non-streaming, or a stream that produced
-// no content) the whole duration is generation time, which is the only reading
-// available and a floor on the real speed. A wait longer than the request itself
-// is inconsistent data rather than a real measurement, so it falls back the same
-// way; a wait equal to it leaves nothing to divide by and reports no speed.
+// Only the wait before the first token is taken out: that is prefill and
+// queueing, a property of the prompt rather than of the model's speed. Thinking
+// is not taken out — it is output the provider bills, and the clock starts at
+// the first token of any kind, so reasoning tokens are measured over the span
+// that produced them. Starting the clock at the first *visible* token instead
+// would divide the whole output by the visible tail alone and report a rate no
+// model can reach.
+//
+// When there is no first-token measurement (non-streaming, or a stream that
+// emitted nothing) the whole duration is generation time, which is the only
+// reading available and a floor on the real speed. A wait longer than the
+// request itself is inconsistent data rather than a real measurement, so it
+// falls back the same way; a wait equal to it leaves nothing to divide by and
+// reports no speed.
 func throughput(outputTokens, durationMs, ttftMs int64) float64 {
 	gen := durationMs
 	if ttftMs > 0 && ttftMs <= durationMs {

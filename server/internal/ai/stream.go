@@ -667,12 +667,9 @@ type meteredScanner struct {
 	Usage          map[string]any
 	EstimatedChars int
 	Reasoning      *syncPoint
-	// FirstContentAt — Unix milliseconds when the first content delta arrived,
-	// 0 until then. Stamped once, because it is what separates time-to-first-
-	// token from generation: tokens over (duration - ttft) is the speed the
-	// model actually produced text at, which is what makes one provider
-	// comparable to another.
-	FirstContentAt int64
+	// FirstTokenAt — Unix milliseconds when the first token of any kind
+	// arrived, 0 until then.
+	FirstTokenAt int64
 }
 
 type syncPoint struct {
@@ -680,15 +677,26 @@ type syncPoint struct {
 	buf strings.Builder
 }
 
-// noteContent counts a content delta and stamps the first one. Every dialect's
-// content field funnels through here.
+// noteFirstToken stamps the first token, once, and is what separates the wait
+// from the generation: tokens over (duration - ttft) is the speed the model
+// produced output at, which is what makes one provider comparable to another.
+//
+// Reasoning counts as a token. A thinking model streams its thinking before any
+// visible text, and the provider bills that thinking inside completion_tokens,
+// so a clock started at the first *visible* token would divide the whole output
+// by the visible tail alone and report a rate no model can reach.
+func (m *meteredScanner) noteFirstToken() {
+	if m.FirstTokenAt == 0 {
+		m.FirstTokenAt = time.Now().UnixMilli()
+	}
+}
+
+// noteContent counts a content delta and stamps the first token if this is it.
 func (m *meteredScanner) noteContent(s string) {
 	if s == "" {
 		return
 	}
-	if m.EstimatedChars == 0 && m.FirstContentAt == 0 {
-		m.FirstContentAt = time.Now().UnixMilli()
-	}
+	m.noteFirstToken()
 	m.EstimatedChars += runeLen(s)
 }
 
@@ -717,9 +725,16 @@ func (m *meteredScanner) feed(chunk []byte) {
 				m.noteContent(s)
 			}
 		}
-		if m.Reasoning != nil {
-			if rc := jGetPath(d, "choices", "0", "delta", "reasoning_content"); rc != nil {
-				if s, ok := rc.(string); ok {
+		// Checked outside the capture guard: thinking is the first output of a
+		// thinking model, so it starts the clock whether or not the text is
+		// being kept for replay. Every dialect's thinking is converted to this
+		// field before the scanner sees it.
+		if rc := jGetPath(d, "choices", "0", "delta", "reasoning_content"); rc != nil {
+			if s, ok := rc.(string); ok {
+				if s != "" {
+					m.noteFirstToken()
+				}
+				if m.Reasoning != nil {
 					m.Reasoning.mu.Lock()
 					m.Reasoning.buf.WriteString(s)
 					m.Reasoning.mu.Unlock()

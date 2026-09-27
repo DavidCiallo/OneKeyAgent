@@ -17,7 +17,8 @@ type UsageLog struct {
 	InputTokens       int64
 	CachedInputTokens int64
 	OutputTokens      int64
-	// DurationMs / TtftMs — wall time and time to first content token, summed
+	// DurationMs / TtftMs — wall time and time to the first token of any kind
+	// (thinking included), summed
 	// into the usage window so it can report throughput per provider.
 	DurationMs  int64
 	TtftMs      int64

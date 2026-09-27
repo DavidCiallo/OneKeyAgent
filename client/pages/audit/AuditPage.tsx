@@ -31,8 +31,9 @@ function formatTps(tps: number): string {
     return `${tps.toFixed(1)} t/s`;
 }
 
-/** Time to first content token; dash when it was not measurable, which is the
- *  non-streaming path and streams that produced no content. */
+/** Time to the first token of any kind — a thinking model's thinking counts, so
+ *  this is the wait before the model started producing anything. Dash when it
+ *  was not measurable, which is the non-streaming path. */
 function formatTtft(ttft: number): string {
     if (!ttft) return "-";
     if (ttft < 1000) return `${ttft}ms`;
