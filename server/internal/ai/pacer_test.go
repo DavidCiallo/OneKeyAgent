@@ -1,9 +1,46 @@
 package ai
 
 import (
+	"bytes"
+	"strings"
 	"testing"
 	"time"
 )
+
+// A fast provider can hand its whole stream over in a single read, which is
+// exactly the case a ceiling is wanted for. Pacing per read lets all of it
+// through before any wait applies, because the first read is what starts the
+// budget — so the budget has to be spent per frame, not per read.
+func TestMeteredCopyPacesASingleBurst(t *testing.T) {
+	const tokens = 200
+	var sb strings.Builder
+	for i := 0; i < tokens; i++ {
+		sb.WriteString(`data: {"choices":[{"index":0,"delta":{"content":"x"}}]}` + "\n\n")
+	}
+	body := []byte(sb.String())
+
+	// bytes.Reader returns the whole body from the first Read, which is the
+	// shape a bursting upstream has on the wire.
+	var out bytes.Buffer
+	sc := &meteredScanner{}
+	start := time.Now()
+	meteredCopy(&out, bytes.NewReader(body), sc, &streamPacer{rate: 100})
+	elapsed := time.Since(start)
+
+	if out.String() != string(body) {
+		t.Fatalf("the stream was altered: %d bytes in, %d out", len(body), out.Len())
+	}
+	if got := sc.outputTokensEstimate(); got != tokens {
+		t.Fatalf("estimate = %d, want %d", got, tokens)
+	}
+	// 200 tokens at 100 t/s is two seconds of budget.
+	if elapsed < 1900*time.Millisecond {
+		t.Fatalf("%d tokens at 100 t/s took %v: the burst went out unpaced", tokens, elapsed)
+	}
+	if elapsed > 3*time.Second {
+		t.Fatalf("took %v, want about 2s", elapsed)
+	}
+}
 
 // The pacer is what a provider's max_tps turns into, so its arithmetic is worth
 // pinning without sleeping through it. The origin is set by hand here: the

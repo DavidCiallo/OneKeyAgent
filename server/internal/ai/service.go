@@ -1042,6 +1042,27 @@ func (p *streamPacer) delay(tokens int, now time.Time) time.Duration {
 	return 0
 }
 
+// active reports whether the stream is paced at all, so the common uncapped
+// path keeps its single feed-and-write per read.
+func (p *streamPacer) active() bool { return p != nil && p.rate > 0 }
+
+// splitFrames cuts a read into SSE lines, each keeping its newline. Order is
+// preserved and no byte is added or dropped; only the timing changes.
+func splitFrames(chunk []byte) [][]byte {
+	frames := make([][]byte, 0, 8)
+	start := 0
+	for i, b := range chunk {
+		if b == '\n' {
+			frames = append(frames, chunk[start:i+1])
+			start = i + 1
+		}
+	}
+	if start < len(chunk) {
+		frames = append(frames, chunk[start:])
+	}
+	return frames
+}
+
 // meteredCopy forwards bytes untouched, scanning SSE inline for usage and
 // reasoning content (port of the TS passthrough with inline cost parsing), and
 // holds the stream back when the provider has a rate ceiling.
@@ -1052,14 +1073,30 @@ func meteredCopy(dst io.Writer, src io.Reader, sc *meteredScanner, pacer *stream
 		if n > 0 {
 			chunk := make([]byte, n)
 			copy(chunk, buf[:n])
-			sc.feed(chunk)
-			// Sleeping here, before the client sees the chunk, is what makes the
-			// stream slower for the caller as well as for the meter.
-			if wait := pacer.delay(sc.outputTokensEstimate(), time.Now()); wait > 0 {
-				time.Sleep(wait)
-			}
-			if _, werr := dst.Write(chunk); werr != nil {
-				return // client went away; settle still runs via caller
+			if !pacer.active() {
+				sc.feed(chunk)
+				if _, werr := dst.Write(chunk); werr != nil {
+					return // client went away; settle still runs via caller
+				}
+			} else {
+				// Pace frame by frame rather than read by read. An upstream can
+				// hand its whole stream over in one read — a fast provider, or a
+				// buffering proxy in front of one — and a read-sized wait would
+				// let every token out before the budget had even started, since
+				// the read that starts it is the read being exempted. One frame
+				// is about one token, which is fine enough to spread a burst.
+				for _, frame := range splitFrames(chunk) {
+					sc.feed(frame)
+					// Sleeping here, before the client sees the frame, is what
+					// makes the stream slower for the caller as well as for the
+					// meter.
+					if wait := pacer.delay(sc.outputTokensEstimate(), time.Now()); wait > 0 {
+						time.Sleep(wait)
+					}
+					if _, werr := dst.Write(frame); werr != nil {
+						return
+					}
+				}
 			}
 		}
 		if err != nil {
