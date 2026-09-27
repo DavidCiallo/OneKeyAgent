@@ -45,6 +45,16 @@ TAIL = 0.15
 # What the stub reports as output tokens; only used to make TPS a readable
 # number rather than a fraction.
 OUT_TOKENS = 200
+# The rate-ceiling case: a burst of one-character deltas, and the ceiling the
+# provider is configured with. One character per delta is deliberate — it is the
+# case where counting characters alone would under-report the output four times
+# over, so the pacing has to fall back to counting deltas.
+PACED_TOKENS = 200
+PACED_TPS = 100
+# The stub writes one frame at a time with a hair of a gap, the way a real
+# provider delivers, which leaves the ceiling something to pace. Without it the
+# whole burst could land in one read and there would be nothing left to slow.
+PACED_FRAME_GAP = 0.001
 
 PASS, FAIL = [], []
 TOKEN = {"value": ""}
@@ -108,6 +118,20 @@ class Upstream(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
+            if "paced-" in text:
+                # A provider far faster than its configured ceiling: the whole
+                # response in a burst of single-character deltas.
+                self._frame({"choices": [{"index": 0, "delta": {"role": "assistant"}}]})
+                for _ in range(PACED_TOKENS):
+                    self._frame({"choices": [{"index": 0, "delta": {"content": "x"}}]})
+                    time.sleep(PACED_FRAME_GAP)
+                self._frame({
+                    "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+                    "usage": {"prompt_tokens": 5, "completion_tokens": PACED_TOKENS,
+                              "total_tokens": 5 + PACED_TOKENS},
+                })
+                self._frame("[DONE]")
+                return
             if "think-" in text:
                 # A thinking model: its first output is the thinking, sent at
                 # once, and the visible text only starts after the same think
@@ -332,13 +356,72 @@ def main():
             check("ttft is a small part of the request", ttft < duration / 3,
                   f"ttft={ttft} of {duration}")
 
-        print("\n5. the series endpoint")
+        print("\n5. a provider's rate ceiling slows its stream down to it")
+        # The same burst of traffic through two providers, one with a ceiling and
+        # one without: the only difference between the two measurements is the
+        # ceiling, so the drop can only have come from pacing.
+        post("/api/model/create", {"model": {
+            "alias": "fast-alias", "input_price": 1.0, "output_price": 1.0, "is_public": 1}})
+        post("/api/provider/create", {"provider": {
+            "model_alias": "fast-alias", "priority": 1, "name": "fast",
+            "base_url": UPSTREAM, "model": "m", "api_key": "k",
+            "auth_type": "bearer", "api_type": "openai", "enabled": 1,
+        }})
+        post("/api/model/create", {"model": {
+            "alias": "paced-alias", "input_price": 1.0, "output_price": 1.0, "is_public": 1}})
+        made = post("/api/provider/create", {"provider": {
+            "model_alias": "paced-alias", "priority": 1, "name": "paced",
+            "base_url": UPSTREAM, "model": "m", "api_key": "k",
+            "auth_type": "bearer", "api_type": "openai", "enabled": 1,
+            "max_tps": PACED_TPS,
+        }})
+        stored = ((made.get("data") or {}).get("provider") or {}).get("max_tps")
+        check("the ceiling is stored on the provider", stored == PACED_TPS, f"max_tps={stored}")
+
+        code = relay(True, api_key, "paced-one", alias="fast-alias")
+        check("the uncapped relay succeeded", code == 200, f"code={code}")
+        code = relay(True, api_key, "paced-one", alias="paced-alias")
+        check("the capped relay succeeded", code == 200, f"code={code}")
+
+        rows = (post("/api/audit/list", {}).get("data") or {}).get("list", [])
+
+        def attempt(alias):
+            mine = [r for r in rows if r.get("model_alias") == alias]
+            return mine[0] if mine else None
+
+        fast, paced = attempt("fast-alias"), attempt("paced-alias")
+        check("both attempts are recorded", fast is not None and paced is not None,
+              f"fast={fast is not None} paced={paced is not None}")
+        if fast and paced:
+            f_tps, p_tps = fast.get("tps") or 0, paced.get("tps") or 0
+            check("the uncapped stream is far faster than the ceiling",
+                  f_tps > PACED_TPS * 2, f"tps={round(f_tps, 1)} ceiling={PACED_TPS}")
+            check("the capped stream is held at the ceiling",
+                  p_tps <= PACED_TPS * 1.2,
+                  f"tps={round(p_tps, 1)} ceiling={PACED_TPS}")
+            # Above the floor matters as much as below the ceiling: a stream that
+            # merely came out slow would pass a one-sided check.
+            check("it is paced to the ceiling, not just under it",
+                  p_tps >= PACED_TPS * 0.8, f"tps={round(p_tps, 1)} ceiling={PACED_TPS}")
+            check("the ceiling is what slowed it", p_tps < f_tps * 0.5,
+                  f"capped={round(p_tps, 1)} uncapped={round(f_tps, 1)}")
+            check("the stream really waited",
+                  (paced.get("duration_ms") or 0) >= 1000 * PACED_TOKENS / PACED_TPS * 0.8,
+                  f"duration={paced.get('duration_ms')}ms for {paced.get('output_tokens')} "
+                  f"tokens at {PACED_TPS} t/s")
+            # The budget starts at the first token, so the wait for that token is
+            # not the thing being slowed.
+            check("the ceiling leaves the first token alone",
+                  (paced.get("ttft_ms") or 0) < 250,
+                  f"ttft_ms={paced.get('ttft_ms')}")
+
+        print("\n6. the series endpoint")
         series = post("/api/audit/tps", {"range": "1h"})
         check("series request succeeded", series.get("success"), str(series)[:160])
         allp = series.get("data") or {}
         names = sorted(p.get("name") for p in (allp.get("providers") or []))
         check("every provider with traffic appears in the series",
-              names == ["plain", "streamer", "thinker"], str(names))
+              {"plain", "streamer", "thinker", "fast", "paced"} <= set(names), str(names))
         check("the series covers the requested range", allp.get("range") == "1h",
               f"range={allp.get('range')} granularity={allp.get('granularity')}")
 
@@ -371,7 +454,7 @@ def main():
             check("idle slots are omitted rather than zero", len(empty) > 0,
                   f"{len(empty)} idle slots of {len(points)}")
 
-        print("\n6. ranges and access")
+        print("\n7. ranges and access")
         for rng, count, gran in [("12h", 720, "1m"), ("48h", 48, "60m")]:
             d = post("/api/audit/tps", {"range": rng}).get("data") or {}
             check(f"{rng} uses {gran} with {count} points",

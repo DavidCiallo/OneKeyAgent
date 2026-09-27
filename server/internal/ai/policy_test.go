@@ -109,7 +109,7 @@ func TestPolicyAllParkedFallsBack(t *testing.T) {
 }
 
 // TestPolicyDailyQuota — a provider stops being selected once it has served its
-// declared number of requests today, and the counter resets on a new day.
+// declared number of requests this hour, and the counter resets on a new hour.
 func TestPolicyDailyQuota(t *testing.T) {
 	p := newProviderPolicy(nil)
 	cands := []*store.Provider{prov("a", 1, 0, 2), prov("b", 2, 0, 0)}
@@ -132,15 +132,15 @@ func TestPolicyDailyQuota(t *testing.T) {
 		t.Fatalf("unlimited provider was filtered: %v", got)
 	}
 
-	// Rolling the day re-opens the quota.
+	// Rolling the hour re-opens the quota.
 	p.mu.Lock()
-	p.dailyKey = "1970-01-01"
+	p.periodKey = "1970-01-01T00"
 	p.mu.Unlock()
 	if got := ids(p.selectProviders(cands, 0, true, true)); !equal(got, []string{"a", "b"}) {
-		t.Fatalf("order = %v, want the quota reset on a new day", got)
+		t.Fatalf("order = %v, want the quota reset on a new hour", got)
 	}
 	if snap := p.Snapshot(prov("a", 1, 0, 0)); snap.TodayCount != 0 {
-		t.Fatalf("today_count = %d right after the day rolled, want 0", snap.TodayCount)
+		t.Fatalf("today_count = %d right after the hour rolled, want 0", snap.TodayCount)
 	}
 }
 
@@ -354,9 +354,9 @@ func TestRoutingTimezoneMovesTheWindow(t *testing.T) {
 	}
 }
 
-// The daily counters read the same clock, so "today" is the routing day.
+// The hourly counters read the same clock, so the window is the routing hour.
 func TestDailyCountersUseTheRoutingClock(t *testing.T) {
-	// 16:30 UTC is already the next day in Shanghai.
+	// 16:30 UTC is already the next day (and a different hour) in Shanghai.
 	instant := time.Date(2026, 9, 26, 16, 30, 0, 0, time.UTC)
 	utc := policyAt("UTC", instant)
 	sh := policyAt("Asia/Shanghai", instant)
@@ -370,8 +370,8 @@ func TestDailyCountersUseTheRoutingClock(t *testing.T) {
 	if got := sh.Snapshot(&store.Provider{ID: "a"}).TodayCount; got != 1 {
 		t.Fatalf("Shanghai today count = %d, want 1", got)
 	}
-	if utc.policyDay() == sh.policyDay() {
-		t.Fatal("the two zones are on different calendar days at this instant, keys should differ")
+	if utc.policyHour() == sh.policyHour() {
+		t.Fatal("the two zones are on different hours at this instant, keys should differ")
 	}
 }
 

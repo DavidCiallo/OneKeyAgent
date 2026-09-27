@@ -78,6 +78,10 @@ var tables = []tableDef{
 		{"max_context", "INTEGER NOT NULL DEFAULT 0"},
 		// daily_quota — requests allowed per local day; 0 = unlimited, in-memory.
 		{"daily_quota", "INTEGER NOT NULL DEFAULT 0"},
+		// max_tps — ceiling on the streamed output rate in tokens per second;
+		// 0 = unlimited. Enforced by pacing the stream, so it slows a provider
+		// down rather than rejecting the work.
+		{"max_tps", "INTEGER NOT NULL DEFAULT 0"},
 		// active_from / active_to — minutes past local midnight between which the
 		// provider may be used (peak/off-peak routing); both 0 = any time.
 		{"active_from", "INTEGER NOT NULL DEFAULT 0"},
