@@ -10,7 +10,7 @@ import (
 )
 
 // Provider selection policy: in-memory, per-process filters applied on top of
-// the priority order — failure cooldown, daily quota, context size, active
+// the priority order — failure cooldown, hourly quota, context size, active
 // window.
 //
 // They are preferences, not gates: when every candidate is filtered out the
@@ -23,9 +23,12 @@ type providerPolicy struct {
 
 	failures      map[string]int
 	cooldownUntil map[string]int64
-	dailyCount    map[string]int
-	// dailyKey is the routing-clock calendar day the counters belong to.
-	dailyKey string
+	// periodCount — requests served in the current routing-clock hour. The DB
+	// column keeps the historical name daily_quota, but it counts per hour now;
+	// "100 per hour" is simply stored as 100.
+	periodCount map[string]int
+	// periodKey is the routing-clock hour the counters belong to.
+	periodKey string
 
 	// loc caches the zone parsed for locName, so a settings read does not hit
 	// the timezone database on every request.
@@ -45,7 +48,7 @@ func newProviderPolicy(settings *service.Settings) *providerPolicy {
 		settings:      settings,
 		failures:      map[string]int{},
 		cooldownUntil: map[string]int64{},
-		dailyCount:    map[string]int{},
+		periodCount:   map[string]int{},
 		nowFn:         time.Now,
 		maxFailures:   policyMaxFailures,
 		cooldownMs:    policyCooldownMs,
@@ -88,18 +91,20 @@ const (
 	policyRetryDelayMs = 500
 )
 
-// dayKey — the calendar day on the routing clock.
-func dayKey(now time.Time) string {
-	return now.Format("2006-01-02")
+// hourKey — the routing-clock hour, down to the hour so the quota window is one
+// wall-clock hour. The stored limit keeps the historical daily_quota column; a
+// "100 per hour" limit is simply held as 100 there.
+func hourKey(now time.Time) string {
+	return now.Format("2006-01-02T15")
 }
 
-// rollDayLocked resets the daily counters when the calendar day changes.
-// Callers must hold p.mu.
-func (p *providerPolicy) rollDayLocked(now time.Time) {
-	k := dayKey(now)
-	if p.dailyKey != k {
-		p.dailyKey = k
-		p.dailyCount = map[string]int{}
+// rollPeriodLocked resets the hourly counters when the routing-clock hour
+// changes. Callers must hold p.mu.
+func (p *providerPolicy) rollPeriodLocked(now time.Time) {
+	k := hourKey(now)
+	if p.periodKey != k {
+		p.periodKey = k
+		p.periodCount = map[string]int{}
 	}
 }
 
@@ -127,7 +132,7 @@ func minuteOfDay(t time.Time) int {
 func (p *providerPolicy) eligible(providerID string, dailyQuota int64, now time.Time, cooldownOK, quotaOK bool) (bool, string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.rollDayLocked(now)
+	p.rollPeriodLocked(now)
 
 	if cooldownOK {
 		if until, ok := p.cooldownUntil[providerID]; ok {
@@ -137,8 +142,8 @@ func (p *providerPolicy) eligible(providerID string, dailyQuota int64, now time.
 			delete(p.cooldownUntil, providerID)
 		}
 	}
-	if quotaOK && dailyQuota > 0 && int64(p.dailyCount[providerID]) >= dailyQuota {
-		return false, "daily quota reached"
+	if quotaOK && dailyQuota > 0 && int64(p.periodCount[providerID]) >= dailyQuota {
+		return false, "hourly quota reached"
 	}
 	return true, ""
 }
@@ -148,10 +153,10 @@ func (p *providerPolicy) recordSuccess(providerID string) {
 	now := p.routingNow()
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.rollDayLocked(now)
+	p.rollPeriodLocked(now)
 	p.failures[providerID] = 0
 	delete(p.cooldownUntil, providerID)
-	p.dailyCount[providerID]++
+	p.periodCount[providerID]++
 }
 
 // recordFailure counts a consecutive failure and parks the provider at the
@@ -160,7 +165,7 @@ func (p *providerPolicy) recordFailure(providerID string) bool {
 	now := p.routingNow()
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.rollDayLocked(now)
+	p.rollPeriodLocked(now)
 
 	p.failures[providerID]++
 	if p.maxFailures <= 0 || p.failures[providerID] < p.maxFailures {
@@ -173,8 +178,11 @@ func (p *providerPolicy) recordFailure(providerID string) bool {
 type policySnapshot struct {
 	Failures      int   `json:"failures"`
 	CooldownUntil int64 `json:"cooldown_until"`
-	TodayCount    int   `json:"today_count"`
-	InWindow      bool  `json:"in_window"`
+	// TodayCount — requests served in the current routing-clock hour. The field
+	// name is historical; the value is the per-hour count the quota compares
+	// against.
+	TodayCount int   `json:"today_count"`
+	InWindow   bool  `json:"in_window"`
 }
 
 // Snapshot reports one provider's policy state for the admin UI.
@@ -189,16 +197,16 @@ func (p *providerPolicy) Snapshot(pr *store.Provider) policySnapshot {
 	if until, ok := p.cooldownUntil[pr.ID]; ok && now.UnixMilli() < until {
 		out.CooldownUntil = until
 	}
-	if p.dailyKey == dayKey(now) {
-		out.TodayCount = p.dailyCount[pr.ID]
+	if p.periodKey == hourKey(now) {
+		out.TodayCount = p.periodCount[pr.ID]
 	}
 	return out
 }
 
-// policyDay — the routing clock's current calendar day, used by tests to show
-// that the day boundary really does move with the zone.
-func (p *providerPolicy) policyDay() string {
-	return dayKey(p.routingNow())
+// policyHour — the routing clock's current hour, used by tests to show that the
+// hour boundary really does move with the zone.
+func (p *providerPolicy) policyHour() string {
+	return hourKey(p.routingNow())
 }
 
 // PolicySnapshot — the Server-level accessor used by the admin API.
@@ -267,7 +275,7 @@ func fitsContext(declaredTokens int64, requestTokens int) bool {
 // ─────────────────────────── selection ───────────────────────────
 
 // selectProviders filters a priority-ordered candidate list by active window,
-// context size, cooldown and daily quota. When every candidate is filtered out
+// context size, cooldown and hourly quota. When every candidate is filtered out
 // the original list is returned, since trying a parked upstream beats failing
 // the request — which also means a window is a preference, not a gate.
 func (p *providerPolicy) selectProviders(

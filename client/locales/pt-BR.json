@@ -75,7 +75,7 @@
         "Yes": "Sim",
         "No": "Não",
         "MaxContext": "Contexto máximo",
-        "DailyQuota": "Cota diária",
+        "DailyQuota": "Cota por hora",
         "MaxTps": "TPS máx.",
         "MaxTpsHint": "Limite da saída em streaming em tokens por segundo. Aplicado por ritmo, então um provedor mais rápido parece mais lento. 0 = sem limite.",
         "Parked": "Pausado",

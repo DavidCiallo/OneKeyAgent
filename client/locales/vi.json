@@ -72,7 +72,7 @@
         "Yes": "Có",
         "No": "Không",
         "MaxContext": "Giới hạn ngữ cảnh",
-        "DailyQuota": "Hạn mức hàng ngày",
+        "DailyQuota": "Hạn mức mỗi giờ",
         "MaxTps": "TPS tối đa",
         "MaxTpsHint": "Giới hạn đầu ra khi streaming, tính bằng token mỗi giây. Áp dụng bằng cách giãn nhịp nên nhà cung cấp nhanh sẽ chậm lại. 0 = không giới hạn.",
         "Parked": "Tạm dừng",
