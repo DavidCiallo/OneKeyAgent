@@ -166,6 +166,7 @@ func TestRefreshSnapshotMergesUsageWindowByNaturalKey(t *testing.T) {
 	if err := BucketLogUsage(db, BucketLogInput{
 		AccountID: "acc1", ModelAlias: "alpha", ProviderID: "p1",
 		InputTokens: 30, CachedInputTokens: 0, OutputTokens: 10, Cost: 0.5,
+		DurationMs: 3000, TtftMs: 400,
 	}); err != nil {
 		t.Fatalf("local usage: %v", err)
 	}
@@ -187,6 +188,7 @@ func TestRefreshSnapshotMergesUsageWindowByNaturalKey(t *testing.T) {
 				"granularity": "1m", "bucket_time": bucketTime,
 				"input_tokens": 100, "cached_input_tokens": 0, "output_tokens": 50,
 				"cost": 1.5, "request_count": 2,
+				"duration_ms": 7000, "ttft_ms": 600, "ttft_count": 2,
 			},
 		},
 	}); err != nil {
@@ -195,7 +197,7 @@ func TestRefreshSnapshotMergesUsageWindowByNaturalKey(t *testing.T) {
 
 	var rows int
 	var gotID string
-	var it, ot, rc int64
+	var it, ot, rc, dur, ttft, ttftCount int64
 	var cost float64
 	if err := db.QueryRow(`SELECT COUNT(*) FROM usage_bucket WHERE account_id='acc1' AND granularity='1m'`).Scan(&rows); err != nil {
 		t.Fatalf("count: %v", err)
@@ -203,8 +205,10 @@ func TestRefreshSnapshotMergesUsageWindowByNaturalKey(t *testing.T) {
 	if rows != 1 {
 		t.Fatalf("%d rows for one window, want 1 — the refresh forked it by id", rows)
 	}
-	if err := db.QueryRow(`SELECT id, input_tokens, output_tokens, cost, request_count FROM usage_bucket
-		WHERE account_id='acc1' AND granularity='1m'`).Scan(&gotID, &it, &ot, &cost, &rc); err != nil {
+	if err := db.QueryRow(`SELECT id, input_tokens, output_tokens, cost, request_count,
+			duration_ms, ttft_ms, ttft_count FROM usage_bucket
+		WHERE account_id='acc1' AND granularity='1m'`).Scan(
+		&gotID, &it, &ot, &cost, &rc, &dur, &ttft, &ttftCount); err != nil {
 		t.Fatalf("read: %v", err)
 	}
 	if gotID != localID {
@@ -216,6 +220,13 @@ func TestRefreshSnapshotMergesUsageWindowByNaturalKey(t *testing.T) {
 	}
 	if diff := cost - 2.0; diff > 1e-9 || diff < -1e-9 {
 		t.Fatalf("cost = %v, want 2.0 (1.5 + local 0.5)", cost)
+	}
+	// The timing columns merge the same way. If they were left out of
+	// additiveCols the refresh would overwrite them with main's value, and this
+	// node's own traffic would vanish from the throughput chart.
+	if dur != 10_000 || ttft != 1_000 || ttftCount != 3 {
+		t.Fatalf("timing = dur:%d ttft:%d count:%d, want 10000/1000/3 (7000/600/2 + local 3000/400/1)",
+			dur, ttft, ttftCount)
 	}
 }
 

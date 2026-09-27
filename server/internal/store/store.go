@@ -122,6 +122,17 @@ var tables = []tableDef{
 		{"output_tokens", "INTEGER NOT NULL DEFAULT 0"},
 		{"cost", "REAL NOT NULL DEFAULT 0"},
 		{"request_count", "INTEGER NOT NULL DEFAULT 0"},
+		// duration_ms / ttft_ms accumulate so a bucket can report throughput:
+		// output tokens over (duration - ttft) is how fast the model actually
+		// produced text, with the wait for the first token taken out. Rows
+		// written before these columns existed hold 0 and simply report no
+		// speed until their granularity's retention ages them out.
+		{"duration_ms", "INTEGER NOT NULL DEFAULT 0"},
+		{"ttft_ms", "INTEGER NOT NULL DEFAULT 0"},
+		// Requests that reported a first token. ttft_ms sums over exactly these,
+		// so this is the denominator for an average first-token latency — the
+		// non-streaming path contributes nothing to either.
+		{"ttft_count", "INTEGER NOT NULL DEFAULT 0"},
 		{"create_time", "INTEGER NOT NULL DEFAULT 0"},
 		{"update_time", "INTEGER"},
 		{"delete_time", "INTEGER"},
@@ -173,6 +184,9 @@ var tables = []tableDef{
 		{"endpoint", "TEXT NOT NULL DEFAULT ''"},
 		{"status_code", "INTEGER NOT NULL DEFAULT 0"},
 		{"duration_ms", "INTEGER NOT NULL DEFAULT 0"},
+		// Time to first content token; 0 on the non-streaming path, where there
+		// is no first token to time — the response arrives whole.
+		{"ttft_ms", "INTEGER NOT NULL DEFAULT 0"},
 		{"input_tokens", "INTEGER NOT NULL DEFAULT 0"},
 		{"cached_input_tokens", "INTEGER NOT NULL DEFAULT 0"},
 		{"output_tokens", "INTEGER NOT NULL DEFAULT 0"},
@@ -301,16 +315,33 @@ func backfillAuditBodies(db *sql.DB) error {
 	return err
 }
 
-// purgeLegacyAuditBodies — drop stored audit bodies left by earlier builds.
-// Those builds kept whole prompts (up to 64 KiB) on the newest failures, and a
-// database upgraded in place would otherwise carry that text indefinitely:
-// new rows store a field summary instead, and retention only trims by count.
-// Clearing them at startup is what makes the smaller-retention change apply to
-// data that already exists.
+// auditBodiesPurgedKey — node_state flag for the one-off legacy body purge.
+const auditBodiesPurgedKey = "audit_bodies_purged"
+
+// purgeLegacyAuditBodies — drop stored audit bodies left by earlier builds,
+// once. Those builds kept whole prompts (up to 64 KiB) on the newest failures,
+// and a database upgraded in place would otherwise carry that text
+// indefinitely: new rows store a field summary instead, and retention only
+// trims by count. Clearing them is what makes the smaller-retention change
+// apply to data that already exists.
+//
+// The node_state guard is load-bearing: the statement cannot tell a legacy row
+// from a current one — it matches every row that has a body. Unguarded it ran
+// on every startup, so each restart wiped the bodies the current build had just
+// written, leaving the audit page with nothing to show when a row is expanded.
 func purgeLegacyAuditBodies(db *sql.DB) error {
-	_, err := db.Exec(`UPDATE audit_log SET request_body = '', response_body = ''
-		WHERE request_body <> '' OR response_body <> ''`)
-	return err
+	purged, err := GetNodeState(db, auditBodiesPurgedKey)
+	if err != nil {
+		return err
+	}
+	if purged != "" {
+		return nil
+	}
+	if _, err := db.Exec(`UPDATE audit_log SET request_body = '', response_body = ''
+		WHERE request_body <> '' OR response_body <> ''`); err != nil {
+		return err
+	}
+	return SetNodeState(db, auditBodiesPurgedKey, "1")
 }
 
 // dedupeBucketRows merges usage_bucket rows that share a window, keeping the
