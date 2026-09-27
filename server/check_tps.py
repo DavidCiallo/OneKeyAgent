@@ -118,6 +118,19 @@ class Upstream(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
+            if "burst-" in text:
+                # The worst case for a ceiling: the whole stream handed over as
+                # fast as the socket takes it, so it can land in a single read.
+                self._frame({"choices": [{"index": 0, "delta": {"role": "assistant"}}]})
+                for _ in range(PACED_TOKENS):
+                    self._frame({"choices": [{"index": 0, "delta": {"content": "x"}}]})
+                self._frame({
+                    "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+                    "usage": {"prompt_tokens": 5, "completion_tokens": PACED_TOKENS,
+                              "total_tokens": 5 + PACED_TOKENS},
+                })
+                self._frame("[DONE]")
+                return
             if "paced-" in text:
                 # A provider far faster than its configured ceiling: the whole
                 # response in a burst of single-character deltas.
@@ -415,13 +428,39 @@ def main():
                   (paced.get("ttft_ms") or 0) < 250,
                   f"ttft_ms={paced.get('ttft_ms')}")
 
+        # The same ceiling against a stream that arrives as one burst rather than
+        # frame by frame. Pacing per read would let this one through untouched,
+        # since the read that starts the budget is the read being exempted.
+        post("/api/model/create", {"model": {
+            "alias": "burst-alias", "input_price": 1.0, "output_price": 1.0, "is_public": 1}})
+        post("/api/provider/create", {"provider": {
+            "model_alias": "burst-alias", "priority": 1, "name": "bursty",
+            "base_url": UPSTREAM, "model": "m", "api_key": "k",
+            "auth_type": "bearer", "api_type": "openai", "enabled": 1,
+            "max_tps": PACED_TPS,
+        }})
+        code = relay(True, api_key, "burst-one", alias="burst-alias")
+        check("the burst relay succeeded", code == 200, f"code={code}")
+        rows = (post("/api/audit/list", {}).get("data") or {}).get("list", [])
+        burst = attempt("burst-alias")
+        check("the burst attempt is recorded", burst is not None, f"burst={burst is not None}")
+        if burst:
+            b_tps = burst.get("tps") or 0
+            check("a stream that arrives in one burst is still held at the ceiling",
+                  b_tps <= PACED_TPS * 1.2, f"tps={round(b_tps, 1)} ceiling={PACED_TPS}")
+            check("the burst is paced to the ceiling, not just under it",
+                  b_tps >= PACED_TPS * 0.8, f"tps={round(b_tps, 1)} ceiling={PACED_TPS}")
+            check("the burst really waited",
+                  (burst.get("duration_ms") or 0) >= 1000 * PACED_TOKENS / PACED_TPS * 0.8,
+                  f"duration={burst.get('duration_ms')}ms for {burst.get('output_tokens')} tokens")
+
         print("\n6. the series endpoint")
         series = post("/api/audit/tps", {"range": "1h"})
         check("series request succeeded", series.get("success"), str(series)[:160])
         allp = series.get("data") or {}
         names = sorted(p.get("name") for p in (allp.get("providers") or []))
         check("every provider with traffic appears in the series",
-              {"plain", "streamer", "thinker", "fast", "paced"} <= set(names), str(names))
+              {"plain", "streamer", "thinker", "fast", "paced", "bursty"} <= set(names), str(names))
         check("the series covers the requested range", allp.get("range") == "1h",
               f"range={allp.get('range')} granularity={allp.get('granularity')}")
 
