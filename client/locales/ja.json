@@ -76,7 +76,7 @@
         "No": "いいえ",
         "MaxContext": "コンテキスト上限",
         "DailyQuota": "1時間の割り当て",
-        "MaxTps": "最大TPS",
+        "ChunkDelay": "ブロック遅延 (ms)",
         "Parked": "停止中",
         "QuotaSpent": "割り当て超過",
         "FailStreakHint": "連続失敗数。5回で300秒間停止します。",

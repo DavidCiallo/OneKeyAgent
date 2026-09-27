@@ -953,12 +953,13 @@ func (s *Server) StartStreamAt(body map[string]any, accountID, endpoint string) 
 		}
 
 		pr, pw := io.Pipe()
-		// A ceiling on this provider's streamed rate, 0 meaning none. Applied
-		// per attempt so a failover to another provider is paced by its own.
-		pacer := &streamPacer{rate: float64(provider.MaxTps)}
+		// How long each streamed block is held back, 0 meaning not at all.
+		// Applied per attempt so a failover to another provider is delayed by
+		// its own setting.
+		delayer := &streamDelayer{delay: time.Duration(provider.ChunkDelayMs) * time.Millisecond}
 		go func() {
 			sc := &meteredScanner{Reasoning: capture}
-			meteredCopy(pw, converted, sc, pacer)
+			meteredCopy(pw, converted, sc, delayer)
 			// settle: reasoning cache + atomic deduct + bucket log
 			if capture != nil && tcID != "" {
 				capture.mu.Lock()
@@ -986,16 +987,14 @@ func (s *Server) StartStreamAt(body map[string]any, accountID, endpoint string) 
 			cost := service.CalculateCost(rawInput, cachedInput, rawOutput, inputPrice, cachePrice, outputPrice)
 			duration := elapsedMs(started)
 			ttft := ttftMs(started, sc.FirstTokenAt, duration)
-			if rateDebugOn && pacer.active() {
-				// What the ceiling saw and what it did. est is the budget it
-				// paced against; reported_out is what the provider billed, which
-				// is what the audit divides by — when est is far below it, the
-				// stream was paced as if it carried fewer tokens than it did.
-				fmt.Printf("[Rate] provider=%s cap=%.0f/tps frames=%d est=%d chars=%d deltas=%d "+
-					"reported_out=%d usage=%v slept=%dms gen=%dms ttft=%dms\n",
-					provider.Name, pacer.rate, pacer.frames, sc.outputTokensEstimate(),
-					sc.OutputChars, sc.OutputDeltas, rawOutput, sc.Usage != nil,
-					pacer.slept.Milliseconds(), duration-ttft, ttft)
+			if rateDebugOn && delayer.active() {
+				// What the wait saw and what it did. frames counts the blocks
+				// held back and slept the total it waited, which is what the
+				// admin reads back to dial the delay: gen should come out near
+				// frames*delay, and out/gen is the rate that produced.
+				fmt.Printf("[Rate] provider=%s delay=%dms frames=%d slept=%dms gen=%dms ttft=%dms out=%d\n",
+					provider.Name, provider.ChunkDelayMs, delayer.frames,
+					delayer.slept.Milliseconds(), duration-ttft, ttft, rawOutput)
 			}
 			service.Settle(s.DB, service.UsageLog{
 				AccountID: accountID, ModelAlias: alias, ProviderID: provider.ID,
@@ -1019,54 +1018,62 @@ func (s *Server) StartStreamAt(body map[string]any, accountID, endpoint string) 
 	return nil, fmt.Errorf("All providers failed")
 }
 
-// streamPacer holds a stream back so its output rate cannot exceed a ceiling.
-// It is the one place a provider is deliberately slowed down: pacing rather
-// than rejecting keeps the request working, which is what makes it usable both
-// to shape load and to compare a fast provider against a slow one.
+// streamDelayer holds a stream back by a fixed wait between its output frames.
+// It is the one place a provider is deliberately slowed down: a wait rather than
+// a rejection keeps the request working, which is what makes it usable both to
+// shape load and to compare a fast provider against a slow one.
 //
-// The budget starts at the first token and that token is sent at once, so the
-// ceiling changes the generation rate and leaves the wait for the first token
-// alone — the same split TPS and TTFT are measured on. A stream that arrives as
-// a single chunk has nothing left to pace, which no rate can slow.
-type streamPacer struct {
-	// rate is the ceiling in tokens per second; <= 0 leaves the stream alone.
-	rate float64
-	// origin is when the first token appeared, which is where the budget starts.
-	origin time.Time
-	// frames and slept are what the ceiling actually did, kept for the
-	// RATE_DEBUG line: frames is how many pieces the stream was paced in, and
-	// slept is how long it was held back in total.
+// A fixed wait is the whole mechanism — nothing is counted and so nothing can be
+// miscounted. The trade is that the resulting tokens per second depend on how
+// many tokens an upstream packs into a frame, so one setting is a different rate
+// on a different provider; that is what makes it dialable, the admin reads the
+// rate off the audit and sets the wait to match.
+type streamDelayer struct {
+	// delay is the wait between output frames; <= 0 leaves the stream alone.
+	delay time.Duration
+	// next is when the following output frame may go out, always measured from
+	// the frame that was actually sent. Zero until one has been, which is what
+	// leaves the wait for the first token alone.
+	next time.Time
+	// frames and slept are what the wait actually did, kept for the RATE_DEBUG
+	// line: frames is how many output frames went out, and slept is how long it
+	// held them back in total.
 	frames int
 	slept  time.Duration
 }
 
-// rateDebugOn — RATE_DEBUG=1 prints one line per paced stream: what the ceiling
-// saw and what it did. Off by default, and the only way to tell why a ceiling
-// did or did not bite on a real upstream.
+// rateDebugOn — RATE_DEBUG=1 prints one line per delayed stream: what the wait
+// saw and what it did. Off by default, and the only way to tell why a delay did
+// or did not bite on a real upstream.
 var rateDebugOn = os.Getenv("RATE_DEBUG") != ""
 
-// delay reports how long to hold back a stream that has produced `tokens` so far
-// by `now`. Zero means send it immediately.
-func (p *streamPacer) delay(tokens int, now time.Time) time.Duration {
-	if p == nil || p.rate <= 0 || tokens <= 0 {
+// wait reports how long to hold back an output frame arriving at `now`. Zero
+// means send it immediately: the first output frame defines TTFT, so holding it
+// back would move the wait without the measurement seeing it.
+func (d *streamDelayer) wait(now time.Time) time.Duration {
+	if d == nil || d.delay <= 0 || d.next.IsZero() {
 		return 0
 	}
-	if p.origin.IsZero() {
-		// The first output is what the clock starts at: it defines the wait, and
-		// delaying it would move TTFT without the measurement seeing it.
-		p.origin = now
-		return 0
-	}
-	budget := time.Duration(float64(tokens) / p.rate * float64(time.Second))
-	if wait := p.origin.Add(budget).Sub(now); wait > 0 {
-		return wait
+	if w := d.next.Sub(now); w > 0 {
+		return w
 	}
 	return 0
 }
 
-// active reports whether the stream is paced at all, so the common uncapped
+// sent records that an output frame went out at `now`, which schedules the next
+// one. The clock restarts from the actual send rather than accumulating, so a
+// slow client does not build up a backlog that later comes out in a burst.
+func (d *streamDelayer) sent(now time.Time) {
+	if d == nil || d.delay <= 0 {
+		return
+	}
+	d.frames++
+	d.next = now.Add(d.delay)
+}
+
+// active reports whether the stream is delayed at all, so the common undelayed
 // path keeps its single feed-and-write per read.
-func (p *streamPacer) active() bool { return p != nil && p.rate > 0 }
+func (d *streamDelayer) active() bool { return d != nil && d.delay > 0 }
 
 // splitFrames cuts a read into SSE lines, each keeping its newline. Order is
 // preserved and no byte is added or dropped; only the timing changes.
@@ -1087,38 +1094,49 @@ func splitFrames(chunk []byte) [][]byte {
 
 // meteredCopy forwards bytes untouched, scanning SSE inline for usage and
 // reasoning content (port of the TS passthrough with inline cost parsing), and
-// holds the stream back when the provider has a rate ceiling.
-func meteredCopy(dst io.Writer, src io.Reader, sc *meteredScanner, pacer *streamPacer) {
+// holds the stream back when the provider has a per-block wait set.
+func meteredCopy(dst io.Writer, src io.Reader, sc *meteredScanner, delayer *streamDelayer) {
 	buf := make([]byte, 32*1024)
 	for {
 		n, err := src.Read(buf)
 		if n > 0 {
 			chunk := make([]byte, n)
 			copy(chunk, buf[:n])
-			if !pacer.active() {
+			if !delayer.active() {
 				sc.feed(chunk)
 				if _, werr := dst.Write(chunk); werr != nil {
 					return // client went away; settle still runs via caller
 				}
 			} else {
-				// Pace frame by frame rather than read by read. An upstream can
-				// hand its whole stream over in one read — a fast provider, or a
+				// Frame by frame rather than read by read. An upstream can hand
+				// its whole stream over in one read — a fast provider, or a
 				// buffering proxy in front of one — and a read-sized wait would
-				// let every token out before the budget had even started, since
-				// the read that starts it is the read being exempted. One frame
-				// is about one token, which is fine enough to spread a burst.
+				// leave the burst with nothing to slow it.
+				//
+				// Only frames that carry output are held back. Role,
+				// finish_reason, usage and [DONE] are control: waiting on them
+				// would stretch the request without changing the speed the
+				// caller sees. Content and reasoning both count as output, so a
+				// thinking model's thinking is slowed by the same rule as the
+				// text it precedes.
 				for _, frame := range splitFrames(chunk) {
+					before := sc.OutputDeltas
 					sc.feed(frame)
-					pacer.frames++
-					// Sleeping here, before the client sees the frame, is what
-					// makes the stream slower for the caller as well as for the
-					// meter.
-					if wait := pacer.delay(sc.outputTokensEstimate(), time.Now()); wait > 0 {
-						time.Sleep(wait)
-						pacer.slept += wait
+					output := sc.OutputDeltas > before
+					if output {
+						// Holding the frame back before it is written is what
+						// makes the stream slower for the caller as well as for
+						// the meter.
+						if w := delayer.wait(time.Now()); w > 0 {
+							time.Sleep(w)
+							delayer.slept += w
+						}
 					}
 					if _, werr := dst.Write(frame); werr != nil {
 						return
+					}
+					if output {
+						delayer.sent(time.Now())
 					}
 				}
 			}
