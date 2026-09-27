@@ -1,4 +1,4 @@
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Textarea, Select, SelectItem, Switch, Tooltip } from "@heroui/react";
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Textarea, Select, SelectItem, Switch } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
 
 type ProviderForm = {
@@ -166,14 +166,12 @@ export function ProviderFormModal({ isOpen, onOpenChange, mode, form, onFormChan
                                 value={String(form.daily_quota ?? 0)}
                                 onChange={e => onFormChange({ ...form, daily_quota: parseInt(e.target.value) || 0 })}
                             />
-                            <Tooltip content={locale.MaxTpsHint}>
-                                <Input
-                                    type="number"
-                                    label={locale.MaxTps}
-                                    value={String(form.max_tps ?? 0)}
-                                    onChange={e => onFormChange({ ...form, max_tps: parseInt(e.target.value) || 0 })}
-                                />
-                            </Tooltip>
+                            <Input
+                                type="number"
+                                label={locale.MaxTps}
+                                value={String(form.max_tps ?? 0)}
+                                onChange={e => onFormChange({ ...form, max_tps: parseInt(e.target.value) || 0 })}
+                            />
                         </div>
                         <div className="flex flex-row gap-3">
                             <Input
