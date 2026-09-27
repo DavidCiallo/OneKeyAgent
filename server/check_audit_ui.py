@@ -204,6 +204,13 @@ RECORDER = r"""
   window.fetch = function (...a) {
     const u = a[0];
     note(u && u.url ? u.url : u);
+    try {
+      const url = String(u && u.url ? u.url : u);
+      const init = a[1];
+      if (url.indexOf('/api/audit/tps') >= 0 && init && typeof init.body === 'string') {
+        window.__bodies.push(init.body);
+      }
+    } catch (e) {}
     return of.apply(this, a);
   };
   const oo = XMLHttpRequest.prototype.open;
@@ -212,6 +219,12 @@ RECORDER = r"""
     return oo.call(this, m, u, ...r);
   };
   window.__hits = (frag) => window.__reqs.filter(u => u.indexOf(frag) >= 0).length;
+  // The chart's window travels in the POST body, not the URL, so the bodies
+  // have to be recorded too or a range switch would be invisible here.
+  window.__bodies = [];
+  window.__ranges = () => window.__bodies.map(b => {
+    try { return JSON.parse(b).range; } catch (e) { return null; }
+  });
   // HeroUI drives selection and buttons through react-aria press events, which
   // a bare .click() does not produce — dispatch the whole sequence.
   window.__press = (el) => {
@@ -351,6 +364,9 @@ def main():
         print("\n1. produce failed rows with bodies")
         codes = [relay(f"broken-{i:03d}-") for i in range(3)]
         check("failing relays answered non-200", all(c != 200 for c in codes), str(set(codes)))
+        # One success as well: the throughput chart needs a bucket with output
+        # tokens in it, and a failed attempt has none.
+        check("a successful relay for the chart", relay("good-") == 200)
         rows = (post("/api/audit/list", {}).get("data") or {}).get("list", [])
         failed = [r for r in rows if r["success"] != 1]
         check("failed rows listed with has_detail",
@@ -446,10 +462,14 @@ def main():
         lists_before = len([u for u in again.get("hits", []) if "/api/audit/list" in u])
         refreshed = cdp.eval(r"""
         (() => {
-          // The toolbar button: not in the table, not one of the outcome tabs.
+          // Matched by the label the page gives its refresh control, in every
+          // locale the app ships: position is no longer a safe identity now
+          // that the chart has buttons of its own.
+          const labels = ['Refresh', '刷新', '更新', 'Actualizar', 'Atualizar',
+                          'Обновить', 'รีเฟรช', 'Làm mới'];
           const b = [...document.querySelectorAll('button')]
             .filter(x => !x.closest('table') && x.getAttribute('role') !== 'tab')
-            .pop();
+            .find(x => labels.includes(x.textContent.trim()));
           if (!b) return { ok: false };
           const label = b.textContent.trim();
           window.__press(b);
@@ -465,6 +485,91 @@ def main():
         check("refresh did not request every body",
               final.get("detail") == fetched,
               f"detail calls {final.get('detail')} (was {fetched})")
+
+        print("\n6. the throughput chart")
+        chart = cdp.eval(r"""
+        (() => {
+          const buttons = [...document.querySelectorAll('button')];
+          return {
+            curves: document.querySelectorAll('.recharts-line-curve').length,
+            seriesHits: window.__hits('/api/audit/tps'),
+            ranges: ['1h','12h','48h'].filter(r => buttons.some(b => b.textContent.trim() === r)),
+            sent: window.__ranges(),
+            hasProvider: document.body.innerText.includes('stub'),
+          };
+        })()
+        """)
+        check("the page requested the series", chart.get("seriesHits", 0) >= 1,
+              f"{chart.get('seriesHits')} calls")
+        check("it opens on the 1h window", chart.get("sent") == ["1h"], str(chart.get("sent")))
+        check("a line is drawn for the one provider", chart.get("curves") == 1,
+              f"{chart.get('curves')} curves")
+        check("the provider is named in the legend", chart.get("hasProvider"), "")
+        check("the range selector offers 1h/12h/48h",
+              chart.get("ranges") == ["1h", "12h", "48h"], str(chart.get("ranges")))
+
+        pressed = cdp.eval(r"""
+        (() => {
+          const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === '48h');
+          if (!b) return false;
+          window.__press(b);
+          return true;
+        })()
+        """)
+        check("the 48h button is present", pressed)
+        switched = wait_for(cdp, "window.__ranges().slice(-1)[0]", lambda v: v == "48h", tries=20)
+        check("selecting 48h asks for that window", switched == "48h",
+              f"last={switched} all={cdp.eval('window.__ranges()')}")
+        # The refetch has a loading state, so the redraw is what needs waiting
+        # for — the request having been sent only means it is in flight.
+        drawn = wait_for(cdp, "document.querySelectorAll('.recharts-line-curve').length",
+                         lambda v: v == 1, tries=20)
+        check("the chart still draws after switching", drawn == 1, f"{drawn} curves")
+
+        # The stub never streams, so there is no first-token measurement to
+        # average — which makes the metric toggle provable: one view has a line
+        # and the other has nothing, from the same traffic.
+        cdp.eval(r"""
+        (() => {
+          const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === 'TTFT');
+          if (b) window.__press(b);
+          return !!b;
+        })()
+        """)
+        time.sleep(1.2)
+        ttft_view = cdp.eval(r"""
+        (() => ({
+          curves: document.querySelectorAll('.recharts-line-curve').length,
+          wrappers: document.querySelectorAll('.recharts-wrapper').length,
+        }))()
+        """)
+        # The chart itself is gone, not merely empty: counting wrappers avoids
+        # reading the table's own empty state as the chart's.
+        check("the TTFT view empties out with no streaming traffic",
+              ttft_view.get("curves") == 0 and ttft_view.get("wrappers") == 0, str(ttft_view))
+
+        cdp.eval(r"""
+        (() => {
+          const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === 'TPS');
+          if (b) window.__press(b);
+          return !!b;
+        })()
+        """)
+        time.sleep(1.2)
+        check("switching back to TPS restores the line",
+              cdp.eval("document.querySelectorAll('.recharts-line-curve').length") == 1,
+              f"{cdp.eval('document.querySelectorAll(\".recharts-line-curve\").length')} curves")
+
+        print("\n7. the per-request first-token column")
+        check("the table has a ttft cell on every row",
+              cdp.eval(r"""
+              (() => {
+                const cells = [...document.querySelectorAll('table thead th')]
+                  .map(h => h.textContent.trim());
+                return cells.includes('TTFT');
+              })()
+              """),
+              "")
     finally:
         proc.terminate()
         try:

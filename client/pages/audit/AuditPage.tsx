@@ -1,6 +1,7 @@
 import { Header } from "../../components/header/Header";
 import { useEffect, useMemo, useState, useCallback, Fragment } from "react";
 import { AuditDTO, AuditDetailDTO } from "../../../shared/modules/audit/audit.interface";
+import { AuditTpsChart } from "./components/AuditTpsChart";
 import { auditApi } from "../../api/instance";
 import { Locale } from "../../methods/locale";
 import { Button, Chip, Tab, Tabs } from "@heroui/react";
@@ -30,6 +31,14 @@ function formatTps(tps: number): string {
     return `${tps.toFixed(1)} t/s`;
 }
 
+/** Time to first content token; dash when it was not measurable, which is the
+ *  non-streaming path and streams that produced no content. */
+function formatTtft(ttft: number): string {
+    if (!ttft) return "-";
+    if (ttft < 1000) return `${ttft}ms`;
+    return `${(ttft / 1000).toFixed(2)}s`;
+}
+
 /** HTTP status → chip color, so failures read at a glance. */
 function statusColor(code: number): "success" | "warning" | "danger" | "default" {
     if (code === 200) return "success";
@@ -52,7 +61,7 @@ export default function AuditPage() {
     const locale = Locale("AuditPage");
     const [tab, setTab] = useState<Outcome>("success");
     const [list, setList] = useState<AuditDTO[]>([]);
-    const [keep, setKeep] = useState(10);
+    const [keep, setKeep] = useState(20);
     const [loading, setLoading] = useState(true);
 
     const fetchList = useCallback(async (showSpinner: boolean) => {
@@ -132,6 +141,8 @@ export default function AuditPage() {
                     {(locale.KeepHint || "Keeps the latest {n} records per outcome.").replace("{n}", String(keep))}
                 </p>
 
+                <AuditTpsChart />
+
                 <div className="flex-1 overflow-auto border border-gray-200 rounded-lg">
                     <table className="w-full text-sm">
                         <thead className="bg-gray-50 sticky top-0">
@@ -143,6 +154,7 @@ export default function AuditPage() {
                                 <th className="px-3 py-2 font-medium">{locale.Endpoint || "Endpoint"}</th>
                                 <th className="px-3 py-2 font-medium">{locale.Status || "Status"}</th>
                                 <th className="px-3 py-2 font-medium">{locale.Duration || "Duration"}</th>
+                                <th className="px-3 py-2 font-medium">{locale.Ttft || "TTFT"}</th>
                                 <th className="px-3 py-2 font-medium">{locale.Tokens || "Tokens"}</th>
                                 <th className="px-3 py-2 font-medium">{locale.Tps || "TPS"}</th>
                                 <th className="px-3 py-2 font-medium">{locale.Cost || "Cost"}</th>
@@ -151,9 +163,9 @@ export default function AuditPage() {
                         </thead>
                         <tbody>
                             {loading && rows.length === 0 ? (
-                                <tr><td colSpan={tab === "failed" ? 11 : 10} className="px-3 py-6 text-center text-gray-400">Loading...</td></tr>
+                                <tr><td colSpan={tab === "failed" ? 12 : 11} className="px-3 py-6 text-center text-gray-400">Loading...</td></tr>
                             ) : rows.length === 0 ? (
-                                <tr><td colSpan={tab === "failed" ? 11 : 10} className="px-3 py-6 text-center text-gray-400">{locale.NoData || "No data"}</td></tr>
+                                <tr><td colSpan={tab === "failed" ? 12 : 11} className="px-3 py-6 text-center text-gray-400">{locale.NoData || "No data"}</td></tr>
                             ) : rows.map(r => (
                                 <Fragment key={r.id}>
                                     <tr className="border-t border-gray-100 align-top">
@@ -172,6 +184,7 @@ export default function AuditPage() {
                                             </Chip>
                                         </td>
                                         <td className="px-3 py-2 whitespace-nowrap">{formatDuration(r.duration_ms)}</td>
+                                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">{formatTtft(r.ttft_ms)}</td>
                                         <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">
                                             {r.input_tokens || 0}/{r.cached_input_tokens || 0}/{r.output_tokens || 0}
                                         </td>
@@ -193,7 +206,7 @@ export default function AuditPage() {
                                     </tr>
                                     {tab === "failed" && expanded.has(r.id) && (
                                         <tr className="border-t border-gray-100 bg-gray-50/60">
-                                            <td colSpan={11} className="px-4 py-3">
+                                            <td colSpan={12} className="px-4 py-3">
                                                 {detailLoading === r.id ? (
                                                     <p className="text-xs text-gray-400">Loading...</p>
                                                 ) : (

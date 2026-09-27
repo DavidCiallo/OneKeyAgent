@@ -237,10 +237,10 @@ var updatable = map[string][]string{
 	"settings": {"key", "value"},
 	"gift_card": {"code", "token_amount", "status", "redeemed_by", "redeemed_at"},
 	"account_role": {"account_id", "role_id"},
-	"usage_bucket": {"account_id", "model_alias", "provider_id", "bucket_time", "granularity", "input_tokens", "cached_input_tokens", "output_tokens", "cost", "request_count"},
+	"usage_bucket": {"account_id", "model_alias", "provider_id", "bucket_time", "granularity", "input_tokens", "cached_input_tokens", "output_tokens", "cost", "request_count", "duration_ms", "ttft_ms", "ttft_count"},
 	"transaction": {"account_id", "txid", "amount", "confirmations", "status", "payment_id", "type"},
 	"session_reasoning": {"session_key", "tool_call_id", "reasoning_content"},
-	"audit_log": {"ts", "success", "account_id", "account_name", "model_alias", "provider_id", "provider_name", "api_type", "endpoint", "status_code", "duration_ms", "input_tokens", "cached_input_tokens", "output_tokens", "cost", "stream", "err", "request_body", "response_body"},
+	"audit_log": {"ts", "success", "account_id", "account_name", "model_alias", "provider_id", "provider_name", "api_type", "endpoint", "status_code", "duration_ms", "ttft_ms", "input_tokens", "cached_input_tokens", "output_tokens", "cost", "stream", "err", "request_body", "response_body"},
 }
 
 // GenericInsert mirrors the JSONL insert: generates id + timestamps when

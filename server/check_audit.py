@@ -199,9 +199,9 @@ def main():
         keep = (listing.get("data") or {}).get("keep")
         oks = [r for r in rows if r["success"] == 1]
         bads = [r for r in rows if r["success"] != 1]
-        check("keep reported as 10", keep == 10, f"keep={keep}")
-        check("at most 10 successes kept", len(oks) <= 10, f"{len(oks)} rows")
-        check("at most 10 failures kept", len(bads) <= 10, f"{len(bads)} rows")
+        check("keep reported as 20", keep == 20, f"keep={keep}")
+        check("at most 20 successes kept", len(oks) <= 20, f"{len(oks)} rows")
+        check("at most 20 failures kept", len(bads) <= 20, f"{len(bads)} rows")
         check("both outcomes recorded", len(oks) > 0 and len(bads) > 0,
               f"ok={len(oks)} bad={len(bads)}")
 

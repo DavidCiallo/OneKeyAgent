@@ -17,9 +17,13 @@ type UsageLog struct {
 	InputTokens       int64
 	CachedInputTokens int64
 	OutputTokens      int64
-	InputPrice        float64
-	CachePrice        float64
-	OutputPrice       float64
+	// DurationMs / TtftMs — wall time and time to first content token, summed
+	// into the usage window so it can report throughput per provider.
+	DurationMs  int64
+	TtftMs      int64
+	InputPrice  float64
+	CachePrice  float64
+	OutputPrice float64
 }
 
 func (u *UsageLog) Cost() float64 {
@@ -168,6 +172,8 @@ func Settle(db *sql.DB, log UsageLog) {
 		CachedInputTokens: log.CachedInputTokens,
 		OutputTokens:      log.OutputTokens,
 		Cost:              cost,
+		DurationMs:        log.DurationMs,
+		TtftMs:            log.TtftMs,
 	}); err != nil {
 		fmt.Println("[Billing] log usage failed:", err)
 	}

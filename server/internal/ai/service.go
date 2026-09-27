@@ -148,6 +148,9 @@ type auditRecord struct {
 	Success      bool
 	StatusCode   int
 	DurationMs   int64
+	// TtftMs — time to first content token; 0 when it was not measurable
+	// (non-streaming, or the stream produced no content).
+	TtftMs       int64
 	InputTokens  int64
 	CachedInput  int64
 	OutputTokens int64
@@ -171,6 +174,7 @@ func (s *Server) audit(r auditRecord) {
 		AccountID: r.AccountID, AccountName: r.AccountName, ModelAlias: r.ModelAlias,
 		ProviderID: r.ProviderID, ProviderName: r.ProviderName, ApiType: r.ApiType,
 		Endpoint: r.Endpoint, StatusCode: int64(r.StatusCode), DurationMs: r.DurationMs,
+		TtftMs:      r.TtftMs,
 		InputTokens: r.InputTokens, CachedInputTokens: r.CachedInput, OutputTokens: r.OutputTokens,
 		Cost: r.Cost, Err: r.Err,
 	}
@@ -201,6 +205,28 @@ func elapsedMs(start time.Time) int64 {
 	d := time.Since(start).Milliseconds()
 	if d < 0 {
 		return 0
+	}
+	return d
+}
+
+// ttftMs — time to first content token, clamped into [0, duration].
+//
+// firstAt is 0 when no content ever arrived (a stream that failed mid-flight,
+// or a reasoning-only response with no visible text), and the whole duration is
+// then treated as generation time: with nothing to subtract there is no
+// measurement to report, and a zero would read as an impossibly fast first
+// token. A first token stamped before the request started, or after it ended,
+// means the clocks disagree rather than anything real, so it is clamped.
+func ttftMs(start time.Time, firstAt, duration int64) int64 {
+	if firstAt <= 0 {
+		return 0
+	}
+	d := firstAt - start.UnixMilli()
+	if d < 0 {
+		return 0
+	}
+	if d > duration {
+		return duration
 	}
 	return d
 }
@@ -810,9 +836,15 @@ func (s *Server) ChatCompletionsAt(body map[string]any, accountID, endpoint stri
 			return nil, fmt.Errorf("429 Insufficient balance")
 		}
 
+		duration := elapsedMs(started)
+		// No first token to time here: the response arrives whole, so the wait
+		// is not separable from generation and the whole duration counts as
+		// generation time. Leaving it out entirely would report no throughput
+		// at all for a non-streaming caller.
 		service.Settle(s.DB, service.UsageLog{
 			AccountID: accountID, ModelAlias: alias, ProviderID: provider.ID,
 			InputTokens: rawInput, CachedInputTokens: cachedInput, OutputTokens: rawOutput,
+			DurationMs: duration,
 			InputPrice: inputPrice, CachePrice: cachePrice, OutputPrice: outputPrice,
 		})
 
@@ -820,7 +852,7 @@ func (s *Server) ChatCompletionsAt(body map[string]any, accountID, endpoint stri
 		s.audit(auditRecord{
 			AccountID: accountID, AccountName: acctName, ModelAlias: alias,
 			ProviderID: provider.ID, ProviderName: provider.Name, ApiType: provider.ApiTypeStr(),
-			Endpoint: endpoint, Success: true, StatusCode: 200, DurationMs: elapsedMs(started),
+			Endpoint: endpoint, Success: true, StatusCode: 200, DurationMs: duration,
 			InputTokens: rawInput, CachedInput: cachedInput, OutputTokens: rawOutput, Cost: cost,
 		})
 		return rdata, nil
@@ -947,16 +979,20 @@ func (s *Server) StartStreamAt(body map[string]any, accountID, endpoint string) 
 			}
 			cachedInput := service.ExtractCachedTokens(sc.Usage)
 			cost := service.CalculateCost(rawInput, cachedInput, rawOutput, inputPrice, cachePrice, outputPrice)
+			duration := elapsedMs(started)
+			ttft := ttftMs(started, sc.FirstContentAt, duration)
 			service.Settle(s.DB, service.UsageLog{
 				AccountID: accountID, ModelAlias: alias, ProviderID: provider.ID,
 				InputTokens: rawInput, CachedInputTokens: cachedInput, OutputTokens: rawOutput,
+				DurationMs: duration, TtftMs: ttft,
 				InputPrice: inputPrice, CachePrice: cachePrice, OutputPrice: outputPrice,
 			})
 			s.audit(auditRecord{
 				AccountID: accountID, AccountName: acctName, ModelAlias: alias,
 				ProviderID: provider.ID, ProviderName: provider.Name, ApiType: provider.ApiTypeStr(),
-				Endpoint: endpoint, Success: true, StatusCode: 200, DurationMs: elapsedMs(started),
-				InputTokens: rawInput, CachedInput: cachedInput, OutputTokens: rawOutput, Cost: cost,
+				Endpoint: endpoint, Success: true, StatusCode: 200, DurationMs: duration,
+				TtftMs:       ttft,
+				InputTokens:  rawInput, CachedInput: cachedInput, OutputTokens: rawOutput, Cost: cost,
 				Stream: true,
 			})
 			pw.Close()

@@ -50,6 +50,9 @@ var additiveCols = map[string]map[string]bool{
 		"output_tokens":       true,
 		"cost":                true,
 		"request_count":       true,
+		"duration_ms":         true,
+		"ttft_ms":             true,
+		"ttft_count":          true,
 	},
 }
 

@@ -12,29 +12,37 @@ import (
 
 // ─────────────────────────── Usage buckets ───────────────────────────
 
-const bucketCols = "id,account_id,model_alias,provider_id,bucket_time,granularity,input_tokens,cached_input_tokens,output_tokens,cost,request_count,create_time,update_time,delete_time"
+const bucketCols = "id,account_id,model_alias,provider_id,bucket_time,granularity,input_tokens,cached_input_tokens,output_tokens,cost,request_count,duration_ms,ttft_ms,ttft_count,create_time,update_time,delete_time"
 
 type UsageBucket struct {
-	ID               string  `json:"id"`
-	AccountID        string  `json:"account_id"`
-	ModelAlias       string  `json:"model_alias"`
-	ProviderID       string  `json:"provider_id"`
-	BucketTime       int64   `json:"bucket_time"`
-	Granularity      string  `json:"granularity"`
-	InputTokens      int64   `json:"input_tokens"`
-	CachedInputTokens int64  `json:"cached_input_tokens"`
-	OutputTokens     int64   `json:"output_tokens"`
-	Cost             float64 `json:"cost"`
-	RequestCount     int64   `json:"request_count"`
-	CreateTime       int64   `json:"create_time"`
-	UpdateTime       *int64  `json:"update_time"`
-	DeleteTime       *int64  `json:"delete_time"`
+	ID                string  `json:"id"`
+	AccountID         string  `json:"account_id"`
+	ModelAlias        string  `json:"model_alias"`
+	ProviderID        string  `json:"provider_id"`
+	BucketTime        int64   `json:"bucket_time"`
+	Granularity       string  `json:"granularity"`
+	InputTokens       int64   `json:"input_tokens"`
+	CachedInputTokens int64   `json:"cached_input_tokens"`
+	OutputTokens      int64   `json:"output_tokens"`
+	Cost              float64 `json:"cost"`
+	RequestCount      int64   `json:"request_count"`
+	// DurationMs / TtftMs — summed so the window can report throughput and
+	// first-token latency. Both are 0 on buckets written before they existed.
+	DurationMs int64 `json:"duration_ms"`
+	TtftMs     int64 `json:"ttft_ms"`
+	// TtftCount — requests that reported a first token, the denominator for an
+	// average ttft_ms.
+	TtftCount  int64  `json:"ttft_count"`
+	CreateTime int64  `json:"create_time"`
+	UpdateTime *int64 `json:"update_time"`
+	DeleteTime *int64 `json:"delete_time"`
 }
 
 func scanBucket(row interface{ Scan(...any) error }) (*UsageBucket, error) {
 	b := &UsageBucket{}
 	err := row.Scan(&b.ID, &b.AccountID, &b.ModelAlias, &b.ProviderID, &b.BucketTime, &b.Granularity,
 		&b.InputTokens, &b.CachedInputTokens, &b.OutputTokens, &b.Cost, &b.RequestCount,
+		&b.DurationMs, &b.TtftMs, &b.TtftCount,
 		&b.CreateTime, &b.UpdateTime, &b.DeleteTime)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -54,6 +62,11 @@ type BucketLogInput struct {
 	CachedInputTokens int64
 	OutputTokens      int64
 	Cost              float64
+	// DurationMs / TtftMs — wall time and time to first content token for this
+	// request. Summed into the window so it can report throughput; TtftMs is 0
+	// on the non-streaming path, where there is no first token to time.
+	DurationMs int64
+	TtftMs     int64
 }
 
 // BucketLogUsage — accumulate one settled request into the 1m/60m/1d windows.
@@ -86,22 +99,34 @@ func BucketLogUsage(db *sql.DB, u BucketLogInput) error {
 	b60m := (now / 3_600_000) * 3_600_000
 	b1d := LocalMidnight(now)
 
+	// A first token is only visible on the streaming path, so a request that
+	// reported none is not part of the ttft_ms average.
+	ttftCount := int64(0)
+	if u.TtftMs > 0 {
+		ttftCount = 1
+	}
+
 	for _, gt := range [][2]any{{b1m, "1m"}, {b60m, "60m"}, {b1d, "1d"}} {
 		bucketTime := gt[0].(int64)
 		gran := gt[1].(string)
 		if _, err := tx.Exec(
 			`INSERT INTO usage_bucket (id, account_id, model_alias, provider_id, bucket_time, granularity,
-				input_tokens, cached_input_tokens, output_tokens, cost, request_count, create_time, update_time, delete_time)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, NULL)
+				input_tokens, cached_input_tokens, output_tokens, cost, request_count,
+				duration_ms, ttft_ms, ttft_count, create_time, update_time, delete_time)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, NULL)
 			 ON CONFLICT(account_id, model_alias, provider_id, granularity, bucket_time) DO UPDATE SET
 				input_tokens = input_tokens + excluded.input_tokens,
 				cached_input_tokens = cached_input_tokens + excluded.cached_input_tokens,
 				output_tokens = output_tokens + excluded.output_tokens,
 				cost = cost + excluded.cost,
 				request_count = request_count + 1,
+				duration_ms = duration_ms + excluded.duration_ms,
+				ttft_ms = ttft_ms + excluded.ttft_ms,
+				ttft_count = ttft_count + excluded.ttft_count,
 				update_time = excluded.update_time`,
 			cryptox.Nanoid(6), u.AccountID, u.ModelAlias, u.ProviderID, bucketTime, gran,
-			u.InputTokens, u.CachedInputTokens, u.OutputTokens, Round6(u.Cost), now, now,
+			u.InputTokens, u.CachedInputTokens, u.OutputTokens, Round6(u.Cost),
+			u.DurationMs, u.TtftMs, ttftCount, now, now,
 		); err != nil {
 			return err
 		}
@@ -115,6 +140,7 @@ func BucketLogUsage(db *sql.DB, u BucketLogInput) error {
 					"granularity": gran, "bucket_time": bucketTime,
 					"input_tokens": u.InputTokens, "cached_input_tokens": u.CachedInputTokens,
 					"output_tokens": u.OutputTokens, "cost": Round6(u.Cost), "request_count": int64(1),
+					"duration_ms": u.DurationMs, "ttft_ms": u.TtftMs, "ttft_count": ttftCount,
 				}, true); err != nil {
 				return err
 			}

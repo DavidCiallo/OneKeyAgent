@@ -667,11 +667,29 @@ type meteredScanner struct {
 	Usage          map[string]any
 	EstimatedChars int
 	Reasoning      *syncPoint
+	// FirstContentAt — Unix milliseconds when the first content delta arrived,
+	// 0 until then. Stamped once, because it is what separates time-to-first-
+	// token from generation: tokens over (duration - ttft) is the speed the
+	// model actually produced text at, which is what makes one provider
+	// comparable to another.
+	FirstContentAt int64
 }
 
 type syncPoint struct {
 	mu  sync.Mutex
 	buf strings.Builder
+}
+
+// noteContent counts a content delta and stamps the first one. Every dialect's
+// content field funnels through here.
+func (m *meteredScanner) noteContent(s string) {
+	if s == "" {
+		return
+	}
+	if m.EstimatedChars == 0 && m.FirstContentAt == 0 {
+		m.FirstContentAt = time.Now().UnixMilli()
+	}
+	m.EstimatedChars += runeLen(s)
 }
 
 func (m *meteredScanner) feed(chunk []byte) {
@@ -691,12 +709,12 @@ func (m *meteredScanner) feed(chunk []byte) {
 		}
 		if content := jGetPath(d, "choices", "0", "delta", "content"); content != nil {
 			if s, ok := content.(string); ok {
-				m.EstimatedChars += runeLen(s)
+				m.noteContent(s)
 			}
 		}
 		if content := jGetPath(d, "choices", "0", "text"); content != nil {
 			if s, ok := content.(string); ok {
-				m.EstimatedChars += runeLen(s)
+				m.noteContent(s)
 			}
 		}
 		if m.Reasoning != nil {

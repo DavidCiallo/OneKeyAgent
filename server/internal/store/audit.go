@@ -10,14 +10,15 @@ import (
 
 // Audit retention: newest N successful and newest N failed requests. Small on
 // purpose — the trail is a debugging aid for what just happened, not a history,
-// and every failed row can carry a prompt.
-const AuditKeep = 10
+// and every failed row can carry a prompt. The page lists both outcomes, so the
+// table holds at most 2N rows.
+const AuditKeep = 20
 
 // auditBodyKey — how much of a stored request body counts as "the same
 // request" for dedupe: the first 1000 characters.
 const auditBodyKey = 1000
 
-const auditCols = "id,ts,success,account_id,account_name,model_alias,provider_id,provider_name,api_type,endpoint,status_code,duration_ms,input_tokens,cached_input_tokens,output_tokens,cost,stream,err,request_body,response_body,create_time,update_time,delete_time"
+const auditCols = "id,ts,success,account_id,account_name,model_alias,provider_id,provider_name,api_type,endpoint,status_code,duration_ms,ttft_ms,input_tokens,cached_input_tokens,output_tokens,cost,stream,err,request_body,response_body,create_time,update_time,delete_time"
 
 // auditListCols — everything auditCols has except the two bodies, plus
 // has_detail. The bodies are by far the largest part of a row and the page only
@@ -25,7 +26,7 @@ const auditCols = "id,ts,success,account_id,account_name,model_alias,provider_id
 // has_detail is computed in SQL so the UI still knows which rows can expand.
 // COALESCE guards rows written before the body columns had a default.
 const auditListCols = "id,ts,success,account_id,account_name,model_alias,provider_id,provider_name," +
-	"api_type,endpoint,status_code,duration_ms,input_tokens,cached_input_tokens,output_tokens," +
+	"api_type,endpoint,status_code,duration_ms,ttft_ms,input_tokens,cached_input_tokens,output_tokens," +
 	"cost,stream,err," +
 	"(COALESCE(request_body,'') <> '' OR COALESCE(response_body,'') <> '') AS has_detail," +
 	"create_time,update_time,delete_time"
@@ -44,6 +45,9 @@ type AuditLog struct {
 	Endpoint          string  `json:"endpoint"`
 	StatusCode        int64   `json:"status_code"`
 	DurationMs        int64   `json:"duration_ms"`
+	// TtftMs — time to first content token. 0 when it was not measurable, which
+	// is the non-streaming path and streams that produced no content.
+	TtftMs            int64   `json:"ttft_ms"`
 	InputTokens       int64   `json:"input_tokens"`
 	CachedInputTokens int64   `json:"cached_input_tokens"`
 	OutputTokens      int64   `json:"output_tokens"`
@@ -67,7 +71,7 @@ func scanAudit(row interface{ Scan(...any) error }) (*AuditLog, error) {
 	// NULL must not take down the whole audit list.
 	var reqBody, respBody sql.NullString
 	err := row.Scan(&a.ID, &a.Ts, &a.Success, &a.AccountID, &a.AccountName, &a.ModelAlias, &a.ProviderID,
-		&a.ProviderName, &a.ApiType, &a.Endpoint, &a.StatusCode, &a.DurationMs, &a.InputTokens,
+		&a.ProviderName, &a.ApiType, &a.Endpoint, &a.StatusCode, &a.DurationMs, &a.TtftMs, &a.InputTokens,
 		&a.CachedInputTokens, &a.OutputTokens, &a.Cost, &a.Stream, &a.Err,
 		&reqBody, &respBody,
 		&a.CreateTime, &a.UpdateTime, &a.DeleteTime)
@@ -89,7 +93,7 @@ func scanAuditList(row interface{ Scan(...any) error }) (*AuditLog, error) {
 	a := &AuditLog{}
 	var hasDetail int64
 	err := row.Scan(&a.ID, &a.Ts, &a.Success, &a.AccountID, &a.AccountName, &a.ModelAlias, &a.ProviderID,
-		&a.ProviderName, &a.ApiType, &a.Endpoint, &a.StatusCode, &a.DurationMs, &a.InputTokens,
+		&a.ProviderName, &a.ApiType, &a.Endpoint, &a.StatusCode, &a.DurationMs, &a.TtftMs, &a.InputTokens,
 		&a.CachedInputTokens, &a.OutputTokens, &a.Cost, &a.Stream, &a.Err,
 		&hasDetail,
 		&a.CreateTime, &a.UpdateTime, &a.DeleteTime)
@@ -123,9 +127,9 @@ func AuditInsert(db *sql.DB, a AuditLog) error {
 		return nil
 	}
 	_, err := db.Exec(`INSERT INTO audit_log (`+auditCols+`)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		a.ID, a.Ts, a.Success, a.AccountID, a.AccountName, a.ModelAlias, a.ProviderID,
-		a.ProviderName, a.ApiType, a.Endpoint, a.StatusCode, a.DurationMs, a.InputTokens,
+		a.ProviderName, a.ApiType, a.Endpoint, a.StatusCode, a.DurationMs, a.TtftMs, a.InputTokens,
 		a.CachedInputTokens, a.OutputTokens, a.Cost, a.Stream, a.Err,
 		a.RequestBody, a.ResponseBody,
 		a.CreateTime, nil, nil)

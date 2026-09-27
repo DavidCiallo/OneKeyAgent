@@ -118,6 +118,17 @@ var tables = []tableDef{
 		{"output_tokens", "INTEGER NOT NULL DEFAULT 0"},
 		{"cost", "REAL NOT NULL DEFAULT 0"},
 		{"request_count", "INTEGER NOT NULL DEFAULT 0"},
+		// duration_ms / ttft_ms accumulate so a bucket can report throughput:
+		// output tokens over (duration - ttft) is how fast the model actually
+		// produced text, with the wait for the first token taken out. Rows
+		// written before these columns existed hold 0 and simply report no
+		// speed until their granularity's retention ages them out.
+		{"duration_ms", "INTEGER NOT NULL DEFAULT 0"},
+		{"ttft_ms", "INTEGER NOT NULL DEFAULT 0"},
+		// Requests that reported a first token. ttft_ms sums over exactly these,
+		// so this is the denominator for an average first-token latency — the
+		// non-streaming path contributes nothing to either.
+		{"ttft_count", "INTEGER NOT NULL DEFAULT 0"},
 		{"create_time", "INTEGER NOT NULL DEFAULT 0"},
 		{"update_time", "INTEGER"},
 		{"delete_time", "INTEGER"},
@@ -169,6 +180,9 @@ var tables = []tableDef{
 		{"endpoint", "TEXT NOT NULL DEFAULT ''"},
 		{"status_code", "INTEGER NOT NULL DEFAULT 0"},
 		{"duration_ms", "INTEGER NOT NULL DEFAULT 0"},
+		// Time to first content token; 0 on the non-streaming path, where there
+		// is no first token to time — the response arrives whole.
+		{"ttft_ms", "INTEGER NOT NULL DEFAULT 0"},
 		{"input_tokens", "INTEGER NOT NULL DEFAULT 0"},
 		{"cached_input_tokens", "INTEGER NOT NULL DEFAULT 0"},
 		{"output_tokens", "INTEGER NOT NULL DEFAULT 0"},
