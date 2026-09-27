@@ -8,3 +8,5 @@ logs/*
 server/bin/
 server/testtmp/
 devdata/
+__pycache__/
+*.pyc
