@@ -54,14 +54,26 @@ export function AuditTpsChart() {
 
     // recharts wants one row per x value with a key per line, so the per-point
     // provider maps are flattened by provider name.
+    //
+    // A slot with no traffic carries the previous value forward instead of
+    // leaving a hole, so a quiet minute draws as a flat line rather than as a
+    // break the reader has to interpret. Slots before a provider's first
+    // measurement stay empty: there is nothing to carry yet, and the line
+    // should start where the traffic does.
     const data = useMemo(() => {
         if (!result) return [];
+        const carried: Record<string, number> = {};
         return result.points.map((p) => {
             const row: Record<string, number | string> = { tick: tick(p.ts, range) };
             const values = metric === "tps" ? p.tps : p.ttft;
             for (const provider of result.providers) {
                 const v = values[provider.id];
-                if (typeof v === "number") row[provider.name || provider.id] = v;
+                if (typeof v === "number") {
+                    carried[provider.id] = v;
+                }
+                if (carried[provider.id] !== undefined) {
+                    row[provider.name || provider.id] = carried[provider.id];
+                }
             }
             return row;
         });
@@ -77,8 +89,8 @@ export function AuditTpsChart() {
                     <span className="font-medium text-sm">{locale.Throughput || "Throughput"}</span>
                     <span className="text-xs text-gray-400">
                         {metric === "tps"
-                            ? (locale.TpsHint || "output tokens per second of generation, first-token wait excluded, thinking included")
-                            : (locale.TtftHint || "average wait for the first token, thinking included, streaming requests only")}
+                            ? (locale.TpsHint || "output tokens per second of generation, first-token wait excluded, thinking included; a slot with no traffic repeats the last value")
+                            : (locale.TtftHint || "average wait for the first token, thinking included, streaming requests only; a slot with no traffic repeats the last value")}
                     </span>
                 </div>
                 <div className="flex flex-row items-center gap-2">
@@ -133,9 +145,10 @@ export function AuditTpsChart() {
                                 stroke={COLORS[i % COLORS.length]}
                                 dot={false}
                                 strokeWidth={2}
-                                // A bucket with no traffic must break the line
-                                // rather than drop to zero.
-                                connectNulls={false}
+                                // The carried-forward values already close the
+                                // interior gaps; this only keeps a late-starting
+                                // provider's line joined rather than broken.
+                                connectNulls
                                 isAnimationActive={false}
                             />
                         ))}
