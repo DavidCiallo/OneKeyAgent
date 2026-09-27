@@ -240,6 +240,11 @@ export function ProviderCardGrid({ list, onEdit, onCopy, onDelete, onMoveUp, onM
                                     {locale.Quota} {item.today_count || 0}/{humanCount(item.daily_quota)}
                                 </Chip>
                             ) : null}
+                            {item.max_tps ? (
+                                <Chip size="sm" variant="bordered" className="shrink-0" color="warning">
+                                    {locale.MaxTps} {item.max_tps} t/s
+                                </Chip>
+                            ) : null}
                             <WindowChip item={item} locale={locale} />
                         </div>
                     </div>

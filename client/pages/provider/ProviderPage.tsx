@@ -28,6 +28,7 @@ type ProviderForm = {
     enabled: number;
     max_context: number;
     daily_quota: number;
+    max_tps: number;
     active_from: string;
     active_to: string;
 };
@@ -38,6 +39,7 @@ const emptyForm = (): ProviderForm => ({
     auth_type: "bearer", api_type: "openai", extra_json: "",
     supports_thinking: 0, supports_reasoning_effort: 0, replay_reasoning: 0,
     enable_search: 0, enabled: 1, max_context: 0, daily_quota: 0,
+    max_tps: 0,
     active_from: "", active_to: "",
 });
 
@@ -172,6 +174,7 @@ export default function ProviderPage() {
                 enabled: item.enabled,
                 max_context: item.max_context ?? 0,
                 daily_quota: item.daily_quota ?? 0,
+                max_tps: item.max_tps ?? 0,
                 active_from: item.active_from ?? 0,
                 active_to: item.active_to ?? 0,
             },
@@ -202,6 +205,7 @@ export default function ProviderPage() {
             enabled: item.enabled,
             max_context: item.max_context ?? 0,
             daily_quota: item.daily_quota ?? 0,
+            max_tps: item.max_tps ?? 0,
             active_from: minutesToTime(item.active_from),
             active_to: minutesToTime(item.active_to),
         });
@@ -229,6 +233,7 @@ export default function ProviderPage() {
                     enabled: form.enabled,
                     max_context: form.max_context,
                     daily_quota: form.daily_quota,
+                    max_tps: form.max_tps,
                     active_from: timeToMinutes(form.active_from),
                     active_to: timeToMinutes(form.active_to),
                 },
@@ -263,6 +268,7 @@ export default function ProviderPage() {
                     enabled: form.enabled !== undefined ? form.enabled : undefined,
                     max_context: form.max_context !== undefined ? form.max_context : undefined,
                     daily_quota: form.daily_quota !== undefined ? form.daily_quota : undefined,
+                    max_tps: form.max_tps !== undefined ? form.max_tps : undefined,
                     active_from: timeToMinutes(form.active_from),
                     active_to: timeToMinutes(form.active_to),
                 },

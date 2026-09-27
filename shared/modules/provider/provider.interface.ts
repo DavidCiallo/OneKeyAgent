@@ -20,6 +20,7 @@ export class ProviderDTO {
     public enabled: number;
     public max_context?: number;
     public daily_quota?: number;
+    public max_tps?: number;
     public active_from?: number;
     public active_to?: number;
     public create_time: number;
@@ -51,6 +52,7 @@ export class ProviderDTO {
         this.enabled = origin.enabled;
         this.max_context = (origin as any).max_context;
         this.daily_quota = (origin as any).daily_quota;
+        this.max_tps = (origin as any).max_tps;
         this.active_from = (origin as any).active_from;
         this.active_to = (origin as any).active_to;
         this.create_time = origin.create_time;
@@ -77,10 +79,11 @@ export class ProviderCreateBody {
     public enabled?: number;
     public max_context?: number;
     public daily_quota?: number;
+    public max_tps?: number;
     public active_from?: number;
     public active_to?: number;
 
-    constructor(origin: Pick<ProviderEntity, "model_alias" | "base_url" | "model" | "priority" | "name"> & Partial<Pick<ProviderEntity, "api_key" | "auth_type" | "api_type" | "proxy_url" | "supports_thinking" | "supports_reasoning_effort" | "replay_reasoning" | "enable_search" | "extra_json" | "enabled" | "max_context" | "daily_quota" | "active_from" | "active_to">>) {
+    constructor(origin: Pick<ProviderEntity, "model_alias" | "base_url" | "model" | "priority" | "name"> & Partial<Pick<ProviderEntity, "api_key" | "auth_type" | "api_type" | "proxy_url" | "supports_thinking" | "supports_reasoning_effort" | "replay_reasoning" | "enable_search" | "extra_json" | "enabled" | "max_context" | "daily_quota" | "max_tps" | "active_from" | "active_to">>) {
         if (!origin.model_alias || !origin.base_url || !origin.model || origin.priority === undefined) {
             throw new Error("model_alias, base_url, model and priority are required");
         }
@@ -101,6 +104,7 @@ export class ProviderCreateBody {
         this.enabled = origin.enabled ?? 1;
         this.max_context = origin.max_context;
         this.daily_quota = origin.daily_quota;
+        this.max_tps = origin.max_tps;
         this.active_from = origin.active_from;
         this.active_to = origin.active_to;
     }
@@ -128,6 +132,7 @@ export class ProviderUpdateBody {
     public enabled?: number;
     public max_context?: number;
     public daily_quota?: number;
+    public max_tps?: number;
     public active_from?: number;
     public active_to?: number;
 
@@ -139,7 +144,7 @@ export class ProviderUpdateBody {
             origin.api_key, origin.auth_type, origin.api_type, origin.proxy_url,
             origin.supports_thinking, origin.supports_reasoning_effort, origin.replay_reasoning,
             origin.enable_search, origin.extra_json, origin.enabled,
-            origin.max_context, origin.daily_quota, origin.active_from, origin.active_to,
+            origin.max_context, origin.daily_quota, origin.max_tps, origin.active_from, origin.active_to,
         ];
         if (fields.every(v => v === undefined)) {
             throw new Error("At least one field is required");
@@ -161,6 +166,7 @@ export class ProviderUpdateBody {
         origin.enabled !== undefined && (this.enabled = origin.enabled);
         origin.max_context !== undefined && (this.max_context = origin.max_context);
         origin.daily_quota !== undefined && (this.daily_quota = origin.daily_quota);
+        origin.max_tps !== undefined && (this.max_tps = origin.max_tps);
         origin.active_from !== undefined && (this.active_from = origin.active_from);
         origin.active_to !== undefined && (this.active_to = origin.active_to);
     }

@@ -952,9 +952,12 @@ func (s *Server) StartStreamAt(body map[string]any, accountID, endpoint string) 
 		}
 
 		pr, pw := io.Pipe()
+		// A ceiling on this provider's streamed rate, 0 meaning none. Applied
+		// per attempt so a failover to another provider is paced by its own.
+		pacer := &streamPacer{rate: float64(provider.MaxTps)}
 		go func() {
 			sc := &meteredScanner{Reasoning: capture}
-			meteredCopy(pw, converted, sc)
+			meteredCopy(pw, converted, sc, pacer)
 			// settle: reasoning cache + atomic deduct + bucket log
 			if capture != nil && tcID != "" {
 				capture.mu.Lock()
@@ -1004,9 +1007,45 @@ func (s *Server) StartStreamAt(body map[string]any, accountID, endpoint string) 
 	return nil, fmt.Errorf("All providers failed")
 }
 
+// streamPacer holds a stream back so its output rate cannot exceed a ceiling.
+// It is the one place a provider is deliberately slowed down: pacing rather
+// than rejecting keeps the request working, which is what makes it usable both
+// to shape load and to compare a fast provider against a slow one.
+//
+// The budget starts at the first token and that token is sent at once, so the
+// ceiling changes the generation rate and leaves the wait for the first token
+// alone — the same split TPS and TTFT are measured on. A stream that arrives as
+// a single chunk has nothing left to pace, which no rate can slow.
+type streamPacer struct {
+	// rate is the ceiling in tokens per second; <= 0 leaves the stream alone.
+	rate float64
+	// origin is when the first token appeared, which is where the budget starts.
+	origin time.Time
+}
+
+// delay reports how long to hold back a stream that has produced `tokens` so far
+// by `now`. Zero means send it immediately.
+func (p *streamPacer) delay(tokens int, now time.Time) time.Duration {
+	if p == nil || p.rate <= 0 || tokens <= 0 {
+		return 0
+	}
+	if p.origin.IsZero() {
+		// The first output is what the clock starts at: it defines the wait, and
+		// delaying it would move TTFT without the measurement seeing it.
+		p.origin = now
+		return 0
+	}
+	budget := time.Duration(float64(tokens) / p.rate * float64(time.Second))
+	if wait := p.origin.Add(budget).Sub(now); wait > 0 {
+		return wait
+	}
+	return 0
+}
+
 // meteredCopy forwards bytes untouched, scanning SSE inline for usage and
-// reasoning content (port of the TS passthrough with inline cost parsing).
-func meteredCopy(dst io.Writer, src io.Reader, sc *meteredScanner) {
+// reasoning content (port of the TS passthrough with inline cost parsing), and
+// holds the stream back when the provider has a rate ceiling.
+func meteredCopy(dst io.Writer, src io.Reader, sc *meteredScanner, pacer *streamPacer) {
 	buf := make([]byte, 32*1024)
 	for {
 		n, err := src.Read(buf)
@@ -1014,6 +1053,11 @@ func meteredCopy(dst io.Writer, src io.Reader, sc *meteredScanner) {
 			chunk := make([]byte, n)
 			copy(chunk, buf[:n])
 			sc.feed(chunk)
+			// Sleeping here, before the client sees the chunk, is what makes the
+			// stream slower for the caller as well as for the meter.
+			if wait := pacer.delay(sc.outputTokensEstimate(), time.Now()); wait > 0 {
+				time.Sleep(wait)
+			}
 			if _, werr := dst.Write(chunk); werr != nil {
 				return // client went away; settle still runs via caller
 			}
