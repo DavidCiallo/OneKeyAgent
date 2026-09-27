@@ -73,7 +73,7 @@
         "No": "Không",
         "MaxContext": "Giới hạn ngữ cảnh",
         "DailyQuota": "Hạn mức mỗi giờ",
-        "MaxTps": "TPS tối đa",
+        "ChunkDelay": "Độ trễ mỗi khối (ms)",
         "Parked": "Tạm dừng",
         "QuotaSpent": "Hết hạn mức",
         "FailStreakHint": "Số lần lỗi liên tiếp; 5 lần sẽ tạm dừng 300 giây.",

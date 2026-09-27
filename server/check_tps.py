@@ -9,8 +9,10 @@ think before its first output, so the two timing numbers are separable:
   3. a non-streaming request records no ttft (there is no first token to time)
   4. a thinking model's thinking starts the clock, so tps covers the thinking
      rather than just the visible tail it precedes
-  5. /api/audit/tps returns a per-provider series with both numbers
-  6. the range selector is honoured, an unknown range falls back, and a
+  5. a provider's per-block delay holds its stream back, and the thinking is
+     held back by the same rule as the text after it
+  6. /api/audit/tps returns a per-provider series with both numbers
+  7. the range selector is honoured, an unknown range falls back, and a
      non-admin is refused
 
 Run: python server/check_tps.py
@@ -45,15 +47,15 @@ TAIL = 0.15
 # What the stub reports as output tokens; only used to make TPS a readable
 # number rather than a fraction.
 OUT_TOKENS = 200
-# The rate-ceiling case: a burst of one-character deltas, and the ceiling the
-# provider is configured with. One character per delta is deliberate — it is the
-# case where counting characters alone would under-report the output four times
-# over, so the pacing has to fall back to counting deltas.
+# The delayed case: a burst of single-character deltas, and the per-block wait
+# the provider is configured with. One token per block at 10ms a block works out
+# at ~100 t/s, which is the rate the checks below read back off the audit.
 PACED_TOKENS = 200
+PACED_DELAY_MS = 10
 PACED_TPS = 100
 # The stub writes one frame at a time with a hair of a gap, the way a real
-# provider delivers, which leaves the ceiling something to pace. Without it the
-# whole burst could land in one read and there would be nothing left to slow.
+# provider delivers. Without the gap the whole burst can land in one read, which
+# is exactly the shape the per-block wait exists to slow.
 PACED_FRAME_GAP = 0.001
 
 PASS, FAIL = [], []
@@ -119,8 +121,8 @@ class Upstream(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
             if "burst-" in text:
-                # The worst case for a ceiling: the whole stream handed over as
-                # fast as the socket takes it, so it can land in a single read.
+                # The worst case for a wait: the whole stream handed over as fast
+                # as the socket takes it, so it can land in a single read.
                 self._frame({"choices": [{"index": 0, "delta": {"role": "assistant"}}]})
                 for _ in range(PACED_TOKENS):
                     self._frame({"choices": [{"index": 0, "delta": {"content": "x"}}]})
@@ -131,9 +133,26 @@ class Upstream(BaseHTTPRequestHandler):
                 })
                 self._frame("[DONE]")
                 return
+            if "thinkd-" in text:
+                # A thinking model under a wait. Its thinking is the bulk of what
+                # it streams and the first thing on the wire, so the wait has to
+                # cover the thinking as well as the text that follows it: slowing
+                # only the visible tail would leave almost all of it at speed.
+                self._frame({"choices": [{"index": 0, "delta": {"role": "assistant"}}]})
+                for _ in range(PACED_TOKENS):
+                    self._frame({"choices": [{"index": 0, "delta": {"reasoning_content": "x"}}]})
+                self._frame({"choices": [{"index": 0, "delta": {"content": "done"}}]})
+                self._frame({
+                    "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+                    "usage": {"prompt_tokens": 5,
+                              "completion_tokens": PACED_TOKENS + 1,
+                              "total_tokens": 5 + PACED_TOKENS + 1},
+                })
+                self._frame("[DONE]")
+                return
             if "paced-" in text:
-                # A provider far faster than its configured ceiling: the whole
-                # response in a burst of single-character deltas.
+                # A provider far faster than the wait it is configured with: the
+                # whole response in a burst of single-character deltas.
                 self._frame({"choices": [{"index": 0, "delta": {"role": "assistant"}}]})
                 for _ in range(PACED_TOKENS):
                     self._frame({"choices": [{"index": 0, "delta": {"content": "x"}}]})
@@ -369,10 +388,10 @@ def main():
             check("ttft is a small part of the request", ttft < duration / 3,
                   f"ttft={ttft} of {duration}")
 
-        print("\n5. a provider's rate ceiling slows its stream down to it")
-        # The same burst of traffic through two providers, one with a ceiling and
+        print("\n5. a provider's per-block delay slows its stream down")
+        # The same burst of traffic through two providers, one with a wait set and
         # one without: the only difference between the two measurements is the
-        # ceiling, so the drop can only have come from pacing.
+        # wait, so the drop can only have come from it.
         post("/api/model/create", {"model": {
             "alias": "fast-alias", "input_price": 1.0, "output_price": 1.0, "is_public": 1}})
         post("/api/provider/create", {"provider": {
@@ -386,15 +405,16 @@ def main():
             "model_alias": "paced-alias", "priority": 1, "name": "paced",
             "base_url": UPSTREAM, "model": "m", "api_key": "k",
             "auth_type": "bearer", "api_type": "openai", "enabled": 1,
-            "max_tps": PACED_TPS,
+            "chunk_delay_ms": PACED_DELAY_MS,
         }})
-        stored = ((made.get("data") or {}).get("provider") or {}).get("max_tps")
-        check("the ceiling is stored on the provider", stored == PACED_TPS, f"max_tps={stored}")
+        stored = ((made.get("data") or {}).get("provider") or {}).get("chunk_delay_ms")
+        check("the delay is stored on the provider", stored == PACED_DELAY_MS,
+              f"chunk_delay_ms={stored}")
 
         code = relay(True, api_key, "paced-one", alias="fast-alias")
-        check("the uncapped relay succeeded", code == 200, f"code={code}")
+        check("the undelayed relay succeeded", code == 200, f"code={code}")
         code = relay(True, api_key, "paced-one", alias="paced-alias")
-        check("the capped relay succeeded", code == 200, f"code={code}")
+        check("the delayed relay succeeded", code == 200, f"code={code}")
 
         rows = (post("/api/audit/list", {}).get("data") or {}).get("list", [])
 
@@ -407,37 +427,36 @@ def main():
               f"fast={fast is not None} paced={paced is not None}")
         if fast and paced:
             f_tps, p_tps = fast.get("tps") or 0, paced.get("tps") or 0
-            check("the uncapped stream is far faster than the ceiling",
-                  f_tps > PACED_TPS * 2, f"tps={round(f_tps, 1)} ceiling={PACED_TPS}")
-            check("the capped stream is held at the ceiling",
-                  p_tps <= PACED_TPS * 1.2,
-                  f"tps={round(p_tps, 1)} ceiling={PACED_TPS}")
-            # Above the floor matters as much as below the ceiling: a stream that
+            check("the undelayed stream is far faster than the delayed one",
+                  f_tps > PACED_TPS * 2, f"tps={round(f_tps, 1)}")
+            check("the delayed stream is held near the rate the wait implies",
+                  p_tps <= PACED_TPS * 1.2, f"tps={round(p_tps, 1)}")
+            # Above the floor matters as much as below the top: a stream that
             # merely came out slow would pass a one-sided check.
-            check("it is paced to the ceiling, not just under it",
-                  p_tps >= PACED_TPS * 0.8, f"tps={round(p_tps, 1)} ceiling={PACED_TPS}")
-            check("the ceiling is what slowed it", p_tps < f_tps * 0.5,
-                  f"capped={round(p_tps, 1)} uncapped={round(f_tps, 1)}")
+            check("it is delayed to that rate, not just under it",
+                  p_tps >= PACED_TPS * 0.8, f"tps={round(p_tps, 1)}")
+            check("the wait is what slowed it", p_tps < f_tps * 0.5,
+                  f"delayed={round(p_tps, 1)} undelayed={round(f_tps, 1)}")
             check("the stream really waited",
                   (paced.get("duration_ms") or 0) >= 1000 * PACED_TOKENS / PACED_TPS * 0.8,
                   f"duration={paced.get('duration_ms')}ms for {paced.get('output_tokens')} "
-                  f"tokens at {PACED_TPS} t/s")
-            # The budget starts at the first token, so the wait for that token is
-            # not the thing being slowed.
-            check("the ceiling leaves the first token alone",
+                  f"blocks {PACED_DELAY_MS}ms apart")
+            # The first block is written at once, so the wait for the first token
+            # is not the thing being slowed.
+            check("the delay leaves the first token alone",
                   (paced.get("ttft_ms") or 0) < 250,
                   f"ttft_ms={paced.get('ttft_ms')}")
 
-        # The same ceiling against a stream that arrives as one burst rather than
-        # frame by frame. Pacing per read would let this one through untouched,
-        # since the read that starts the budget is the read being exempted.
+        # The same wait against a stream that arrives as one burst rather than
+        # frame by frame. A wait applied per read would let this one through
+        # untouched, since the read that starts the clock is the read exempted.
         post("/api/model/create", {"model": {
             "alias": "burst-alias", "input_price": 1.0, "output_price": 1.0, "is_public": 1}})
         post("/api/provider/create", {"provider": {
             "model_alias": "burst-alias", "priority": 1, "name": "bursty",
             "base_url": UPSTREAM, "model": "m", "api_key": "k",
             "auth_type": "bearer", "api_type": "openai", "enabled": 1,
-            "max_tps": PACED_TPS,
+            "chunk_delay_ms": PACED_DELAY_MS,
         }})
         code = relay(True, api_key, "burst-one", alias="burst-alias")
         check("the burst relay succeeded", code == 200, f"code={code}")
@@ -446,13 +465,41 @@ def main():
         check("the burst attempt is recorded", burst is not None, f"burst={burst is not None}")
         if burst:
             b_tps = burst.get("tps") or 0
-            check("a stream that arrives in one burst is still held at the ceiling",
-                  b_tps <= PACED_TPS * 1.2, f"tps={round(b_tps, 1)} ceiling={PACED_TPS}")
-            check("the burst is paced to the ceiling, not just under it",
-                  b_tps >= PACED_TPS * 0.8, f"tps={round(b_tps, 1)} ceiling={PACED_TPS}")
+            check("a stream that arrives in one burst is still held back",
+                  b_tps <= PACED_TPS * 1.2, f"tps={round(b_tps, 1)}")
+            check("the burst is delayed to that rate, not just under it",
+                  b_tps >= PACED_TPS * 0.8, f"tps={round(b_tps, 1)}")
             check("the burst really waited",
                   (burst.get("duration_ms") or 0) >= 1000 * PACED_TOKENS / PACED_TPS * 0.8,
                   f"duration={burst.get('duration_ms')}ms for {burst.get('output_tokens')} tokens")
+
+        # A thinking model streams its thinking first and that thinking is the
+        # bulk of what it bills, so the wait has to cover it too. Slowing only the
+        # visible tail would leave nearly the whole response at full speed.
+        post("/api/model/create", {"model": {
+            "alias": "think-paced-alias", "input_price": 1.0, "output_price": 1.0, "is_public": 1}})
+        post("/api/provider/create", {"provider": {
+            "model_alias": "think-paced-alias", "priority": 1, "name": "think-paced",
+            "base_url": UPSTREAM, "model": "m", "api_key": "k",
+            "auth_type": "bearer", "api_type": "openai", "enabled": 1,
+            "chunk_delay_ms": PACED_DELAY_MS,
+        }})
+        code = relay(True, api_key, "thinkd-one", alias="think-paced-alias")
+        check("the thinking relay succeeded", code == 200, f"code={code}")
+        rows = (post("/api/audit/list", {}).get("data") or {}).get("list", [])
+        tpace = attempt("think-paced-alias")
+        check("the delayed thinking attempt is recorded", tpace is not None,
+              f"think-paced={tpace is not None}")
+        if tpace:
+            tp_tps = tpace.get("tps") or 0
+            check("thinking is held back by the same wait as the text after it",
+                  tp_tps <= PACED_TPS * 1.2,
+                  f"tps={round(tp_tps, 1)}: {PACED_TOKENS} thinking blocks plus one of text")
+            check("the thinking stream is delayed to that rate, not just under it",
+                  tp_tps >= PACED_TPS * 0.8, f"tps={round(tp_tps, 1)}")
+            check("the thinking stream really waited",
+                  (tpace.get("duration_ms") or 0) >= 1000 * PACED_TOKENS / PACED_TPS * 0.8,
+                  f"duration={tpace.get('duration_ms')}ms for {tpace.get('output_tokens')} tokens")
 
         print("\n6. the series endpoint")
         series = post("/api/audit/tps", {"range": "1h"})
@@ -460,7 +507,8 @@ def main():
         allp = series.get("data") or {}
         names = sorted(p.get("name") for p in (allp.get("providers") or []))
         check("every provider with traffic appears in the series",
-              {"plain", "streamer", "thinker", "fast", "paced", "bursty"} <= set(names), str(names))
+              {"plain", "streamer", "thinker", "fast", "paced", "bursty",
+               "think-paced"} <= set(names), str(names))
         check("the series covers the requested range", allp.get("range") == "1h",
               f"range={allp.get('range')} granularity={allp.get('granularity')}")
 

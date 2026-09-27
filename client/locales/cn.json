@@ -81,7 +81,7 @@
         "No": "否",
         "MaxContext": "上下文上限",
         "DailyQuota": "每小时配额",
-        "MaxTps": "限速 (t/s)",
+        "ChunkDelay": "每块延迟 (ms)",
         "Parked": "已暂停",
         "QuotaSpent": "配额用尽",
         "FailStreakHint": "连续失败次数，达到 5 次将暂停该供应商 300 秒。",

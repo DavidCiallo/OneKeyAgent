@@ -76,7 +76,7 @@
         "No": "No",
         "MaxContext": "Contexto máximo",
         "DailyQuota": "Cuota por hora",
-        "MaxTps": "TPS máx.",
+        "ChunkDelay": "Retardo por bloque (ms)",
         "Parked": "Pausado",
         "QuotaSpent": "Cuota agotada",
         "FailStreakHint": "Fallos consecutivos; 5 lo pausa durante 300 s.",

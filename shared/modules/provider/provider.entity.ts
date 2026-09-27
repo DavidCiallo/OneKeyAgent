@@ -21,8 +21,8 @@ export interface ProviderEntity extends BaseEntity {
     max_context?: number;
     /** Requests per local day; 0 = unlimited, in-memory. */
     daily_quota?: number;
-    /** Streamed output ceiling in tokens per second; 0 = unlimited. */
-    max_tps?: number;
+    /** How long each streamed block is held back, in ms; 0 = no wait. */
+    chunk_delay_ms?: number;
     /** Minutes past routing-local midnight; both 0 = any time. */
     active_from?: number;
     active_to?: number;

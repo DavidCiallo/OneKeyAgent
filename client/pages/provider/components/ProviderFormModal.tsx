@@ -19,7 +19,7 @@ type ProviderForm = {
     enabled: number;
     max_context: number;
     daily_quota: number;
-    max_tps: number;
+    chunk_delay_ms: number;
     active_from: string;
     active_to: string;
 };
@@ -168,9 +168,9 @@ export function ProviderFormModal({ isOpen, onOpenChange, mode, form, onFormChan
                             />
                             <Input
                                 type="number"
-                                label={locale.MaxTps}
-                                value={String(form.max_tps ?? 0)}
-                                onChange={e => onFormChange({ ...form, max_tps: parseInt(e.target.value) || 0 })}
+                                label={locale.ChunkDelay}
+                                value={String(form.chunk_delay_ms ?? 0)}
+                                onChange={e => onFormChange({ ...form, chunk_delay_ms: parseInt(e.target.value) || 0 })}
                             />
                         </div>
                         <div className="flex flex-row gap-3">

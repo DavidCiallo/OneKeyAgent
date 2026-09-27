@@ -134,8 +134,8 @@ function LimitRow({ item, locale }: { item: ProviderDTO; locale: any }) {
             </span>
         );
     }
-    if (item.max_tps) {
-        parts.push(<span key="tps" className="shrink-0 text-warning">{locale.MaxTps} {item.max_tps} t/s</span>);
+    if (item.chunk_delay_ms) {
+        parts.push(<span key="cd" className="shrink-0 text-warning">{locale.ChunkDelay} {item.chunk_delay_ms}</span>);
     }
 
     // Active window, inline rather than its own chip.

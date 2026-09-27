@@ -78,7 +78,7 @@
         "No": "No",
         "MaxContext": "Max context",
         "DailyQuota": "Hourly quota",
-        "MaxTps": "Max TPS",
+        "ChunkDelay": "Block delay (ms)",
         "Parked": "Parked",
         "QuotaSpent": "Quota spent",
         "FailStreakHint": "Consecutive failures; 5 parks this provider for 300s.",

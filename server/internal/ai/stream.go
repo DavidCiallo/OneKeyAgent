@@ -670,10 +670,10 @@ type meteredScanner struct {
 	// FirstTokenAt — Unix milliseconds when the first token of any kind
 	// arrived, 0 until then.
 	FirstTokenAt int64
-	// OutputChars / OutputDeltas — everything the provider bills as completion:
-	// content, legacy text and thinking. The stream pacer paces against these;
-	// EstimatedChars stays content-only because the billing fallback uses it.
-	OutputChars  int
+	// OutputDeltas — how many non-empty deltas the provider billed as
+	// completion: content, legacy text and thinking. The stream delay keys off
+	// this to tell an output block from a control one; EstimatedChars stays
+	// content-only because the billing fallback uses it.
 	OutputDeltas int
 }
 
@@ -703,31 +703,13 @@ func (m *meteredScanner) noteContent(s string) {
 	}
 	m.noteFirstToken()
 	m.EstimatedChars += runeLen(s)
-	m.noteOutput(runeLen(s))
+	m.noteOutput()
 }
 
-// noteOutput counts a non-empty delta of billed output for the pacer.
-func (m *meteredScanner) noteOutput(chars int) {
-	m.OutputChars += chars
+// noteOutput counts a non-empty delta of billed output, which is what the
+// stream delay holds back.
+func (m *meteredScanner) noteOutput() {
 	m.OutputDeltas++
-}
-
-// estimatedCharsPerToken — the ratio the billing fallback already uses when an
-// upstream reports no usage, so pacing and the estimate agree.
-const estimatedCharsPerToken = 4
-
-// outputTokensEstimate — what the pacer charges the budget for. Mid-stream there
-// is no usage to read, so it estimates: characters over four, which is right for
-// latin text and wrong for scripts where a character is closer to a token (a CJK
-// character is one), so the delta count is taken when it is larger. One delta per
-// token is what most upstreams send, which makes the count the better floor and
-// stops the budget being spent four times too fast on such text.
-func (m *meteredScanner) outputTokensEstimate() int {
-	byChars := m.OutputChars / estimatedCharsPerToken
-	if m.OutputDeltas > byChars {
-		return m.OutputDeltas
-	}
-	return byChars
 }
 
 func (m *meteredScanner) feed(chunk []byte) {
@@ -763,8 +745,9 @@ func (m *meteredScanner) feed(chunk []byte) {
 			if s, ok := rc.(string); ok {
 				if s != "" {
 					m.noteFirstToken()
-					// Billed as completion output, so it spends paced budget too.
-					m.noteOutput(runeLen(s))
+					// Billed as completion output, so it is held back by the
+					// stream delay exactly as visible text is.
+					m.noteOutput()
 				}
 				if m.Reasoning != nil {
 					m.Reasoning.mu.Lock()
