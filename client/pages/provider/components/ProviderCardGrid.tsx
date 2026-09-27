@@ -114,14 +114,12 @@ function HealthChip({ item, locale }: { item: ProviderDTO; locale: any }) {
     return null;
 }
 
-// active_from/active_to are minutes past routing-local midnight; equal or zero
-// means no window. Off-window is a warning rather than a danger: it is a
-// deliberate schedule, not a fault.
 // LimitRow — the four sizing/limit values on one unbreakable line: context
 // window, hourly quota (used/limit), stream rate cap, active window. They are
-// kept together so the card does not scatter them across wraps; a value is only
-// shown when it is set, and the ones that can trip (quota spent, off-window)
-// still turn warning-coloured.
+// kept together so the card does not scatter them across wraps. A value is only
+// shown when it is set, and the ones that can trip (quota spent, off-window, the
+// rate cap) turn warning-coloured — no hover text: the numbers and the colour
+// carry it.
 function LimitRow({ item, locale }: { item: ProviderDTO; locale: any }) {
     const parts: ReactNode[] = [];
 
@@ -131,19 +129,13 @@ function LimitRow({ item, locale }: { item: ProviderDTO; locale: any }) {
     if (item.daily_quota) {
         const spent = (item.today_count || 0) >= item.daily_quota;
         parts.push(
-            <Tooltip key="quota" content={`${item.today_count}/${item.daily_quota}`}>
-                <span className={`shrink-0 ${spent ? "text-warning" : ""}`}>
-                    {locale.Quota} {item.today_count || 0}/{humanCount(item.daily_quota)}
-                </span>
-            </Tooltip>
+            <span key="quota" className={`shrink-0 ${spent ? "text-warning" : ""}`}>
+                {locale.Quota} {item.today_count || 0}/{humanCount(item.daily_quota)}
+            </span>
         );
     }
     if (item.max_tps) {
-        parts.push(
-            <Tooltip key="tps" content={locale.MaxTpsHint}>
-                <span className="shrink-0 text-warning">{locale.MaxTps} {item.max_tps} t/s</span>
-            </Tooltip>
-        );
+        parts.push(<span key="tps" className="shrink-0 text-warning">{locale.MaxTps} {item.max_tps} t/s</span>);
     }
 
     // Active window, inline rather than its own chip.
@@ -153,9 +145,9 @@ function LimitRow({ item, locale }: { item: ProviderDTO; locale: any }) {
         const clock = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
         const off = item.in_window === false;
         parts.push(
-            <Tooltip key="win" content={off ? locale.OutsideWindow : `${clock(from)}-${clock(to)}`}>
-                <span className={`shrink-0 ${off ? "text-warning" : ""}`}>{clock(from)}-{clock(to)}</span>
-            </Tooltip>
+            <span key="win" className={`shrink-0 ${off ? "text-warning" : ""}`}>
+                {clock(from)}-{clock(to)}
+            </span>
         );
     }
 
