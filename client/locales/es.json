@@ -77,7 +77,6 @@
         "MaxContext": "Contexto máximo",
         "DailyQuota": "Cuota por hora",
         "MaxTps": "TPS máx.",
-        "MaxTpsHint": "Límite de la salida en streaming en tokens por segundo. Se aplica regulando el flujo, así que un proveedor más rápido se ve más lento. 0 = sin límite.",
         "Parked": "Pausado",
         "QuotaSpent": "Cuota agotada",
         "FailStreakHint": "Fallos consecutivos; 5 lo pausa durante 300 s.",

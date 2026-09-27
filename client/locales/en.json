@@ -79,7 +79,6 @@
         "MaxContext": "Max context",
         "DailyQuota": "Hourly quota",
         "MaxTps": "Max TPS",
-        "MaxTpsHint": "Ceiling on streamed output in tokens per second. Applied by pacing the stream, so a faster provider reads slower. 0 = unlimited.",
         "Parked": "Parked",
         "QuotaSpent": "Quota spent",
         "FailStreakHint": "Consecutive failures; 5 parks this provider for 300s.",
