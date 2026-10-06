@@ -137,3 +137,114 @@ export function statsAlignDown(ts: number, stepMs: number): number {
     const day = statsDayStart(ts);
     return day + Math.floor((ts - day) / stepMs) * stepMs;
 }
+
+// ─────────────────────── calendar dates (yyyymmdd) ───────────────────────
+//
+// The usage page's range filter is a pair of calendar dates rather than a
+// lookback, so it has to convert a date the operator typed in the stats zone
+// into the exact millisecond boundary the server buckets on. Doing that with
+// `new Date("2024-06-15")` would parse it as UTC midnight, which is the wrong
+// instant for any zone east or west of UTC — the same class of bug the
+// statistics clock was introduced to fix.
+
+/** A calendar date in the stats zone, as `yyyymmdd`. */
+export type StatsDate = string;
+
+const DATE_RE = /^(\d{4})(\d{2})(\d{2})$/;
+
+/** Parse `yyyymmdd` to its parts, or null when it is not a valid date. */
+export function parseStatsDate(s: string): { year: number; month: number; day: number } | null {
+    const m = DATE_RE.exec((s || "").trim());
+    if (!m) return null;
+    const year = Number(m[1]), month = Number(m[2]), day = Number(m[3]);
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+    // Reject a day that does not exist in that month (20240231).
+    const probe = new Date(Date.UTC(year, month - 1, day));
+    if (probe.getUTCFullYear() !== year || probe.getUTCMonth() !== month - 1 || probe.getUTCDate() !== day) {
+        return null;
+    }
+    return { year, month, day };
+}
+
+/** Today's date in the stats zone, as `yyyymmdd`. */
+export function statsToday(now: number = Date.now()): StatsDate {
+    const p = statsParts(now);
+    return `${p.year}${p.month}${p.day}`;
+}
+
+/**
+ * Midnight opening the given stats-zone calendar date.
+ *
+ * Via the same fixed-point walk as statsDayStart: the offset is measured at a
+ * UTC guess and re-measured at each candidate, so a date whose midnight falls on
+ * the other side of a DST transition still resolves to the real local midnight.
+ */
+export function statsDateStart(date: StatsDate): number {
+    const parsed = parseStatsDate(date);
+    if (!parsed) return NaN;
+    const zone = statsTimezone();
+    if (!zone) {
+        return new Date(parsed.year, parsed.month - 1, parsed.day).getTime();
+    }
+    const want = Date.UTC(parsed.year, parsed.month - 1, parsed.day);
+    let start = want - zoneOffsetMs(want, zone);
+    for (let i = 0; i < 3; i++) {
+        const q = partsIn(start, zone);
+        if (
+            Number(q.year) === parsed.year &&
+            Number(q.month) === parsed.month &&
+            Number(q.day) === parsed.day &&
+            q.hour === "00" &&
+            q.minute === "00"
+        ) {
+            return start;
+        }
+        start = want - zoneOffsetMs(start, zone);
+    }
+    return start;
+}
+
+/**
+ * The exclusive end of a `from`–`to` range, i.e. the midnight after `to`.
+ *
+ * Advancing through the calendar rather than adding 86_400_000 ms is what makes
+ * the range cover a DST day completely: a local day is 23 or 25 hours on a
+ * transition, and a fixed 24h would leave an hour of the last day outside the
+ * window (or pull an hour of the next day in).
+ */
+export function statsDateEndExclusive(to: StatsDate): number {
+    const parsed = parseStatsDate(to);
+    if (!parsed) return NaN;
+    const zone = statsTimezone();
+    if (!zone) {
+        return new Date(parsed.year, parsed.month - 1, parsed.day + 1).getTime();
+    }
+    // Normalise through the Date constructor so month/year rollover is handled.
+    const rolled = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day + 1));
+    const next = `${rolled.getUTCFullYear()}${String(rolled.getUTCMonth() + 1).padStart(2, "0")}${String(rolled.getUTCDate()).padStart(2, "0")}`;
+    return statsDateStart(next);
+}
+
+/** Render a date for display: `2024-06-15`. */
+export function formatStatsDate(date: StatsDate): string {
+    const p = parseStatsDate(date);
+    if (!p) return date;
+    return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+}
+
+/** How many calendar days a range spans, inclusive of both ends. */
+export function statsDaySpan(from: StatsDate, to: StatsDate): number {
+    const a = parseStatsDate(from), b = parseStatsDate(to);
+    if (!a || !b) return 0;
+    const av = Date.UTC(a.year, a.month - 1, a.day);
+    const bv = Date.UTC(b.year, b.month - 1, b.day);
+    return Math.round((bv - av) / 86_400_000) + 1;
+}
+
+/** Shift a date by whole calendar days. */
+export function statsDateAdd(date: StatsDate, days: number): StatsDate {
+    const p = parseStatsDate(date);
+    if (!p) return date;
+    const d = new Date(Date.UTC(p.year, p.month - 1, p.day + days));
+    return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}${String(d.getUTCDate()).padStart(2, "0")}`;
+}

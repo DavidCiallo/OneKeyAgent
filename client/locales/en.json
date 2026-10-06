@@ -106,8 +106,12 @@
         "Loading": "Loading...",
         "UserUsage": "User Usage",
         "History": "History",
-        "GroupFilter": "Filter groups",
-        "GroupCount": "{n} groups"
+        "DateRange": "Date range",
+        "DayCount": "{n}d",
+        "Last7": "7d",
+        "Last30": "30d",
+        "MonthToDate": "MTD",
+        "GroupTagHeader": "Groups"
     },
     "AuthPage": {
         "Title": "EHEX",

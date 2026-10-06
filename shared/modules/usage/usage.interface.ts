@@ -167,7 +167,10 @@ export interface UserSessionGroup {
 export class UsageSessionsRequest implements BaseRequest {
     public auth?: string;
     public gapMinutes?: number;
+    /** Window start, ms. On the stats clock (the zone's local midnight for a day). */
     public since?: number;
+    /** Window end, ms, exclusive. Omitted or 0 means "up to now". */
+    public until?: number;
     public account_ids?: string[];
     public model_aliases?: string[];
     public provider_ids?: string[];
@@ -184,6 +187,7 @@ export class UsageSessionsRequest implements BaseRequest {
         origin.auth && (this.auth = origin.auth);
         origin.gapMinutes && (this.gapMinutes = origin.gapMinutes);
         origin.since && (this.since = origin.since);
+        origin.until && (this.until = origin.until);
         origin.account_ids && (this.account_ids = origin.account_ids);
         origin.model_aliases && (this.model_aliases = origin.model_aliases);
         origin.provider_ids && (this.provider_ids = origin.provider_ids);

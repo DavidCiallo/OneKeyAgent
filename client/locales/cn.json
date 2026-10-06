@@ -102,15 +102,19 @@
         "OutputTokens": "输出 Token",
         "Time": "时间",
         "NoData": "暂无数据",
-        "Today": "今日",
+        "Today": "今天",
         "Last24h": "近一天",
         "Last7Days": "近一周",
         "Total": "总用量",
         "Loading": "加载中...",
         "UserUsage": "用户用量",
         "History": "历史记录",
-        "GroupFilter": "筛选分组",
-        "GroupCount": "{n} 个分组"
+        "DateRange": "日期区间",
+        "DayCount": "{n}天",
+        "Last7": "近7天",
+        "Last30": "近30天",
+        "MonthToDate": "本月",
+        "GroupTagHeader": "分组"
     },
     "AuthPage": {
         "Title": "EHEX",

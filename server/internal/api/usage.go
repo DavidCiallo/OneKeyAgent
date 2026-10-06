@@ -354,11 +354,24 @@ type sessionEntry struct {
 	AccountName       string         `json:"accountName,omitempty"`
 }
 
-// selectGranularity — which bucket resolution a range is answered from. 60m is
-// the coarsest thing that exists now, so anything past a day reads it and is
-// grouped in Go; there is no daily rollup to fall back on.
+// selectGranularity — which bucket resolution a range is answered from.
+//
+// The requested step decides first: a 1d chart asks for day-sized windows, and
+// those must be folded from the 60m rows even when the range is a single day.
+// Answering a one-day range from 1m would return nothing at all, because the
+// folding below only ever sees rows of the granularity that was read.
+//
+// Below that, 1m is the only resolution that can show a sub-hour trend, so any
+// step up to an hour uses it when the range is short enough (1m is retained for
+// a week); longer ranges read 60m. There is no 1d bucket: a day, a week and a
+// month are all folded together from 60m rows on the query side, which is what
+// lets a day boundary follow the configured zone instead of whichever hour the
+// row happened to be written in.
 func selectGranularity(gapMinutes int, since int64) string {
-	if gapMinutes <= 5 {
+	if gapMinutes > 60 {
+		return "60m"
+	}
+	if gapMinutes <= 10 {
 		return "1m"
 	}
 	rangeDays := float64(store.Now()-since) / float64(dayMs)
@@ -450,12 +463,24 @@ func (a *App) usageSessions(c *httpx.Ctx) (any, error) {
 
 	gapMinutes := int(c.Int("gapMinutes"))
 	if gapMinutes == 0 {
-		gapMinutes = 30
+		gapMinutes = 60
 	}
 	now := store.Now()
+
+	// The client sends an explicit window: `since` and, optionally, `until`.
+	// Both are ms timestamps on the stats clock, so the caller decides what
+	// "today" means (the stats zone's midnight) and the server does not have to
+	// guess from a lookback.
 	effectiveSince := now - 7*dayMs
 	if s := c.Int("since"); s > 0 {
 		effectiveSince = s
+	}
+	effectiveUntil := int64(0) // 0 means "up to now"
+	if u := c.Int("until"); u > 0 {
+		effectiveUntil = u
+	}
+	if effectiveUntil > 0 && effectiveUntil < effectiveSince {
+		return nil, fmt.Errorf("until must not precede since")
 	}
 	gapMs := int64(gapMinutes) * 60 * 1000
 	granularity := selectGranularity(gapMinutes, effectiveSince)
@@ -517,6 +542,12 @@ func (a *App) usageSessions(c *httpx.Ctx) (any, error) {
 		BucketTimeGte: &effectiveSince,
 		AccountID:     accountFilter,
 	}, func(b *store.UsageBucket) bool {
+		// The end bound is applied here rather than pushed into the query so the
+		// same predicate also guards the 1m side-window below; one place that
+		// decides "is this row inside the requested range".
+		if effectiveUntil > 0 && b.BucketTime >= effectiveUntil {
+			return true
+		}
 		if accountSet != nil && !accountSet[b.AccountID] {
 			return true
 		}
@@ -563,7 +594,7 @@ func (a *App) usageSessions(c *httpx.Ctx) (any, error) {
 		out := make([]sessionEntry, 0, len(wins))
 		for wStart, wa := range wins {
 			entry := sessionEntry{
-				StartTime: wStart, EndTime: wStart + gap,
+				StartTime: wStart, EndTime: windowEndOf(wStart, gap),
 				RequestCount: wa.reqs,
 				InputTokens: wa.in, CachedInputTokens: wa.cached,
 				OutputTokens: wa.out, Cost: store.Round6(wa.costF),
@@ -779,10 +810,34 @@ func maxI64(a, b int64) int64 {
 }
 
 // windowStartOf — the boundary at or below ts for a display window, on the
-// stats clock. Previously this anchored every gap at local midnight, which is
-// what made a 6h/12h/1d window land on 08:00 in a UTC container: the anchor was
-// the container's midnight, not the operator's.
+// stats clock.
+//
+// A day-or-longer window is anchored at the zone's local midnight, and every
+// hour within it belongs to that day: the 60m rows underneath were written on
+// absolute hour boundaries, so summing them from the local midnight forward is
+// what makes "1d" mean one local day rather than a rolling 24 hours. Sub-day
+// steps floor on absolute time, which is how those rows are written and what
+// keeps them stable across a DST transition.
 func windowStartOf(ts, gapMs int64) int64 { return store.AlignDown(ts, gapMs) }
+
+// windowEndOf — where a display window ends.
+//
+// A fixed gap would be wrong for a day-or-longer window: a local day is 23 or 25
+// hours across a DST transition, so adding 24h to local midnight would either
+// spill into the next day or stop an hour short of it — and the client, which
+// sizes its bars from this range, would draw a day that does not match the data.
+// Day steps therefore advance to the next local midnight.
+func windowEndOf(start, gapMs int64) int64 {
+	if gapMs >= dayMs {
+		// Round the step up to whole days first, then advance that many local
+		// days so every intermediate boundary is also a midnight.
+		days := (gapMs + dayMs - 1) / dayMs
+		loc := store.StatsLocation()
+		d := time.UnixMilli(start).In(loc)
+		return time.Date(d.Year(), d.Month(), d.Day()+int(days), 0, 0, 0, 0, loc).UnixMilli()
+	}
+	return start + gapMs
+}
 
 // windowLabel — a display window's range, formatted on the stats clock so the
 // label agrees with the boundary it came from even when the browser reading it
