@@ -299,6 +299,9 @@ func Open(path string) (*sql.DB, error) {
 	if err := purgeLegacyAuditBodies(db); err != nil {
 		return nil, err
 	}
+	if err := purgeDailyBuckets(db); err != nil {
+		return nil, err
+	}
 	for _, stmt := range indexes {
 		if _, err := db.Exec(stmt); err != nil {
 			return nil, fmt.Errorf("index: %w", err)
@@ -348,6 +351,18 @@ func purgeLegacyAuditBodies(db *sql.DB) error {
 		return err
 	}
 	return SetNodeState(db, auditBodiesPurgedKey, "1")
+}
+
+// purgeDailyBuckets — drop the retired 1d granularity, once.
+//
+// BucketLogUsage no longer writes a daily rollup: it collapsed each day into a
+// single row at insert time, which capped what any chart above an hour could
+// honestly show. Leaving the old rows behind would be worse than useless — the
+// stats path aggregates 60m now, so a surviving 1d row would either be ignored
+// or double-count against the very hours it summarises.
+func purgeDailyBuckets(db *sql.DB) error {
+	_, err := db.Exec("DELETE FROM usage_bucket WHERE granularity = '1d'")
+	return err
 }
 
 // dedupeBucketRows merges usage_bucket rows that share a window, keeping the

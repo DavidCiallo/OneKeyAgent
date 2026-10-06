@@ -119,19 +119,6 @@ func mapToPeriod(m map[int64]float64) statsPeriod {
 	return statsPeriod{Total: total, Amounts: amounts}
 }
 
-func bucketSlots(granularity string) int {
-	switch granularity {
-	case "minute", "1m":
-		return 1
-	case "hour", "60m":
-		return 6
-	case "1d":
-		return 144
-	default:
-		return 1
-	}
-}
-
 func (a *App) usageStats(c *httpx.Ctx) (any, error) {
 	if c.Auth == "" {
 		return nil, fmt.Errorf("Authorization failed")
@@ -196,19 +183,30 @@ func computeStats(a *App, modelFilter, accountFilter *string) (statsPeriod, stat
 		return statsPeriod{}, statsPeriod{}, statsPeriod{}, err
 	}
 
-	// 1d buckets spread across the day's 10-min slots (weekly overview)
-	gran1d := "1d"
-	gte := now - 7*dayMs
+	// 7-day overview: aggregate 60m buckets into 10-min display slots. This used
+	// to read 1d buckets and spread each day's total flat over 144 slots, which
+	// is what made anything above an hour read as a straight line. 60m rows
+	// carry the real hourly shape, so the daily boundary is applied here — on
+	// the stats clock — rather than having been frozen at insert time.
+	gran60 := "60m"
+	gte := store.DayStart(now) - 6*dayMs
 	weekMap := map[int64]float64{}
 	_, err = store.BucketEach(a.DB, store.BucketFilter{
-		Granularity:   &gran1d,
+		Granularity:   &gran60,
 		BucketTimeGte: &gte,
 		AccountID:     accountFilter,
 		ModelAlias:    modelFilter,
 	}, func(b *store.UsageBucket) bool {
-		perSlot := float64(b.InputTokens+b.OutputTokens) / float64(bucketSlots("1d"))
-		for i := 0; i < 144; i++ {
-			weekMap[b.BucketTime+int64(i)*tenMin] += perSlot
+		// A 60m row belongs to the 10-min slot it starts in; spreading it over
+		// its own hour keeps the curve smooth at a 10-min resolution instead of
+		// stepping once an hour.
+		perSlot := float64(b.InputTokens+b.OutputTokens) / 6
+		base := store.TenMinuteSlot(b.BucketTime)
+		for i := 0; i < 6; i++ {
+			slot := base + int64(i)*tenMin
+			if slot >= gte {
+				weekMap[slot] += perSlot
+			}
 		}
 		return true
 	})
@@ -286,10 +284,10 @@ func (a *App) usageStatsBatch(c *httpx.Ctx) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	gran1d := "1d"
-	gte := now - 7*dayMs
+	gran60 := "60m"
+	gte := store.DayStart(now) - 6*dayMs
 	_, err = store.BucketEach(a.DB, store.BucketFilter{
-		Granularity:   &gran1d,
+		Granularity:   &gran60,
 		BucketTimeGte: &gte,
 		AccountID:     accountFilter,
 	}, func(b *store.UsageBucket) bool {
@@ -297,9 +295,14 @@ func (a *App) usageStatsBatch(c *httpx.Ctx) (any, error) {
 		if !ok {
 			return true
 		}
-		perSlot := float64(b.InputTokens+b.OutputTokens) / float64(bucketSlots("1d"))
-		for i := 0; i < 144; i++ {
-			am.week[b.BucketTime+int64(i)*tenMin] += perSlot
+		// Same hourly expansion as the single-alias path, so both agree.
+		perSlot := float64(b.InputTokens+b.OutputTokens) / 6
+		base := store.TenMinuteSlot(b.BucketTime)
+		for i := 0; i < 6; i++ {
+			slot := base + int64(i)*tenMin
+			if slot >= gte {
+				am.week[slot] += perSlot
+			}
 		}
 		return true
 	})
@@ -351,6 +354,9 @@ type sessionEntry struct {
 	AccountName       string         `json:"accountName,omitempty"`
 }
 
+// selectGranularity — which bucket resolution a range is answered from. 60m is
+// the coarsest thing that exists now, so anything past a day reads it and is
+// grouped in Go; there is no daily rollup to fall back on.
 func selectGranularity(gapMinutes int, since int64) string {
 	if gapMinutes <= 5 {
 		return "1m"
@@ -359,10 +365,7 @@ func selectGranularity(gapMinutes int, since int64) string {
 	if rangeDays <= 1 {
 		return "1m"
 	}
-	if rangeDays <= 90 {
-		return "60m"
-	}
-	return "1d"
+	return "60m"
 }
 
 // window accumulator (WinAcc in usage.service.ts)
@@ -737,15 +740,20 @@ func maxI64(a, b int64) int64 {
 	return b
 }
 
-func windowStartOf(ts, gapMs int64) int64 {
-	localMid := store.LocalMidnight(ts)
-	offset := ts - localMid
-	return localMid + (offset/gapMs)*gapMs
-}
+// windowStartOf — the boundary at or below ts for a display window, on the
+// stats clock. Previously this anchored every gap at local midnight, which is
+// what made a 6h/12h/1d window land on 08:00 in a UTC container: the anchor was
+// the container's midnight, not the operator's.
+func windowStartOf(ts, gapMs int64) int64 { return store.AlignDown(ts, gapMs) }
 
+// windowLabel — a display window's range, formatted on the stats clock so the
+// label agrees with the boundary it came from even when the browser reading it
+// sits in another zone. The zone is appended for gaps under a day, where an
+// hour without one is ambiguous.
 func windowLabel(ts, gapMs int64) string {
-	d := time.UnixMilli(ts).In(time.Local)
-	end := time.UnixMilli(ts + gapMs).In(time.Local)
+	loc := store.StatsLocation()
+	d := time.UnixMilli(ts).In(loc)
+	end := time.UnixMilli(ts + gapMs).In(loc)
 	mm, dd := fmt.Sprintf("%02d", int(d.Month())), fmt.Sprintf("%02d", d.Day())
 	switch {
 	case gapMs >= 86_400_000:

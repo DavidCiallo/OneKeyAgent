@@ -6,5 +6,7 @@ declare module '*.css';
 interface Window {
     __APP_CONFIG__?: {
         show_home_page?: boolean;
+        /** IANA zone the server cut its statistics buckets in, if configured. */
+        timezone?: string;
     };
 }

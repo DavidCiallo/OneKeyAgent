@@ -133,8 +133,9 @@ func (a *App) auditTps(c *httpx.Ctx) (any, error) {
 
 	step := rng.StepMs
 	// Buckets are written on step boundaries, so anchor the window the same way
-	// or the first and last slots would never match a row.
-	end := (store.Now() / step) * step
+	// or the first and last slots would never match a row. The anchor is the
+	// stats clock, which keeps this chart's slots identical to the usage page's.
+	end := store.AlignDown(store.Now(), step)
 	start := end - int64(rng.Points-1)*step
 
 	conds := []string{"delete_time IS NULL", "granularity = ?", "bucket_time >= ?", "bucket_time <= ?"}

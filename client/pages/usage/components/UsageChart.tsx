@@ -9,6 +9,7 @@ import {
 } from "recharts";
 import { UsageStatsPeriod } from "../../../../shared/modules/usage/usage.interface";
 import { Locale } from "../../../methods/locale";
+import { statsParts } from "../../../methods/timezone";
 
 type Props = {
     today: UsageStatsPeriod;
@@ -16,18 +17,17 @@ type Props = {
     last7Days: UsageStatsPeriod;
 };
 
-function pad(n: number) {
-    return String(n).padStart(2, "0");
-}
-
+// Labels are rendered in the server's statistics zone, not the browser's: the
+// slots themselves were cut on that clock, so formatting them locally would
+// shift every tick away from the bucket it represents.
 function formatTodayMin(ts: number): string {
-    const d = new Date(ts);
-    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const p = statsParts(ts);
+    return `${p.hour}:${p.minute}`;
 }
 
 function formatWeekDay(ts: number): string {
-    const d = new Date(ts);
-    return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const p = statsParts(ts);
+    return `${p.month}-${p.day} ${p.hour}:${p.minute}`;
 }
 
 export function UsageChart({ today, last24h, last7Days }: Props) {

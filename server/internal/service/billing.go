@@ -122,11 +122,16 @@ func ModelPrices(db *sql.DB, alias string) (input, cache, output float64, err er
 	return 0, 0, 0, nil
 }
 
-// WeeklySpending — sums `1d` granularity only. (The TS version summed all
-// granularities for an account, triple-counting every dollar.)
+// WeeklySpending — the trailing 7-day spend used by the weekly limit gate.
+//
+// Sums 60m buckets, not the retired 1d rollup: the daily bucket was written at
+// insert time and could only answer "the day containing that row", so a window
+// that starts mid-day (as this one does) was approximated. Hourly rows carry
+// the real timestamp, so the cutoff is exact. (The original TS version summed
+// every granularity for an account, triple-counting each dollar.)
 func WeeklySpending(db *sql.DB, accountID string) (float64, error) {
 	since := store.Now() - 7*86_400_000
-	gran := "1d"
+	gran := "60m"
 	total, err := store.BucketSumCost(db, accountID, &gran, since, false)
 	if err != nil {
 		return 0, err

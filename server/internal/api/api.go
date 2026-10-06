@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"onekey/server/internal/ai"
 	"onekey/server/internal/httpx"
@@ -23,16 +24,21 @@ type App struct {
 	// Syncer is nil on the main node: a main database has nothing to push.
 	Syncer    *sync.Syncer
 	staticDir string
+	// statsLoc mirrors the store's stats clock so a handler can format a label
+	// without re-parsing the setting.
+	statsLoc *time.Location
 }
 
 func NewApp(db *sql.DB, settings *service.Settings, staticDir string, syncer *sync.Syncer) *App {
-	return &App{
+	a := &App{
 		DB:        db,
 		Settings:  settings,
 		AI:        ai.NewServer(db, settings),
 		Syncer:    syncer,
 		staticDir: staticDir,
 	}
+	a.ApplyStatsTimezone()
+	return a
 }
 
 // Routes — exact-path mux; any HTTP method is accepted (mounthttp behavior).
@@ -214,6 +220,10 @@ func (a *App) serveIndex(w http.ResponseWriter) {
 func (a *App) bootConfig() map[string]any {
 	return map[string]any{
 		"show_home_page": boolSetting(a.Settings.Get("show_home_page")),
+		// The zone the statistics boundaries were cut in. The browser otherwise
+		// formats every timestamp in its own zone, so an admin reading the panel
+		// from another region would see labels shifted against the buckets.
+		"timezone": a.StatsTimezoneName(),
 	}
 }
 

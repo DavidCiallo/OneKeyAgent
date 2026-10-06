@@ -10,6 +10,7 @@ import { Locale } from "../../methods/locale";
 import { Select, SelectItem, Button, ButtonGroup, Badge } from "@heroui/react";
 import { useAuth } from "../../methods/auth-context";
 import { UsageSessions } from "./components/UsageSessions";
+import { statsDayStart } from "../../methods/timezone";
 
 const GAP_OPTIONS = [
     { value: 1, label: "1min" },
@@ -29,12 +30,18 @@ const TIME_PRESETS = [
     { value: 30, label: "30d" },
 ] as const;
 
+/**
+ * The window start for a preset, in UTC milliseconds.
+ *
+ * "Today" is the stats-zone midnight, not the browser's: the server buckets its
+ * day on the configured clock, so a viewer in another zone asking for "today"
+ * must get the same window the server cut, or the first and last hours of it
+ * fall outside the data that exists.
+ */
 function computeSince(preset: number): number {
     const now = Date.now();
     if (preset === 0) {
-        const d = new Date();
-        d.setHours(0, 0, 0, 0);
-        return d.getTime();
+        return statsDayStart(now);
     }
     return now - preset * 86400000;
 }

@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"onekey/server/internal/api"
 	"onekey/server/internal/cryptox"
@@ -49,6 +51,13 @@ func main() {
 		fmt.Println("Failed to load settings:", err)
 		os.Exit(1)
 	}
+
+	// One clock for routing and for statistics. The stats path used to cut its
+	// day boundary in the container's zone, which is UTC in the shipped compose
+	// file — so a "today" or a 6h window started at 08:00 Beijing and every
+	// range above an hour was silently offset. routing_timezone is the operator's
+	// zone, so it is the one both now use.
+	applyStatsTimezone(settings)
 
 	cryptox.Init()
 
@@ -91,6 +100,20 @@ func main() {
 		fmt.Println("Server failed:", err)
 		os.Exit(1)
 	}
+}
+
+// applyStatsTimezone — point the store's calendar boundaries at the configured
+// zone. An unusable value falls back to the container's local zone, which is
+// what the process would have used anyway, so a typo degrades to the old
+// behaviour rather than to an arbitrary one.
+func applyStatsTimezone(settings *service.Settings) {
+	name := strings.TrimSpace(settings.Get("routing_timezone"))
+	loc := store.SetStatsLocation(name)
+	if loc == time.Local && name != "" && name != time.Local.String() {
+		fmt.Printf("[Init] routing_timezone %q is not a known zone; using the container local zone instead\n", name)
+		return
+	}
+	fmt.Printf("[Init] statistics and routing clock: %s\n", loc)
 }
 
 // seedAdmin — create ADMIN_NAME/EMAIL/PASSWORD account when configured.
