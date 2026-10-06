@@ -21,7 +21,8 @@
         "Subscription": "料金管理",
         "Audit": "監査",
         "NoContent": "アクセス権限がありません",
-        "Logout": "ログアウト"
+        "Logout": "ログアウト",
+        "Group": "グループ"
     },
     "ModelPage": {
         "Alias": "エイリアス",
@@ -102,7 +103,9 @@
         "Total": "合計",
         "Loading": "読み込み中...",
         "UserUsage": "ユーザー使用量",
-        "History": "履歴"
+        "History": "履歴",
+        "GroupFilter": "グループで絞り込み",
+        "GroupCount": "{n} グループ"
     },
     "AuthPage": {
         "Title": "EHEX",
@@ -296,5 +299,25 @@
         "Cost": "コスト",
         "Error": "エラー",
         "NoData": "データなし"
+    },
+    "GroupPage": {
+        "Title": "グループ",
+        "Name": "名前",
+        "Remark": "備考",
+        "Members": "メンバー",
+        "Actions": "操作",
+        "Add": "グループ追加",
+        "Edit": "編集",
+        "Delete": "削除",
+        "Cancel": "キャンセル",
+        "Save": "保存",
+        "Clear": "クリア",
+        "SelectAll": "すべて選択",
+        "SearchAccounts": "アカウントを検索",
+        "NoAccounts": "アカウントなし",
+        "Empty": "グループがありません",
+        "Loading": "読み込み中...",
+        "NameRequired": "名前を入力してください",
+        "DeleteConfirm": "このグループを削除しますか？アカウントは残り、グループ関係のみ削除されます。"
     }
 }

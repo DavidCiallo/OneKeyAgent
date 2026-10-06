@@ -5,7 +5,7 @@ import {
     UserSessionGroup,
     UserSession,
 } from "../../../shared/modules/usage/usage.interface";
-import { usageApi, accountApi, providerApi, modelApi } from "../../api/instance";
+import { usageApi, accountApi, providerApi, modelApi, groupApi } from "../../api/instance";
 import { Locale } from "../../methods/locale";
 import { Select, SelectItem, Button, ButtonGroup, Badge } from "@heroui/react";
 import { useAuth } from "../../methods/auth-context";
@@ -58,28 +58,34 @@ export default function UsagePage() {
     const [accounts, setAccounts] = useState<{ id: string; name: string; email: string }[]>([]);
     const [providers, setProviders] = useState<{ id: string; name: string }[]>([]);
     const [modelAliases, setModelAliases] = useState<string[]>([]);
+    // Available groups for the filter selector. Distinct from `groups`, which
+    // holds the aggregated session rows returned by the API.
+    const [groupOptions, setGroupOptions] = useState<{ id: string; name: string; member_count: number }[]>([]);
 
     // Draft selections (not yet applied)
     const [draftAccountIds, setDraftAccountIds] = useState<Set<string>>(new Set());
     const [draftModelAliases, setDraftModelAliases] = useState<Set<string>>(new Set());
     const [draftProviderIds, setDraftProviderIds] = useState<Set<string>>(new Set());
+    const [draftGroupIds, setDraftGroupIds] = useState<Set<string>>(new Set());
 
     // Applied selections (sent to server)
     const [appliedAccountIds, setAppliedAccountIds] = useState<Set<string>>(new Set());
     const [appliedModelAliases, setAppliedModelAliases] = useState<Set<string>>(new Set());
     const [appliedProviderIds, setAppliedProviderIds] = useState<Set<string>>(new Set());
+    const [appliedGroupIds, setAppliedGroupIds] = useState<Set<string>>(new Set());
 
     const [loading, setLoading] = useState(true);
     const admin = isAdmin();
     const [groupBy, setGroupBy] = useState<"provider" | "model">(admin ? "provider" : "model");
     const [valueType, setValueType] = useState<"tokens" | "cost">("tokens");
 
-    const filterCount = appliedAccountIds.size + appliedModelAliases.size + appliedProviderIds.size;
+    const filterCount = appliedAccountIds.size + appliedModelAliases.size + appliedProviderIds.size + appliedGroupIds.size;
 
     const hasDraftChanges =
         !setsEqual(draftAccountIds, appliedAccountIds) ||
         !setsEqual(draftModelAliases, appliedModelAliases) ||
-        !setsEqual(draftProviderIds, appliedProviderIds);
+        !setsEqual(draftProviderIds, appliedProviderIds) ||
+        !setsEqual(draftGroupIds, appliedGroupIds);
 
     // Fetch accounts list for admin selector
     useEffect(() => {
@@ -123,9 +129,23 @@ export default function UsagePage() {
         });
     }, []);
 
+    // Groups are an admin-only organisational filter: a non-admin only ever
+    // sees their own traffic, so the selector would be meaningless for them.
+    useEffect(() => {
+        if (!admin) return;
+        groupApi.list({}).then((res) => {
+            if (res.success && res.data) {
+                setGroupOptions(res.data.list.map((g: any) => ({
+                    id: g.id, name: g.name, member_count: g.member_count ?? 0,
+                })));
+            }
+        });
+    }, [admin]);
+
     const fetchSessions = useCallback(async (
         gap: number, preset: number,
         accountIds: Set<string>, modelAliases: Set<string>, providerIds: Set<string>,
+        groupIds: Set<string>,
     ) => {
         setLoading(true);
         const since = computeSince(preset);
@@ -135,6 +155,7 @@ export default function UsagePage() {
             account_ids: accountIds.size > 0 ? Array.from(accountIds) : undefined,
             model_aliases: modelAliases.size > 0 ? Array.from(modelAliases) : undefined,
             provider_ids: providerIds.size > 0 ? Array.from(providerIds) : undefined,
+            group_ids: groupIds.size > 0 ? Array.from(groupIds) : undefined,
         });
         if (res.success && res.data) {
             setGroups(res.data.list);
@@ -145,22 +166,25 @@ export default function UsagePage() {
     }, []);
 
     useEffect(() => {
-        fetchSessions(gapMinutes, timePreset, appliedAccountIds, appliedModelAliases, appliedProviderIds);
-    }, [gapMinutes, timePreset, appliedAccountIds, appliedModelAliases, appliedProviderIds, fetchSessions]);
+        fetchSessions(gapMinutes, timePreset, appliedAccountIds, appliedModelAliases, appliedProviderIds, appliedGroupIds);
+    }, [gapMinutes, timePreset, appliedAccountIds, appliedModelAliases, appliedProviderIds, appliedGroupIds, fetchSessions]);
 
     const applyFilters = () => {
         setAppliedAccountIds(new Set(draftAccountIds));
         setAppliedModelAliases(new Set(draftModelAliases));
         setAppliedProviderIds(new Set(draftProviderIds));
+        setAppliedGroupIds(new Set(draftGroupIds));
     };
 
     const clearFilters = () => {
         setDraftAccountIds(new Set());
         setDraftModelAliases(new Set());
         setDraftProviderIds(new Set());
+        setDraftGroupIds(new Set());
         setAppliedAccountIds(new Set());
         setAppliedModelAliases(new Set());
         setAppliedProviderIds(new Set());
+        setAppliedGroupIds(new Set());
     };
 
     return (
@@ -172,6 +196,34 @@ export default function UsagePage() {
                 ) : (
                     <div className="flex flex-col gap-3">
                         <div className="flex flex-wrap items-center gap-3">
+                            {admin && groupOptions.length > 0 && (
+                                <Select
+                                    size="sm"
+                                    className="w-64"
+                                    selectionMode="multiple"
+                                    selectedKeys={draftGroupIds}
+                                    onSelectionChange={(keys) => setDraftGroupIds(new Set(Array.from(keys).map(String)))}
+                                    placeholder={locale.GroupFilter || "Filter groups"}
+                                    aria-label={locale.GroupFilter || "Filter groups"}
+                                    renderValue={(items) => {
+                                        const selected = Array.from(items);
+                                        if (selected.length === 0) return <span className="text-default-400">{locale.GroupFilter || "Filter groups"}</span>;
+                                        if (selected.length === 1) {
+                                            const g = groupOptions.find(gr => gr.id === selected[0].key);
+                                            return <span>{g ? `${g.name} (${g.member_count})` : selected[0].textValue || selected[0].key}</span>;
+                                        }
+                                        return <span>{(locale.GroupCount || "{n} groups").replace("{n}", String(selected.length))}</span>;
+                                    }}
+                                >
+                                    {/* The count is the point: picking a group means
+                                        "show me these people's combined usage". */}
+                                    {groupOptions.map((g) => (
+                                        <SelectItem key={g.id} textValue={g.name}>
+                                            {`${g.name} (${g.member_count})`}
+                                        </SelectItem>
+                                    ))}
+                                </Select>
+                            )}
                             {admin && accounts.length > 0 && (
                                 <Select
                                     size="sm"

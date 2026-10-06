@@ -111,8 +111,9 @@ The server reads configuration from environment variables (see `.env.example`).
 
 - **Model Management** — add/edit/delete model aliases; set input / cached / output prices, public visibility; per-alias usage stats & charts
 - **Provider Management** — manage upstream providers: priority tier, base URL, upstream model, API key, auth type, API protocol (OpenAI / Anthropic / Gemini), proxy URL, thinking & reasoning-effort support, reasoning replay, search toggle, batch import
-- **Usage Analytics** — token & cost trends by time / model alias / provider; session list and provider bars
+- **Usage Analytics** — token & cost trends by time / model alias / provider; session list and provider bars; filter by account or by group
 - **Account Management** — users, role assignments, filters, pagination, and gift card management
+- **Account Groups** — label accounts into groups (an account can be in several), then filter the usage page by group to see the combined usage of its members. Groups are organisational only and are separate from the role-based permission system.
 - **Profile** — account info, view & regenerate API keys, accessible models
 - **Top-Up & Billing** — current plan, top-up packs, prepaid recharge, gift card redemption, crypto payment modal, statement history
 - **Settings** — system settings (configurable via env or admin UI)
@@ -146,7 +147,7 @@ Authentication accepts `Authorization: Bearer <key>`, `token: <key>` or `x-api-k
 
 ### Admin (Web panel)
 
-Admin APIs are mounted under `/api` (e.g. `/api/account`, `/api/role`, `/api/settings`, `/api/subscription`, `/api/gift_card`, `/api/telegram`) and return a unified envelope:
+Admin APIs are mounted under `/api` (e.g. `/api/account`, `/api/role`, `/api/group`, `/api/settings`, `/api/subscription`, `/api/gift_card`, `/api/telegram`) and return a unified envelope:
 
 ```json
 { "success": true, "data": { ... } }

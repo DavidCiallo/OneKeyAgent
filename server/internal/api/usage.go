@@ -412,6 +412,29 @@ func (a *winAcc) add(b *store.UsageBucket) {
 	m.Cost += b.Cost
 }
 
+// emptySessions — the response shape with no data, so a filtered-to-nothing
+// request still renders an empty chart rather than a blank page.
+func emptySessions() map[string]any {
+	return map[string]any{
+		"list": []any{}, "recentSessions": []any{},
+		"totals": map[string]any{
+			"totalTokens": 0, "totalInputTokens": 0, "totalCachedInputTokens": 0,
+			"totalOutputTokens": 0, "totalCost": 0, "totalRequests": 0,
+		},
+	}
+}
+
+// stringArr — the string members of a decoded JSON array, in order.
+func stringArr(arr []any) []string {
+	out := make([]string, 0, len(arr))
+	for _, v := range arr {
+		if s, ok := v.(string); ok && s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 func (a *App) usageSessions(c *httpx.Ctx) (any, error) {
 	if c.Auth == "" {
 		return nil, fmt.Errorf("Authorization failed")
@@ -443,6 +466,27 @@ func (a *App) usageSessions(c *httpx.Ctx) (any, error) {
 		accountSet = map[string]bool{account.ID: true}
 		aid := account.ID
 		accountFilter = &aid
+	} else if groupIDs := stringArr(c.Arr("group_ids")); len(groupIDs) > 0 {
+		// A group filter is resolved to its member accounts and then treated
+		// exactly like an account selection. Resolving here rather than in the
+		// bucket query keeps the aggregate unchanged: usage_bucket stores an
+		// account id, not a group, so a group is only ever a set of accounts.
+		// An account in two selected groups resolves once (DISTINCT), which is
+		// what stops its traffic being counted twice.
+		members, err := store.AccountGroupMemberIDsMany(a.DB, groupIDs)
+		if err != nil {
+			return nil, err
+		}
+		if len(members) == 0 {
+			// The group exists but has no accounts. Returning the empty shape is
+			// more honest than falling through to "no filter", which would show
+			// the whole instance's usage under a group heading.
+			return emptySessions(), nil
+		}
+		accountSet = map[string]bool{}
+		for _, id := range members {
+			accountSet[id] = true
+		}
 	} else if ids := c.Arr("account_ids"); len(ids) > 0 {
 		accountSet = map[string]bool{}
 		for _, v := range ids {
@@ -510,13 +554,7 @@ func (a *App) usageSessions(c *httpx.Ctx) (any, error) {
 		return nil, err
 	}
 
-	empty := map[string]any{
-		"list": []any{}, "recentSessions": []any{},
-		"totals": map[string]any{
-			"totalTokens": 0, "totalInputTokens": 0, "totalCachedInputTokens": 0,
-			"totalOutputTokens": 0, "totalCost": 0, "totalRequests": 0,
-		},
-	}
+	empty := emptySessions()
 	if len(byAccount) == 0 {
 		return empty, nil
 	}

@@ -94,6 +94,15 @@ func (a *App) Routes() *http.ServeMux {
 		{"/api/role/delete", a.wrap(a.roleDelete)},
 		{"/api/role/assign", a.wrap(a.roleAssign)},
 		{"/api/role/account_roles", a.wrap(a.roleAccountRoles)},
+		// account group
+		{"/api/group/list", a.wrap(a.groupList)},
+		{"/api/group/detail", a.wrap(a.groupDetail)},
+		{"/api/group/create", a.wrap(a.groupCreate)},
+		{"/api/group/update", a.wrap(a.groupUpdate)},
+		{"/api/group/delete", a.wrap(a.groupDelete)},
+		{"/api/group/assign", a.wrap(a.groupAssignMembers)},
+		{"/api/group/account_groups", a.wrap(a.groupAccountGroups)},
+		{"/api/group/set_account_groups", a.wrap(a.groupSetAccountGroups)},
 		// settings
 		{"/api/settings/list", a.wrap(a.settingsList)},
 		{"/api/settings/save", a.wrap(a.settingsSave)},

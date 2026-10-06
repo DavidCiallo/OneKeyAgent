@@ -34,6 +34,7 @@ type refEntry[T any] struct {
 // very traffic it exists to speed up.
 var refTables = map[string]bool{
 	"model": true, "provider": true, "role": true, "account_role": true,
+	"account_group": true, "account_group_member": true,
 }
 
 var refCache = struct {

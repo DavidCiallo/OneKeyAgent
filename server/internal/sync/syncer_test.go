@@ -285,6 +285,82 @@ func TestSnapshotExcludesSoftDeleted(t *testing.T) {
 	}
 }
 
+// TestAccountGroupsSyncToReplica — a group created on the main database must
+// reach a replica, and a membership edited on the replica must reach main.
+//
+// Both directions matter for this table: the group list is reference data that
+// the usage page reads on whichever node answers, while membership is edited
+// from the admin UI, which may well be talking to a replica.
+func TestAccountGroupsSyncToReplica(t *testing.T) {
+	t.Setenv("SYNC_SECRET", "test-secret")
+	t.Setenv("NODE_ID", "replica-group")
+
+	main := newMain(t)
+	replica := newReplica(t, main.srv.URL)
+	syncer := replica.app.Syncer
+
+	if _, err := store.GenericInsert(main.db, "account", map[string]any{
+		"id": "acc1", "name": "ann", "email": "ann@example.com", "api_key": "sk-ann",
+	}); err != nil {
+		t.Fatalf("seed account: %v", err)
+	}
+	g, err := store.AccountGroupCreate(main.db, "support", "first line")
+	if err != nil {
+		t.Fatalf("create group: %v", err)
+	}
+	if err := syncer.Refresh(); err != nil {
+		t.Fatalf("refresh: %v", err)
+	}
+
+	// The group itself arrived.
+	got, err := store.AccountGroupFindOne(replica.db, g.ID)
+	if err != nil {
+		t.Fatalf("group did not reach the replica: %v", err)
+	}
+	if got.Name != "support" || got.Remark != "first line" {
+		t.Fatalf("replica group = %+v", got)
+	}
+
+	// A membership added on the replica travels back to main.
+	if err := store.AccountGroupAssignMembers(replica.db, g.ID, []string{"acc1"}); err != nil {
+		t.Fatalf("assign on replica: %v", err)
+	}
+	if err := syncer.Flush(); err != nil {
+		t.Fatalf("flush: %v", err)
+	}
+	members, err := store.AccountGroupMemberIDs(main.db, g.ID)
+	if err != nil {
+		t.Fatalf("members on main: %v", err)
+	}
+	if len(members) != 1 || members[0] != "acc1" {
+		t.Fatalf("membership did not reach main: %v", members)
+	}
+
+	// Re-adding the same pair on the replica must not create a second row on
+	// main: the membership matches on (group_id, account_id), which is the
+	// unique index that stops a duplicate from double-counting the account.
+	if err := store.AccountGroupAssignMembers(replica.db, g.ID, []string{"acc1"}); err != nil {
+		t.Fatalf("re-assign on replica: %v", err)
+	}
+	if err := syncer.Flush(); err != nil {
+		t.Fatalf("flush 2: %v", err)
+	}
+	if members, err := store.AccountGroupMemberIDs(main.db, g.ID); err != nil || len(members) != 1 {
+		t.Fatalf("re-adding produced %d rows on main (err %v), want 1", len(members), err)
+	}
+
+	// A departure has to travel too, or main keeps counting that account.
+	if err := store.AccountGroupAssignMembers(replica.db, g.ID, nil); err != nil {
+		t.Fatalf("clear on replica: %v", err)
+	}
+	if err := syncer.Flush(); err != nil {
+		t.Fatalf("flush 3: %v", err)
+	}
+	if members, err := store.AccountGroupMemberIDs(main.db, g.ID); err != nil || len(members) != 0 {
+		t.Fatalf("removal did not reach main: %v (err %v)", members, err)
+	}
+}
+
 func readData(t *testing.T, resp *http.Response) map[string]any {
 	t.Helper()
 	var env struct {

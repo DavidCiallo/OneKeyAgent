@@ -21,7 +21,8 @@
         "Subscription": "ค่าใช้จ่าย",
         "Audit": "การตรวจสอบ",
         "NoContent": "ไม่มีเนื้อหา",
-        "Logout": "ออกจากระบบ"
+        "Logout": "ออกจากระบบ",
+        "Group": "กลุ่ม"
     },
     "ModelPage": {
         "Alias": "นามแฝง",
@@ -99,7 +100,9 @@
         "Total": "รวม",
         "Loading": "กำลังโหลด...",
         "UserUsage": "การใช้งานของผู้ใช้",
-        "History": "ประวัติ"
+        "History": "ประวัติ",
+        "GroupFilter": "กรองกลุ่ม",
+        "GroupCount": "{n} กลุ่ม"
     },
     "AuthPage": {
         "Title": "EHEX",
@@ -293,5 +296,25 @@
         "Cost": "ค่าใช้จ่าย",
         "Error": "ข้อผิดพลาด",
         "NoData": "ไม่มีข้อมูล"
+    },
+    "GroupPage": {
+        "Title": "กลุ่ม",
+        "Name": "ชื่อ",
+        "Remark": "หมายเหตุ",
+        "Members": "สมาชิก",
+        "Actions": "การดำเนินการ",
+        "Add": "เพิ่มกลุ่ม",
+        "Edit": "แก้ไข",
+        "Delete": "ลบ",
+        "Cancel": "ยกเลิก",
+        "Save": "บันทึก",
+        "Clear": "ล้าง",
+        "SelectAll": "เลือกทั้งหมด",
+        "SearchAccounts": "ค้นหาบัญชี",
+        "NoAccounts": "ไม่มีบัญชี",
+        "Empty": "ยังไม่มีกลุ่ม",
+        "Loading": "กำลังโหลด...",
+        "NameRequired": "ต้องระบุชื่อ",
+        "DeleteConfirm": "ลบกลุ่มนี้หรือไม่ บัญชีจะยังอยู่ ลบเฉพาะการจัดกลุ่ม"
     }
 }

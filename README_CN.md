@@ -111,8 +111,9 @@ bun run serve    # 启动服务（server/app/index.ts）
 
 - **模型管理** — 增删改模型别名；设置输入 / 缓存 / 输出价格、公开可见性；按别名的用量统计与图表
 - **供应商管理** — 管理上游供应商：优先级、BaseURL、上游模型、API Key、认证类型、接口协议（OpenAI / Anthropic / Gemini）、代理 URL、思考模式 / 推理强度开关、思维重放、联网搜索、批量导入
-- **用量统计** — 按时间 / 模型别名 / 供应商查看 Token 与费用趋势；会话列表与供应商占比
+- **用量统计** — 按时间 / 模型别名 / 供应商查看 Token 与费用趋势；会话列表与供应商占比；支持按账号或按分组筛选
 - **账号管理** — 用户列表、角色分配、筛选分页、礼品卡管理
+- **账号分组** — 给账号打上分组标签（一个账号可属于多个分组），在用量统计页按分组筛选即可查看该分组全部成员的合计用量。分组仅用于组织归类，与角色权限体系相互独立。
 - **账户信息** — 账号资料、查看与重新生成 API Key、可用模型列表
 - **费用管理** — 当前套餐、充值套餐包、预充值、礼品卡兑换、加密支付弹窗、账单流水
 - **系统设置** — 系统配置（可通过环境变量或后台 UI 修改）
@@ -146,7 +147,7 @@ x-api-key: <你的API Key>
 
 ### 管理接口（Web 后台）
 
-管理 API 同样挂载在 `/api` 下（如 `/api/account`、`/api/role`、`/api/settings`、`/api/subscription`、`/api/gift_card`、`/api/telegram`），返回统一格式：
+管理 API 同样挂载在 `/api` 下（如 `/api/account`、`/api/role`、`/api/group`、`/api/settings`、`/api/subscription`、`/api/gift_card`、`/api/telegram`），返回统一格式：
 
 ```json
 { "success": true, "data": { ... } }
