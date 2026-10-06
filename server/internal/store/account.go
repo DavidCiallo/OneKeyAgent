@@ -237,6 +237,8 @@ var updatable = map[string][]string{
 	"settings": {"key", "value"},
 	"gift_card": {"code", "token_amount", "status", "redeemed_by", "redeemed_at"},
 	"account_role": {"account_id", "role_id"},
+	"account_group": {"name", "remark"},
+	"account_group_member": {"group_id", "account_id"},
 	"usage_bucket": {"account_id", "model_alias", "provider_id", "bucket_time", "granularity", "input_tokens", "cached_input_tokens", "output_tokens", "cost", "request_count", "duration_ms", "ttft_ms", "ttft_count"},
 	"transaction": {"account_id", "txid", "amount", "confirmations", "status", "payment_id", "type"},
 	"session_reasoning": {"session_key", "tool_call_id", "reasoning_content"},

@@ -22,7 +22,8 @@
         "Settings": "系统设置",
         "Audit": "请求审计",
         "NoContent": "未授权",
-        "Logout": "退出登录"
+        "Logout": "退出登录",
+        "Group": "分组"
     },
     "ModelPage": {
         "Alias": "别名",
@@ -107,7 +108,9 @@
         "Total": "总用量",
         "Loading": "加载中...",
         "UserUsage": "用户用量",
-        "History": "历史记录"
+        "History": "历史记录",
+        "GroupFilter": "筛选分组",
+        "GroupCount": "{n} 个分组"
     },
     "AuthPage": {
         "Title": "EHEX",
@@ -301,5 +304,25 @@
         "Cost": "费用",
         "Error": "错误",
         "NoData": "暂无数据"
+    },
+    "GroupPage": {
+        "Title": "分组",
+        "Name": "名称",
+        "Remark": "备注",
+        "Members": "成员",
+        "Actions": "操作",
+        "Add": "新增分组",
+        "Edit": "编辑",
+        "Delete": "删除",
+        "Cancel": "取消",
+        "Save": "保存",
+        "Clear": "清空",
+        "SelectAll": "全选",
+        "SearchAccounts": "搜索账号",
+        "NoAccounts": "没有账号",
+        "Empty": "暂无分组",
+        "Loading": "加载中...",
+        "NameRequired": "请填写名称",
+        "DeleteConfirm": "确定删除该分组？账号会保留，仅移除分组关系。"
     }
 }

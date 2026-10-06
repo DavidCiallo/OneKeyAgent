@@ -16,6 +16,7 @@ import NoContentPage from "./pages/nocontent/NoContentPage";
 import TopupPage from "./pages/topup/TopupPage";
 import SettingsPage from "./pages/settings/SettingsPage";
 import AuditPage from "./pages/audit/AuditPage";
+import GroupPage from "./pages/group/GroupPage";
 import { authApi } from "./api/instance";
 import { AuthProvider, useAuth } from "./methods/auth-context";
 
@@ -93,6 +94,7 @@ const AppRoutes = () => {
                 <Route path="/provider" element={<ProtectedRoute name="provider"><ProviderPage /></ProtectedRoute>} />
                 <Route path="/usage" element={<ProtectedRoute name="usage"><UsagePage /></ProtectedRoute>} />
                 <Route path="/account" element={<ProtectedRoute name="account"><AccountPage /></ProtectedRoute>} />
+                <Route path="/group" element={<ProtectedRoute name="group"><GroupPage /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute name="profile"><ProfilePage /></ProtectedRoute>} />
                 <Route path="/subscription" element={<ProtectedRoute name="subscription"><TopupPage /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute name="settings"><SettingsPage /></ProtectedRoute>} />

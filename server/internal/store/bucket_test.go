@@ -53,8 +53,18 @@ func TestBucketLogUsageAccumulates(t *testing.T) {
 	if err := rows.Err(); err != nil {
 		t.Fatalf("rows: %v", err)
 	}
-	if seen != 3 {
-		t.Fatalf("got %d granularity rows, want 3 (1m/60m/1d)", seen)
+	if seen != 2 {
+		t.Fatalf("got %d granularity rows, want 2 (1m/60m)", seen)
+	}
+
+	// The retired 1d rollup must not be written: it collapsed a day into one row
+	// at insert time, which is what made coarse ranges unable to show real shape.
+	var daily int64
+	if err := db.QueryRow("SELECT COUNT(*) FROM usage_bucket WHERE granularity = '1d'").Scan(&daily); err != nil {
+		t.Fatalf("count 1d: %v", err)
+	}
+	if daily != 0 {
+		t.Fatalf("wrote %d daily buckets, want none", daily)
 	}
 }
 
@@ -133,10 +143,8 @@ func TestPurgeExpiredBuckets(t *testing.T) {
 	}
 	insert("old-1m", "1m", now-8*86_400_000)     // past the 7d 1m TTL
 	insert("new-1m", "1m", now-1*3_600_000)      // fresh
-	insert("old-60m", "60m", now-100*86_400_000) // past the 90d 60m TTL
+	insert("old-60m", "60m", now-500*86_400_000) // past the 400d 60m TTL
 	insert("new-60m", "60m", now-86_400_000)     // fresh
-	insert("old-1d", "1d", now-800*86_400_000)   // past the 730d 1d TTL
-	insert("new-1d", "1d", now-86_400_000)       // fresh
 
 	if err := PurgeExpiredBuckets(db); err != nil {
 		t.Fatalf("purge: %v", err)
@@ -148,7 +156,6 @@ func TestPurgeExpiredBuckets(t *testing.T) {
 	}{
 		{"old-1m", false}, {"new-1m", true},
 		{"old-60m", false}, {"new-60m", true},
-		{"old-1d", false}, {"new-1d", true},
 	} {
 		var n int64
 		if err := db.QueryRow("SELECT COUNT(*) FROM usage_bucket WHERE id = ?", tc.id).Scan(&n); err != nil {

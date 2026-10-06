@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"onekey/server/internal/ai"
 	"onekey/server/internal/httpx"
@@ -23,16 +24,21 @@ type App struct {
 	// Syncer is nil on the main node: a main database has nothing to push.
 	Syncer    *sync.Syncer
 	staticDir string
+	// statsLoc mirrors the store's stats clock so a handler can format a label
+	// without re-parsing the setting.
+	statsLoc *time.Location
 }
 
 func NewApp(db *sql.DB, settings *service.Settings, staticDir string, syncer *sync.Syncer) *App {
-	return &App{
+	a := &App{
 		DB:        db,
 		Settings:  settings,
 		AI:        ai.NewServer(db, settings),
 		Syncer:    syncer,
 		staticDir: staticDir,
 	}
+	a.ApplyStatsTimezone()
+	return a
 }
 
 // Routes — exact-path mux; any HTTP method is accepted (mounthttp behavior).
@@ -88,6 +94,15 @@ func (a *App) Routes() *http.ServeMux {
 		{"/api/role/delete", a.wrap(a.roleDelete)},
 		{"/api/role/assign", a.wrap(a.roleAssign)},
 		{"/api/role/account_roles", a.wrap(a.roleAccountRoles)},
+		// account group
+		{"/api/group/list", a.wrap(a.groupList)},
+		{"/api/group/detail", a.wrap(a.groupDetail)},
+		{"/api/group/create", a.wrap(a.groupCreate)},
+		{"/api/group/update", a.wrap(a.groupUpdate)},
+		{"/api/group/delete", a.wrap(a.groupDelete)},
+		{"/api/group/assign", a.wrap(a.groupAssignMembers)},
+		{"/api/group/account_groups", a.wrap(a.groupAccountGroups)},
+		{"/api/group/set_account_groups", a.wrap(a.groupSetAccountGroups)},
 		// settings
 		{"/api/settings/list", a.wrap(a.settingsList)},
 		{"/api/settings/save", a.wrap(a.settingsSave)},
@@ -214,6 +229,10 @@ func (a *App) serveIndex(w http.ResponseWriter) {
 func (a *App) bootConfig() map[string]any {
 	return map[string]any{
 		"show_home_page": boolSetting(a.Settings.Get("show_home_page")),
+		// The zone the statistics boundaries were cut in. The browser otherwise
+		// formats every timestamp in its own zone, so an admin reading the panel
+		// from another region would see labels shifted against the buckets.
+		"timezone": a.StatsTimezoneName(),
 	}
 }
 

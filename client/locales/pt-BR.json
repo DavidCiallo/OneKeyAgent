@@ -21,7 +21,8 @@
         "Subscription": "Faturamento",
         "Audit": "Auditoria",
         "NoContent": "Sem acesso",
-        "Logout": "Sair"
+        "Logout": "Sair",
+        "Group": "Grupos"
     },
     "ModelPage": {
         "Alias": "Apelido",
@@ -102,7 +103,9 @@
         "Total": "Total",
         "Loading": "Carregando...",
         "UserUsage": "Uso do usuário",
-        "History": "Histórico"
+        "History": "Histórico",
+        "GroupFilter": "Filtrar grupos",
+        "GroupCount": "{n} grupos"
     },
     "AuthPage": {
         "Title": "EHEX",
@@ -296,5 +299,25 @@
         "Cost": "Custo",
         "Error": "Erro",
         "NoData": "Sem dados"
+    },
+    "GroupPage": {
+        "Title": "Grupos",
+        "Name": "Nome",
+        "Remark": "Observação",
+        "Members": "Membros",
+        "Actions": "Ações",
+        "Add": "Adicionar grupo",
+        "Edit": "Editar",
+        "Delete": "Excluir",
+        "Cancel": "Cancelar",
+        "Save": "Salvar",
+        "Clear": "Limpar",
+        "SelectAll": "Selecionar tudo",
+        "SearchAccounts": "Buscar contas",
+        "NoAccounts": "Sem contas",
+        "Empty": "Ainda não há grupos",
+        "Loading": "Carregando...",
+        "NameRequired": "O nome é obrigatório",
+        "DeleteConfirm": "Excluir este grupo? As contas permanecem; apenas o agrupamento é removido."
     }
 }

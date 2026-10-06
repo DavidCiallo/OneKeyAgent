@@ -5,6 +5,7 @@ import {
 import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell } from "@heroui/react";
 import { UsageSessionTotals, UserSessionGroup, UserSession, ProviderUsage, ModelUsage } from "../../../../shared/modules/usage/usage.interface";
 import { stringToColor, fmtM, fmtK, format24Time, stripEmail } from "./utils";
+import { statsParts, statsAlignDown } from "../../../methods/timezone";
 
 type Props = {
     groups: UserSessionGroup[];
@@ -42,13 +43,9 @@ function getActiveKeys(
 }
 
 function formatChartLabel(ts: number, showDate: boolean): string {
-    const d = new Date(ts);
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mm = String(d.getMinutes()).padStart(2, "0");
-    if (!showDate) return `${hh}:${mm}`;
-    const M = String(d.getMonth() + 1).padStart(2, "0");
-    const DD = String(d.getDate()).padStart(2, "0");
-    return `${M}/${DD} ${hh}:${mm}`;
+    const p = statsParts(ts);
+    if (!showDate) return `${p.hour}:${p.minute}`;
+    return `${p.month}/${p.day} ${p.hour}:${p.minute}`;
 }
 
 function buildChartData(
@@ -64,7 +61,12 @@ function buildChartData(
     for (const s of sessions) sessionMap.set(s.startTime, s);
 
     const now = Date.now();
-    const minTime = since ? Math.floor(since / gapMs) * gapMs : (sessions.length > 0 ? sessions[0].startTime : 0);
+    // Slot boundaries come from the server already aligned, but the walk between
+    // them starts at the requested `since`, so align it the same way or every
+    // row would sit at an offset the server never produced.
+    const minTime = since
+        ? statsAlignDown(since, gapMs)
+        : (sessions.length > 0 ? sessions[0].startTime : 0);
     const maxTime = since ? now : (sessions.length > 0 ? sessions[sessions.length - 1].startTime : 0);
 
     if (minTime === 0) return [];

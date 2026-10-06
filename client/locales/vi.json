@@ -21,7 +21,8 @@
         "Subscription": "Quản lý phí",
         "Audit": "Kiểm toán",
         "NoContent": "Không có nội dung",
-        "Logout": "Đăng xuất"
+        "Logout": "Đăng xuất",
+        "Group": "Nhóm"
     },
     "ModelPage": {
         "Alias": "Bí danh",
@@ -99,7 +100,9 @@
         "Total": "Tổng",
         "Loading": "Đang tải...",
         "UserUsage": "Sử dụng của người dùng",
-        "History": "Lịch sử"
+        "History": "Lịch sử",
+        "GroupFilter": "Lọc nhóm",
+        "GroupCount": "{n} nhóm"
     },
     "AuthPage": {
         "Title": "EHEX",
@@ -293,5 +296,25 @@
         "Cost": "Chi phí",
         "Error": "Lỗi",
         "NoData": "Không có dữ liệu"
+    },
+    "GroupPage": {
+        "Title": "Nhóm",
+        "Name": "Tên",
+        "Remark": "Ghi chú",
+        "Members": "Thành viên",
+        "Actions": "Thao tác",
+        "Add": "Thêm nhóm",
+        "Edit": "Sửa",
+        "Delete": "Xóa",
+        "Cancel": "Hủy",
+        "Save": "Lưu",
+        "Clear": "Xóa hết",
+        "SelectAll": "Chọn tất cả",
+        "SearchAccounts": "Tìm tài khoản",
+        "NoAccounts": "Không có tài khoản",
+        "Empty": "Chưa có nhóm",
+        "Loading": "Đang tải...",
+        "NameRequired": "Cần nhập tên",
+        "DeleteConfirm": "Xóa nhóm này? Tài khoản vẫn giữ, chỉ bỏ phân nhóm."
     }
 }

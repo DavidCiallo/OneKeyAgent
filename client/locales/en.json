@@ -22,7 +22,8 @@
         "Settings": "Settings",
         "Audit": "Audit",
         "NoContent": "No Content",
-        "Logout": "Logout"
+        "Logout": "Logout",
+        "Group": "Groups"
     },
     "ModelPage": {
         "Alias": "Alias",
@@ -104,7 +105,9 @@
         "Total": "Total",
         "Loading": "Loading...",
         "UserUsage": "User Usage",
-        "History": "History"
+        "History": "History",
+        "GroupFilter": "Filter groups",
+        "GroupCount": "{n} groups"
     },
     "AuthPage": {
         "Title": "EHEX",
@@ -299,5 +302,25 @@
         "Cost": "Cost",
         "Error": "Error",
         "NoData": "No data"
+    },
+    "GroupPage": {
+        "Title": "Groups",
+        "Name": "Name",
+        "Remark": "Remark",
+        "Members": "Members",
+        "Actions": "Actions",
+        "Add": "Add Group",
+        "Edit": "Edit",
+        "Delete": "Delete",
+        "Cancel": "Cancel",
+        "Save": "Save",
+        "Clear": "Clear",
+        "SelectAll": "Select all",
+        "SearchAccounts": "Search accounts",
+        "NoAccounts": "No accounts",
+        "Empty": "No groups yet",
+        "Loading": "Loading...",
+        "NameRequired": "Name is required",
+        "DeleteConfirm": "Delete this group? Accounts stay; only the grouping is removed."
     }
 }

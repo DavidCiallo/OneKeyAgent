@@ -16,10 +16,16 @@ import (
 
 // ─────────────────────────── Settings ───────────────────────────
 
-// DefaultRoutingTimezone — the clock used for provider active windows and for
-// the per-day request counters. It is deliberately independent of the
-// container's TZ (the compose file leaves that at UTC): an operator writing
-// "00:00-08:00" means their own midnight, not 08:00 Beijing.
+// DefaultRoutingTimezone — the clock used for provider active windows, the
+// per-hour request counters, and every calendar boundary in the statistics path
+// (the "today" range, day rollups and chart slots). It is deliberately
+// independent of the container's TZ (the compose file leaves that at UTC): an
+// operator writing "00:00-08:00" means their own midnight, not 08:00 Beijing,
+// and a 6h usage window must start at their midnight for the same reason.
+//
+// Routing and statistics share this one value on purpose. They were separate
+// clocks, and the stats side silently fell back to the container zone — which is
+// why every range above an hour read as if the day started at 08:00.
 const DefaultRoutingTimezone = "Asia/Shanghai"
 
 // settingKeys: key → env fallback (settings.service.ts).

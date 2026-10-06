@@ -463,5 +463,21 @@ func (a *App) settingsSave(c *httpx.Ctx) (any, error) {
 	if err := a.Settings.SetMany(a.DB, pairs); err != nil {
 		return nil, err
 	}
+	// A timezone change re-cuts the day boundary for every subsequent bucket and
+	// every "today" range, so it has to reach the stats clock before the next
+	// request rather than at the next restart.
+	a.ApplyStatsTimezone()
 	return map[string]any{}, nil
 }
+
+// ApplyStatsTimezone — push routing_timezone into the store's stats clock. The
+// startup path and the settings controller both call it; an unknown zone leaves
+// the container's local zone in place.
+func (a *App) ApplyStatsTimezone() {
+	loc := store.SetStatsLocation(a.Settings.Get("routing_timezone"))
+	a.statsLoc = loc
+}
+
+// StatsTimezoneName — the zone name the client needs to render labels in the
+// same clock the server cut its buckets in.
+func (a *App) StatsTimezoneName() string { return a.Settings.Get("routing_timezone") }

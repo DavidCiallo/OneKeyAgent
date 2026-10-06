@@ -107,6 +107,24 @@ var tables = []tableDef{
 		{"update_time", "INTEGER"},
 		{"delete_time", "INTEGER"},
 	}},
+	{"account_group", []colDef{
+		{"id", "TEXT PRIMARY KEY"},
+		{"name", "TEXT NOT NULL DEFAULT ''"},
+		{"remark", "TEXT NOT NULL DEFAULT ''"},
+		{"create_time", "INTEGER NOT NULL DEFAULT 0"},
+		{"update_time", "INTEGER"},
+		{"delete_time", "INTEGER"},
+	}},
+	// One row per (group, account). Multi-group on purpose: an account can be in
+	// both "support" and "vip", and a usage filter on either group must find it.
+	{"account_group_member", []colDef{
+		{"id", "TEXT PRIMARY KEY"},
+		{"group_id", "TEXT NOT NULL DEFAULT ''"},
+		{"account_id", "TEXT NOT NULL DEFAULT ''"},
+		{"create_time", "INTEGER NOT NULL DEFAULT 0"},
+		{"update_time", "INTEGER"},
+		{"delete_time", "INTEGER"},
+	}},
 	{"settings", []colDef{
 		{"id", "TEXT PRIMARY KEY"},
 		{"key", "TEXT NOT NULL DEFAULT ''"},
@@ -245,6 +263,17 @@ var indexes = []string{
 	`CREATE INDEX IF NOT EXISTS idx_provider_alias_enabled ON provider(model_alias, enabled)`,
 	`CREATE INDEX IF NOT EXISTS idx_role_name_type ON role(name, type)`,
 	`CREATE INDEX IF NOT EXISTS idx_account_role_account ON account_role(account_id)`,
+	// A group name must be unique among LIVE groups only. A plain unique index
+	// would let a soft-deleted group keep squatting its name forever, so the
+	// admin could never reuse a name after deleting it — and the delete would
+	// look successful while the create kept failing on the index.
+	`CREATE UNIQUE INDEX IF NOT EXISTS idx_account_group_name ON account_group(name) WHERE delete_time IS NULL`,
+	`CREATE INDEX IF NOT EXISTS idx_group_member_account ON account_group_member(account_id)`,
+	// A usage filter resolves a group to its members, so that direction is the
+	// hot one. Unique so re-adding an existing member cannot double-count every
+	// row the account contributed to a group total — again over live rows only,
+	// or a removed member could never be added back.
+	`CREATE UNIQUE INDEX IF NOT EXISTS idx_group_member_pair ON account_group_member(group_id, account_id) WHERE delete_time IS NULL`,
 	`CREATE UNIQUE INDEX IF NOT EXISTS idx_settings_key ON settings(key)`,
 	`CREATE INDEX IF NOT EXISTS idx_bucket_gt ON usage_bucket(granularity, bucket_time)`,
 	`CREATE INDEX IF NOT EXISTS idx_bucket_acct ON usage_bucket(account_id, granularity, bucket_time)`,
@@ -299,6 +328,19 @@ func Open(path string) (*sql.DB, error) {
 	if err := purgeLegacyAuditBodies(db); err != nil {
 		return nil, err
 	}
+	if err := purgeDailyBuckets(db); err != nil {
+		return nil, err
+	}
+	// Drop the group indexes before recreating them: both were first shipped as
+	// plain (non-partial) unique indexes, and CREATE ... IF NOT EXISTS would
+	// silently keep the old definition, leaving a deleted group's name
+	// permanently unusable. Dropping first converges an upgraded database on the
+	// partial form.
+	for _, name := range []string{"idx_account_group_name", "idx_group_member_pair"} {
+		if _, err := db.Exec("DROP INDEX IF EXISTS " + name); err != nil {
+			return nil, fmt.Errorf("drop index %s: %w", name, err)
+		}
+	}
 	for _, stmt := range indexes {
 		if _, err := db.Exec(stmt); err != nil {
 			return nil, fmt.Errorf("index: %w", err)
@@ -348,6 +390,18 @@ func purgeLegacyAuditBodies(db *sql.DB) error {
 		return err
 	}
 	return SetNodeState(db, auditBodiesPurgedKey, "1")
+}
+
+// purgeDailyBuckets — drop the retired 1d granularity, once.
+//
+// BucketLogUsage no longer writes a daily rollup: it collapsed each day into a
+// single row at insert time, which capped what any chart above an hour could
+// honestly show. Leaving the old rows behind would be worse than useless — the
+// stats path aggregates 60m now, so a surviving 1d row would either be ignored
+// or double-count against the very hours it summarises.
+func purgeDailyBuckets(db *sql.DB) error {
+	_, err := db.Exec("DELETE FROM usage_bucket WHERE granularity = '1d'")
+	return err
 }
 
 // dedupeBucketRows merges usage_bucket rows that share a window, keeping the

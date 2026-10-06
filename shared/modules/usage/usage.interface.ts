@@ -171,6 +171,13 @@ export class UsageSessionsRequest implements BaseRequest {
     public account_ids?: string[];
     public model_aliases?: string[];
     public provider_ids?: string[];
+    /**
+     * Account groups to include. Resolved server-side to their member accounts;
+     * an account in two selected groups is counted once. Combines with the
+     * other filters, and is ignored for a non-admin, who only ever sees their
+     * own traffic.
+     */
+    public group_ids?: string[];
 
     constructor(origin: Partial<UsageSessionsRequest>) {
         if (false) throw new Error("Unexpected error");
@@ -180,6 +187,7 @@ export class UsageSessionsRequest implements BaseRequest {
         origin.account_ids && (this.account_ids = origin.account_ids);
         origin.model_aliases && (this.model_aliases = origin.model_aliases);
         origin.provider_ids && (this.provider_ids = origin.provider_ids);
+        origin.group_ids && (this.group_ids = origin.group_ids);
     }
     static self(unsafe: UsageSessionsRequest) {
         return new UsageSessionsRequest(unsafe);

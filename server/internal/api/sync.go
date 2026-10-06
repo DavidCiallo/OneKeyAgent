@@ -33,6 +33,8 @@ var syncTables = []struct {
 	{"provider", "providers", false},
 	{"role", "roles", false},
 	{"account_role", "account_roles", false},
+	{"account_group", "account_groups", false},
+	{"account_group_member", "account_group_members", false},
 	{"settings", "settings", false},
 	{"gift_card", "gift_cards", false},
 	{"usage_bucket", "usage_buckets", false},

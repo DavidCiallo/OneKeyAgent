@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"onekey/server/internal/cryptox"
@@ -98,7 +99,6 @@ func BucketLogUsage(db *sql.DB, u BucketLogInput) error {
 	now := Now()
 	b1m := (now / 60_000) * 60_000
 	b60m := (now / 3_600_000) * 3_600_000
-	b1d := LocalMidnight(now)
 
 	// A first token is only visible on the streaming path, so a request that
 	// reported none is not part of the ttft_ms average.
@@ -107,7 +107,14 @@ func BucketLogUsage(db *sql.DB, u BucketLogInput) error {
 		ttftCount = 1
 	}
 
-	for _, gt := range [][2]any{{b1m, "1m"}, {b60m, "60m"}, {b1d, "1d"}} {
+	// Only 1m and 60m are written. There used to be a 1d bucket, but it
+	// collapsed a whole day into one row at write time, which made "6h
+	// granularity" impossible to answer honestly: the query side could only
+	// spread the daily total back over the day as a flat line, and it did so
+	// from a boundary fixed at insert time. Long ranges now aggregate 60m rows
+	// instead, so any day/week boundary the operator asks for is computed from
+	// data that still has an hour's resolution.
+	for _, gt := range [][2]any{{b1m, "1m"}, {b60m, "60m"}} {
 		bucketTime := gt[0].(int64)
 		gran := gt[1].(string)
 		if _, err := tx.Exec(
@@ -150,8 +157,10 @@ func BucketLogUsage(db *sql.DB, u BucketLogInput) error {
 	return tx.Commit()
 }
 
-// bucketTTLs — retention per granularity.
-var bucketTTLs = [][2]any{{"1m", int64(7 * 86_400_000)}, {"60m", int64(90 * 86_400_000)}, {"1d", int64(730 * 86_400_000)}}
+// bucketTTLs — retention per granularity. 60m keeps 400 days so the year view
+// and the weekly spending gate (which now sums 60m) are both covered; there is
+// no 1d bucket to fall back on for long ranges any more.
+var bucketTTLs = [][2]any{{"1m", int64(7 * 86_400_000)}, {"60m", int64(400 * 86_400_000)}}
 
 // PurgeExpiredBuckets drops buckets past their granularity's retention.
 //
@@ -296,14 +305,90 @@ func BucketFindPage(db *sql.DB, page int64, accountID, modelAlias *string, since
 	return list, total, nil
 }
 
-// LocalMidnight — local-timezone midnight (JS new Date(y,m,d).getTime()).
-func LocalMidnight(ts int64) int64 {
-	d := time.UnixMilli(ts).In(time.Local)
-	return time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.Local).UnixMilli()
+// ─────────────────────────── the statistics clock ───────────────────────────
+
+// statsLoc is the zone every calendar boundary in the stats path is cut in:
+// the day bucket written by BucketLogUsage, the "today" range, the 1m/60m
+// window anchors and the display slots. It is a package-level value rather than
+// a parameter because the alternative is threading a *time.Location through
+// every bucket, session and chart call for a setting that changes at most once
+// per process.
+//
+// Defaults to the container's local zone (time.Local) so a process that never
+// configures one behaves exactly as before; main sets it from routing_timezone.
+var (
+	statsLocMu sync.RWMutex
+	statsLoc   = time.Local
+	statsName  = ""
+)
+
+// SetStatsLocation — point the statistics clock at an IANA zone. An empty or
+// unknown name restores the container's local zone. Returns the zone actually
+// in effect so the caller can log a typo instead of silently keeping the old
+// boundaries.
+//
+// Changing this mid-flight is safe for new writes but does not rewrite history:
+// 1m/60m buckets are aligned to absolute time and are unaffected, while the
+// day boundary is recomputed on the next write. Existing 1m rows keep the
+// absolute alignment they were written with, so a zone change only shifts how
+// they are grouped into days, never where each row sits.
+func SetStatsLocation(name string) *time.Location {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		statsLocMu.Lock()
+		statsLoc, statsName = time.Local, ""
+		statsLocMu.Unlock()
+		return time.Local
+	}
+	loc, err := time.LoadLocation(name)
+	if err != nil {
+		statsLocMu.Lock()
+		statsLoc, statsName = time.Local, ""
+		statsLocMu.Unlock()
+		return time.Local
+	}
+	statsLocMu.Lock()
+	statsLoc, statsName = loc, name
+	statsLocMu.Unlock()
+	return loc
 }
 
-// TenMinuteSlot — local 10-minute display slot alignment.
-func TenMinuteSlot(ts int64) int64 {
-	day := LocalMidnight(ts)
-	return day + ((ts-day)/(10*60*1000))*(10*60*1000)
+// StatsLocation — the zone the stats path is currently cut in.
+func StatsLocation() *time.Location {
+	statsLocMu.RLock()
+	defer statsLocMu.RUnlock()
+	return statsLoc
 }
+
+// DayStart — midnight of the stats-clock day containing ts.
+func DayStart(ts int64) int64 {
+	loc := StatsLocation()
+	d := time.UnixMilli(ts).In(loc)
+	return time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, loc).UnixMilli()
+}
+
+// LocalMidnight — deprecated alias of DayStart, kept because the name is used
+// by the register-count and daily-bonus paths that predate the stats clock.
+func LocalMidnight(ts int64) int64 { return DayStart(ts) }
+
+// AlignDown — the stats-clock-aligned boundary at or below ts for a step.
+//
+// The alignment is anchored at the day boundary, not at the Unix epoch: a 6h
+// step then lands on 00:00/06:00/12:00/18:00 local, which is what an operator
+// reading a usage chart expects, instead of drifting with the UTC offset.
+// Steps of an hour or less are simply floored, since an hour divides evenly
+// into every local day (including DST days) and flooring keeps 1m/60m rows
+// aligned to absolute time.
+func AlignDown(ts, stepMs int64) int64 {
+	if stepMs <= 0 {
+		return ts
+	}
+	if stepMs <= 3_600_000 {
+		return (ts / stepMs) * stepMs
+	}
+	day := DayStart(ts)
+	return day + ((ts-day)/stepMs)*stepMs
+}
+
+// TenMinuteSlot — 10-minute display slot alignment on the stats clock.
+func TenMinuteSlot(ts int64) int64 { return AlignDown(ts, 10*60*1000) }

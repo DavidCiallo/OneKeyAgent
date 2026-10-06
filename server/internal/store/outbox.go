@@ -82,6 +82,7 @@ var floorAtZeroCols = map[string]bool{"balance": true}
 // would hand the same card back for a second redemption.
 var syncPutTables = map[string]bool{
 	"model": true, "provider": true, "role": true, "account_role": true,
+	"account_group": true, "account_group_member": true,
 	"account": true, "settings": true, "gift_card": true, "transaction": true,
 }
 
@@ -582,21 +583,44 @@ var putConflictCols = map[string]string{
 	"settings": "key",
 }
 
+// putConflictColsMulti — composite conflict keys, for a junction table whose
+// natural key is the pair rather than the row id.
+//
+// account_group_member is why this exists. Every node generates its own row id
+// for the same (group, account) pair, so an id-matched put lands beside the
+// existing row instead of on it and violates the unique index on
+// (group_id, account_id) — which is exactly the index that stops a duplicated
+// member row from double-counting that account in a group total. Matching on the
+// pair, the way usage_bucket matches on its window, is what makes the membership
+// replicate idempotently.
+var putConflictColsMulti = map[string][]string{
+	"account_group_member": {"group_id", "account_id"},
+}
+
 func applyPut(x execer, e OutboxEntry) error {
 	if updatable[e.Table] == nil {
 		return fmt.Errorf("unknown table %s", e.Table)
 	}
 	now := Now()
-	conflictCol := putConflictCols[e.Table]
+	conflictCols := putConflictColsMulti[e.Table]
+	if len(conflictCols) == 0 {
+		if cc := putConflictCols[e.Table]; cc != "" {
+			conflictCols = []string{cc}
+		}
+	}
 	cols := []string{"id"}
 	args := []any{cryptox.Nanoid(8)}
-	if conflictCol == "" {
+	if len(conflictCols) == 0 {
 		args[0] = e.RowID // match on the row id
-	} else if v, has := e.Payload[conflictCol]; has {
-		cols = append(cols, conflictCol)
-		args = append(args, v)
 	} else {
-		return fmt.Errorf("put %s/%s missing key column %s", e.Table, e.RowID, conflictCol)
+		for _, cc := range conflictCols {
+			v, has := e.Payload[cc]
+			if !has {
+				return fmt.Errorf("put %s/%s missing key column %s", e.Table, e.RowID, cc)
+			}
+			cols = append(cols, cc)
+			args = append(args, v)
+		}
 	}
 
 	for _, c := range append(append([]string{}, updatable[e.Table]...), "create_time", "update_time", "delete_time") {
@@ -625,7 +649,7 @@ func applyPut(x execer, e OutboxEntry) error {
 	}
 	ph := strings.TrimSuffix(strings.Repeat("?,", len(cols)), ",")
 
-	if conflictCol == "" {
+	if len(conflictCols) == 0 {
 		_, err := x.Exec(
 			fmt.Sprintf(`INSERT INTO "%s" (%s) VALUES (%s) ON CONFLICT(id) DO UPDATE SET %s`,
 				e.Table, strings.Join(cols, ","), ph, strings.Join(sets, ", ")),
@@ -635,9 +659,15 @@ func applyPut(x execer, e OutboxEntry) error {
 	// Natural-key tables: find the existing row first, update it in place,
 	// otherwise insert. Two statements rather than an ON CONFLICT target so the
 	// node-local id is preserved when the row already exists.
+	conds := make([]string, 0, len(conflictCols))
+	keyArgs := make([]any, 0, len(conflictCols))
+	for _, cc := range conflictCols {
+		conds = append(conds, cc+" = ?")
+		keyArgs = append(keyArgs, e.Payload[cc])
+	}
 	var existingID string
-	if err := x.QueryRow(fmt.Sprintf(`SELECT id FROM "%s" WHERE %s = ? LIMIT 1`, e.Table, conflictCol),
-		e.Payload[conflictCol]).Scan(&existingID); err == nil && existingID != "" {
+	if err := x.QueryRow(fmt.Sprintf(`SELECT id FROM "%s" WHERE %s LIMIT 1`, e.Table, strings.Join(conds, " AND ")),
+		keyArgs...).Scan(&existingID); err == nil && existingID != "" {
 		sets := []string{}
 		uargs := []any{}
 		for i, c := range cols {
@@ -771,6 +801,8 @@ var bootstrapTables = [][2]string{
 	{"provider", "providers"},
 	{"role", "roles"},
 	{"account_role", "account_roles"},
+	{"account_group", "account_groups"},
+	{"account_group_member", "account_group_members"},
 	{"settings", "settings"},
 	{"gift_card", "gift_cards"},
 	{"usage_bucket", "usage_buckets"},
@@ -983,6 +1015,14 @@ func mergedAdditive(col string, snapshot any, unpushed map[string]any) any {
 // window — so an id match would miss the existing row and trip the unique
 // index instead of updating the row this node already has.
 func rowConflictCols(table string, row map[string]any) []string {
+	if keys := putConflictColsMulti[table]; len(keys) > 0 {
+		for _, k := range keys {
+			if _, has := row[k]; !has {
+				return []string{"id"}
+			}
+		}
+		return keys
+	}
 	if cc := putConflictCols[table]; cc != "" {
 		if _, has := row[cc]; has {
 			return []string{cc}
