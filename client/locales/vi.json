@@ -106,7 +106,9 @@
         "Last7": "7 ngày",
         "Last30": "30 ngày",
         "MonthToDate": "Tháng này",
-        "GroupTagHeader": "Nhóm"
+        "GroupTagHeader": "Nhóm",
+        "PickStart": "Chọn ngày bắt đầu",
+        "PickEnd": "Chọn ngày kết thúc"
     },
     "AuthPage": {
         "Title": "EHEX",
