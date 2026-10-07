@@ -104,8 +104,12 @@
         "Loading": "Загрузка...",
         "UserUsage": "Использование пользователя",
         "History": "История",
-        "GroupFilter": "Фильтр по группам",
-        "GroupCount": "{n} групп"
+        "DateRange": "Диапазон дат",
+        "DayCount": "{n}д",
+        "Last7": "7д",
+        "Last30": "30д",
+        "MonthToDate": "СМ",
+        "GroupTagHeader": "Группы"
     },
     "AuthPage": {
         "Title": "EHEX",

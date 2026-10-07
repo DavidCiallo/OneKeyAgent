@@ -10,41 +10,15 @@ import { Locale } from "../../methods/locale";
 import { Select, SelectItem, Button, ButtonGroup, Badge } from "@heroui/react";
 import { useAuth } from "../../methods/auth-context";
 import { UsageSessions } from "./components/UsageSessions";
-import { statsDayStart } from "../../methods/timezone";
+import { DateRangePicker, rangeToMs } from "./components/DateRangePicker";
+import { StatsDate, statsToday } from "../../methods/timezone";
 
 const GAP_OPTIONS = [
     { value: 1, label: "1min" },
-    { value: 15, label: "15min" },
-    { value: 30, label: "30min" },
+    { value: 10, label: "10min" },
     { value: 60, label: "1h" },
-    { value: 360, label: "6h" },
-    { value: 720, label: "12h" },
     { value: 1440, label: "1d" },
 ];
-
-const TIME_PRESETS = [
-    { value: 0, label: "Today" },
-    { value: 1, label: "24h" },
-    { value: 3, label: "3d" },
-    { value: 7, label: "7d" },
-    { value: 30, label: "30d" },
-] as const;
-
-/**
- * The window start for a preset, in UTC milliseconds.
- *
- * "Today" is the stats-zone midnight, not the browser's: the server buckets its
- * day on the configured clock, so a viewer in another zone asking for "today"
- * must get the same window the server cut, or the first and last hours of it
- * fall outside the data that exists.
- */
-function computeSince(preset: number): number {
-    const now = Date.now();
-    if (preset === 0) {
-        return statsDayStart(now);
-    }
-    return now - preset * 86400000;
-}
 
 export default function UsagePage() {
     const locale = Locale("UsagePage");
@@ -54,7 +28,11 @@ export default function UsagePage() {
     const [totals, setTotals] = useState<UsageSessionTotals>({ totalTokens: 0, totalInputTokens: 0, totalCachedInputTokens: 0, totalOutputTokens: 0, totalCost: 0, totalRequests: 0 });
     const [recentSessions, setRecentSessions] = useState<UserSession[]>([]);
     const [gapMinutes, setGapMinutes] = useState(60);
-    const [timePreset, setTimePreset] = useState<number>(0);
+    // Defaults to a single day. The range is inclusive of both ends and is
+    // expressed as calendar dates on the stats clock, so "today" means the
+    // operator's today rather than the browser's.
+    const [rangeFrom, setRangeFrom] = useState<StatsDate>(() => statsToday());
+    const [rangeTo, setRangeTo] = useState<StatsDate>(() => statsToday());
     const [accounts, setAccounts] = useState<{ id: string; name: string; email: string }[]>([]);
     const [providers, setProviders] = useState<{ id: string; name: string }[]>([]);
     const [modelAliases, setModelAliases] = useState<string[]>([]);
@@ -129,29 +107,43 @@ export default function UsagePage() {
         });
     }, []);
 
-    // Groups are an admin-only organisational filter: a non-admin only ever
-    // sees their own traffic, so the selector would be meaningless for them.
+    // Groups are an admin-only shortcut over the account filter: a non-admin
+    // only ever sees their own traffic, so the tags would be meaningless.
+    // Each group's members are fetched too, because a tag has to be able to
+    // expand into the account selection it stands for.
+    const [groupMembers, setGroupMembers] = useState<Record<string, string[]>>({});
     useEffect(() => {
         if (!admin) return;
         groupApi.list({}).then((res) => {
-            if (res.success && res.data) {
-                setGroupOptions(res.data.list.map((g: any) => ({
-                    id: g.id, name: g.name, member_count: g.member_count ?? 0,
-                })));
-            }
+            if (!res.success || !res.data) return;
+            const opts = res.data.list.map((g: any) => ({
+                id: g.id, name: g.name, member_count: g.member_count ?? 0,
+            }));
+            setGroupOptions(opts);
+            Promise.all(opts.map((g: { id: string }) =>
+                groupApi.detail({ id: g.id }).then((d: any) =>
+                    [g.id, (d?.data?.member_ids ?? []) as string[]] as const
+                ).catch(() => [g.id, [] as string[]] as const)
+            )).then((pairs) => {
+                setGroupMembers(Object.fromEntries(pairs));
+            });
         });
     }, [admin]);
 
     const fetchSessions = useCallback(async (
-        gap: number, preset: number,
+        gap: number, from: StatsDate, to: StatsDate,
         accountIds: Set<string>, modelAliases: Set<string>, providerIds: Set<string>,
         groupIds: Set<string>,
     ) => {
         setLoading(true);
-        const since = computeSince(preset);
+        const { since, until } = rangeToMs(from, to);
         const res = await usageApi.sessions({
             gapMinutes: gap,
             since,
+            // Sent even when it is in the future: the server treats it as the
+            // exclusive end, and "today" ends at tomorrow's midnight, which is
+            // still ahead of now at the moment of the request.
+            until,
             account_ids: accountIds.size > 0 ? Array.from(accountIds) : undefined,
             model_aliases: modelAliases.size > 0 ? Array.from(modelAliases) : undefined,
             provider_ids: providerIds.size > 0 ? Array.from(providerIds) : undefined,
@@ -166,14 +158,50 @@ export default function UsagePage() {
     }, []);
 
     useEffect(() => {
-        fetchSessions(gapMinutes, timePreset, appliedAccountIds, appliedModelAliases, appliedProviderIds, appliedGroupIds);
-    }, [gapMinutes, timePreset, appliedAccountIds, appliedModelAliases, appliedProviderIds, appliedGroupIds, fetchSessions]);
+        fetchSessions(gapMinutes, rangeFrom, rangeTo, appliedAccountIds, appliedModelAliases, appliedProviderIds, appliedGroupIds);
+    }, [gapMinutes, rangeFrom, rangeTo, appliedAccountIds, appliedModelAliases, appliedProviderIds, appliedGroupIds, fetchSessions]);
 
     const applyFilters = () => {
         setAppliedAccountIds(new Set(draftAccountIds));
         setAppliedModelAliases(new Set(draftModelAliases));
         setAppliedProviderIds(new Set(draftProviderIds));
         setAppliedGroupIds(new Set(draftGroupIds));
+    };
+
+    /**
+     * Toggle a group as a shortcut over the account selection.
+     *
+     * Selecting a group adds its members to the account draft, so the group is
+     * visible as the accounts it stands for and can be fine-tuned from there:
+     * pick "support", then drop one person from the selection. Turning the group
+     * off removes exactly the members it contributed and leaves any account that
+     * was selected independently or through another group alone.
+     */
+    const toggleGroupTag = (groupId: string) => {
+        const members = groupMembers[groupId] ?? [];
+        const wasOn = draftGroupIds.has(groupId);
+        setDraftGroupIds((prev) => {
+            const next = new Set(prev);
+            if (wasOn) next.delete(groupId); else next.add(groupId);
+            return next;
+        });
+        setDraftAccountIds((prev) => {
+            const next = new Set(prev);
+            if (wasOn) {
+                // Keep anyone another still-selected group also covers.
+                const stillCovered = new Set<string>();
+                for (const gid of draftGroupIds) {
+                    if (gid === groupId) continue;
+                    for (const m of groupMembers[gid] ?? []) stillCovered.add(m);
+                }
+                for (const m of members) {
+                    if (!stillCovered.has(m)) next.delete(m);
+                }
+            } else {
+                for (const m of members) next.add(m);
+            }
+            return next;
+        });
     };
 
     const clearFilters = () => {
@@ -196,41 +224,28 @@ export default function UsagePage() {
                 ) : (
                     <div className="flex flex-col gap-3">
                         <div className="flex flex-wrap items-center gap-3">
-                            {admin && groupOptions.length > 0 && (
-                                <Select
-                                    size="sm"
-                                    className="w-64"
-                                    selectionMode="multiple"
-                                    selectedKeys={draftGroupIds}
-                                    onSelectionChange={(keys) => setDraftGroupIds(new Set(Array.from(keys).map(String)))}
-                                    placeholder={locale.GroupFilter || "Filter groups"}
-                                    aria-label={locale.GroupFilter || "Filter groups"}
-                                    renderValue={(items) => {
-                                        const selected = Array.from(items);
-                                        if (selected.length === 0) return <span className="text-default-400">{locale.GroupFilter || "Filter groups"}</span>;
-                                        if (selected.length === 1) {
-                                            const g = groupOptions.find(gr => gr.id === selected[0].key);
-                                            return <span>{g ? `${g.name} (${g.member_count})` : selected[0].textValue || selected[0].key}</span>;
-                                        }
-                                        return <span>{(locale.GroupCount || "{n} groups").replace("{n}", String(selected.length))}</span>;
-                                    }}
-                                >
-                                    {/* The count is the point: picking a group means
-                                        "show me these people's combined usage". */}
-                                    {groupOptions.map((g) => (
-                                        <SelectItem key={g.id} textValue={g.name}>
-                                            {`${g.name} (${g.member_count})`}
-                                        </SelectItem>
-                                    ))}
-                                </Select>
-                            )}
                             {admin && accounts.length > 0 && (
                                 <Select
                                     size="sm"
                                     className="w-80"
                                     selectionMode="multiple"
-                                    selectedKeys={draftAccountIds}
-                                    onSelectionChange={(keys) => setDraftAccountIds(new Set(Array.from(keys).map(String)))}
+                                    // Group ids are shown as selected alongside the accounts
+                                    // so a tag reads as on/off, even though the applied
+                                    // filter is only ever the account set they expanded to.
+                                    selectedKeys={new Set([...Array.from(draftAccountIds), ...Array.from(draftGroupIds)])}
+                                    onSelectionChange={(keys) => {
+                                        const next = new Set(Array.from(keys).map(String));
+                                        // A group tag's key is a group id, so a change that
+                                        // turns one on or off is routed through the expander
+                                        // rather than being taken as an account id.
+                                        const changedGroup = groupOptions.find((g) =>
+                                            next.has(g.id) !== draftGroupIds.has(g.id));
+                                        if (changedGroup) {
+                                            toggleGroupTag(changedGroup.id);
+                                            return;
+                                        }
+                                        setDraftAccountIds(next);
+                                    }}
                                     placeholder="Filter accounts"
                                     aria-label="Filter accounts"
                                     renderValue={(items) => {
@@ -243,9 +258,44 @@ export default function UsagePage() {
                                         return <span>{selected.length} accounts</span>;
                                     }}
                                 >
-                                    {accounts.map((a) => (
-                                        <SelectItem key={a.id}>{a.name} ({a.email})</SelectItem>
-                                    ))}
+                                    {/* HeroUI's collection only accepts a flat list of
+                                        items, so the optional section headers are spread
+                                        in as arrays rather than conditionals. */}
+                                    {[
+                                        ...(groupOptions.length > 0 ? [
+                                            <SelectItem key="__groups_header" isDisabled textValue="Groups"
+                                                className="opacity-100 data-[disabled=true]:opacity-100">
+                                                <span className="text-tiny uppercase tracking-wide text-default-400">{locale.GroupTagHeader || "Groups"}</span>
+                                            </SelectItem>,
+                                        ] : []),
+                                        // A tag is a shortcut over the account selection, not a
+                                        // separate filter: choosing one selects its members, which
+                                        // then show up as accounts and can be trimmed from there.
+                                        ...groupOptions.map((g) => (
+                                            <SelectItem key={g.id} textValue={g.name}
+                                                className="data-[selected=true]:bg-primary-100 dark:data-[selected=true]:bg-primary-900/40">
+                                                <span className="flex items-center gap-2">
+                                                    <span className={`text-tiny px-1.5 py-0.5 rounded-full
+                                                        ${draftGroupIds.has(g.id)
+                                                            ? "bg-primary text-primary-foreground"
+                                                            : "bg-default-200 text-default-600"}`}>
+                                                        tag
+                                                    </span>
+                                                    <span>{g.name}</span>
+                                                    <span className="text-tiny text-default-400">({g.member_count})</span>
+                                                </span>
+                                            </SelectItem>
+                                        )),
+                                        ...(groupOptions.length > 0 && accounts.length > 0 ? [
+                                            <SelectItem key="__accounts_header" isDisabled textValue="Accounts"
+                                                className="opacity-100 data-[disabled=true]:opacity-100">
+                                                <span className="text-tiny uppercase tracking-wide text-default-400">{locale.Accounts || "Accounts"}</span>
+                                            </SelectItem>,
+                                        ] : []),
+                                        ...accounts.map((a) => (
+                                            <SelectItem key={a.id}>{a.name} ({a.email})</SelectItem>
+                                        )),
+                                    ]}
                                 </Select>
                             )}
                             {providers.length > 0 && (
@@ -330,17 +380,12 @@ export default function UsagePage() {
                                     <SelectItem key={String(opt.value)}>{opt.label}</SelectItem>
                                 ))}
                             </Select>
-                            <ButtonGroup size="sm" variant="flat">
-                                {TIME_PRESETS.map((p) => (
-                                    <Button
-                                        key={p.value}
-                                        color={timePreset === p.value ? "primary" : "default"}
-                                        onPress={() => setTimePreset(p.value)}
-                                    >
-                                        {p.label}
-                                    </Button>
-                                ))}
-                            </ButtonGroup>
+                            <DateRangePicker
+                                from={rangeFrom}
+                                to={rangeTo}
+                                locale={locale}
+                                onChange={(f, t) => { setRangeFrom(f); setRangeTo(t); }}
+                            />
                             {admin && (
                                 <ButtonGroup size="sm" variant="flat">
                                     <Button
@@ -372,7 +417,7 @@ export default function UsagePage() {
                                 </Button>
                             </ButtonGroup>
                         </div>
-                        <UsageSessions groups={groups} totals={totals} recentSessions={recentSessions} gapMinutes={gapMinutes} isAdmin={admin} groupBy={groupBy} valueType={valueType} since={computeSince(timePreset)} />
+                        <UsageSessions groups={groups} totals={totals} recentSessions={recentSessions} gapMinutes={gapMinutes} isAdmin={admin} groupBy={groupBy} valueType={valueType} since={rangeToMs(rangeFrom, rangeTo).since} />
                     </div>
                 )}
             </div>

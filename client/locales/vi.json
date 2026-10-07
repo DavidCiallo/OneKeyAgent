@@ -101,8 +101,12 @@
         "Loading": "Đang tải...",
         "UserUsage": "Sử dụng của người dùng",
         "History": "Lịch sử",
-        "GroupFilter": "Lọc nhóm",
-        "GroupCount": "{n} nhóm"
+        "DateRange": "Khoảng ngày",
+        "DayCount": "{n} ngày",
+        "Last7": "7 ngày",
+        "Last30": "30 ngày",
+        "MonthToDate": "Tháng này",
+        "GroupTagHeader": "Nhóm"
     },
     "AuthPage": {
         "Title": "EHEX",

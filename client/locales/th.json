@@ -101,8 +101,12 @@
         "Loading": "กำลังโหลด...",
         "UserUsage": "การใช้งานของผู้ใช้",
         "History": "ประวัติ",
-        "GroupFilter": "กรองกลุ่ม",
-        "GroupCount": "{n} กลุ่ม"
+        "DateRange": "ช่วงวันที่",
+        "DayCount": "{n}วัน",
+        "Last7": "7วัน",
+        "Last30": "30วัน",
+        "MonthToDate": "เดือนนี้",
+        "GroupTagHeader": "กลุ่ม"
     },
     "AuthPage": {
         "Title": "EHEX",
