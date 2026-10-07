@@ -106,7 +106,9 @@
         "Last7": "7วัน",
         "Last30": "30วัน",
         "MonthToDate": "เดือนนี้",
-        "GroupTagHeader": "กลุ่ม"
+        "GroupTagHeader": "กลุ่ม",
+        "PickStart": "เลือกวันเริ่มต้น",
+        "PickEnd": "เลือกวันสิ้นสุด"
     },
     "AuthPage": {
         "Title": "EHEX",
