@@ -109,7 +109,9 @@
         "Last7": "7d",
         "Last30": "30d",
         "MonthToDate": "MTD",
-        "GroupTagHeader": "Grupos"
+        "GroupTagHeader": "Grupos",
+        "PickStart": "Elige la fecha inicial",
+        "PickEnd": "Elige la fecha final"
     },
     "AuthPage": {
         "Title": "EHEX",

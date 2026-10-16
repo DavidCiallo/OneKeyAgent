@@ -109,7 +109,9 @@
         "Last7": "7д",
         "Last30": "30д",
         "MonthToDate": "СМ",
-        "GroupTagHeader": "Группы"
+        "GroupTagHeader": "Группы",
+        "PickStart": "Выберите начальную дату",
+        "PickEnd": "Выберите конечную дату"
     },
     "AuthPage": {
         "Title": "EHEX",

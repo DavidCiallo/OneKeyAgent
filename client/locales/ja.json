@@ -109,7 +109,9 @@
         "Last7": "7日",
         "Last30": "30日",
         "MonthToDate": "今月",
-        "GroupTagHeader": "グループ"
+        "GroupTagHeader": "グループ",
+        "PickStart": "開始日を選択",
+        "PickEnd": "終了日を選択"
     },
     "AuthPage": {
         "Title": "EHEX",
