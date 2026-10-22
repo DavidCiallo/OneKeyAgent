@@ -132,7 +132,7 @@ export class SubscriptionIpnWebhookBody {
 
 export class SubscriptionTopupRequest implements BaseRequest {
     public auth?: string;
-    public token_amount?: number; // how many raw tokens to purchase
+    public token_amount?: number; // credit amount in CNY
     public pay_currency?: string;
 
     constructor(origin: Partial<SubscriptionTopupRequest>) {
@@ -146,14 +146,14 @@ export class SubscriptionTopupRequest implements BaseRequest {
     }
 }
 
-export class SubscriptionTopupResponse implements BaseResponse<{ invoice_url: string; payment_id: string; token_amount: number; price_dollars: number }> {
+export class SubscriptionTopupResponse implements BaseResponse<{ invoice_url: string; payment_id: string; token_amount: number; price_usd: number }> {
     public success: boolean;
     public message: string;
     public data: {
         invoice_url: string;
         payment_id: string;
         token_amount: number;
-        price_dollars: number;
+        price_usd: number;
     };
 
     constructor(origin: SubscriptionTopupResponse) {

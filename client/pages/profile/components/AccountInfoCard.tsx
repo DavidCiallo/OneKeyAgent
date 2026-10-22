@@ -1,28 +1,22 @@
 import { Card, CardBody, CardHeader, Divider, Chip, Progress } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
-
-const formatBalance = (dollars: number) => {
-    return "$" + dollars.toFixed(2);
-};
-
-const formatUsage = (dollars: number) => {
-    return "$" + dollars.toFixed(3);
-};
-
-const WEEKLY_LIMIT = 100;
+import { money } from "../../../methods/money";
 
 export default function AccountInfoCard({
     account,
     weeklyUsage,
     balance,
+    weeklyLimit,
 }: {
     account: { name: string; email: string; is_admin: number };
     weeklyUsage?: number;
     balance?: number;
+    weeklyLimit?: number;
 }) {
     const locale = Locale("ProfilePage");
     const usage = weeklyUsage ?? 0;
-    const progressPercent = Math.min((usage / WEEKLY_LIMIT) * 100, 100);
+    const limit = weeklyLimit || 0;
+    const progressPercent = limit > 0 ? Math.min((usage / limit) * 100, 100) : 0;
 
     return (
         <Card>
@@ -48,11 +42,11 @@ export default function AccountInfoCard({
                     </div>
                     <div className="w-full md:w-48 flex flex-col items-center justify-center md:pl-6">
                         <span className="text-sm text-gray-500 mb-1 ml-2">{locale.Balance}</span>
-                        <span className="text-2xl font-bold text-primary">{formatBalance(balance || 0)}</span>
+                        <span className="text-2xl font-bold text-primary">{money(balance || 0)}</span>
                         <div className="mt-3 w-full">
                             <div className="flex justify-between text-xs text-gray-500 mb-1">
                                 <span>{locale.WeeklyUsage}</span>
-                                <span>{formatUsage(usage)} / {formatBalance(WEEKLY_LIMIT)}</span>
+                                <span>{money(usage, 3)} / {money(limit)}</span>
                             </div>
                             <Progress
                                 aria-label="Weekly usage"

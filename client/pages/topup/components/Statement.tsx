@@ -17,8 +17,8 @@ function getAmountColor(type: string): string {
 }
 
 function getAmountPrefix(type: string): string {
-    if (type === "usage") return "-$";
-    return "+$";
+    if (type === "usage") return "-¥";
+    return "+¥";
 }
 
 function getTypeChip(type: string, locale: any): { color: "success" | "primary" | "warning" | "danger"; label: string } {
@@ -74,7 +74,7 @@ export default function Statement({ records, total, page, onPageChange, onRefres
                                     </div>
                                     <div className="text-right">
                                         <p className={`text-sm font-semibold ${getAmountColor(record.type)}`}>
-                                            {getAmountPrefix(record.type)}{Math.abs(record.amount).toFixed(3)}
+                                            {getAmountPrefix(record.type)}{Math.abs(record.amount).toFixed(2)}
                                         </p>
                                         <p className="text-xs text-gray-400">
                                             {new Date(record.create_time).toLocaleString()}

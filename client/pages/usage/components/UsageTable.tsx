@@ -9,6 +9,7 @@ import {
 } from "@heroui/react";
 import { UsageDTO } from "../../../../shared/modules/usage/usage.interface";
 import { Locale } from "../../../methods/locale";
+import { money } from "../../../methods/money";
 import { stripEmail } from "./utils";
 
 type Props = {
@@ -45,7 +46,7 @@ export function UsageTable({ list, total, page, onPageChange }: Props) {
                                 <TableCell className="text-center">{item.input_tokens}</TableCell>
                                 <TableCell className="text-center">{item.cached_input_tokens || 0}</TableCell>
                                 <TableCell className="text-center">{item.output_tokens}</TableCell>
-                                <TableCell className="text-center">${item.cost.toFixed(4)}</TableCell>
+                                <TableCell className="text-center">{money(item.cost, 4)}</TableCell>
                                 <TableCell className="text-center">{item.create_time ? new Date(item.create_time).toLocaleString() : "—"}</TableCell>
                             </TableRow>
                         ))}

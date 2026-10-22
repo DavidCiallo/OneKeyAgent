@@ -1,6 +1,7 @@
 import { Button, Chip } from "@heroui/react";
 import { ModelDTO } from "../../../../shared/modules/model/model.entity";
 import { Locale } from "../../../methods/locale";
+import { money } from "../../../methods/money";
 import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
 import { UsageAmountData, UsageStatsPeriod } from "../../../../shared/modules/usage/usage.interface";
 type ModelWithUsage = ModelDTO & {
@@ -98,11 +99,11 @@ export function ModelCardGrid({ list, onEdit, onDelete }: Props) {
 
                         {/* Prices */}
                         <div className="flex gap-3 text-xs text-default-500">
-                            <span>IN: <strong className="text-foreground font-mono">${item.input_price.toFixed(3)}/M</strong></span>
+                            <span>IN: <strong className="text-foreground font-mono">{money(item.input_price, 3)}/M</strong></span>
                             {item.cache_price > 0 && (
-                                <span>CACHE: <strong className="text-foreground font-mono">${item.cache_price.toFixed(3)}/M</strong></span>
+                                <span>CACHE: <strong className="text-foreground font-mono">{money(item.cache_price, 3)}/M</strong></span>
                             )}
-                            <span>OUT: <strong className="text-foreground font-mono">${item.output_price.toFixed(3)}/M</strong></span>
+                            <span>OUT: <strong className="text-foreground font-mono">{money(item.output_price, 3)}/M</strong></span>
                         </div>
 
                         {/* Three mini charts */}

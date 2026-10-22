@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Chip, Divider, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Pagination } from "@heroui/react";
 import { giftCardApi } from "../../../api/instance";
 import { Locale } from "../../../methods/locale";
+import { money } from "../../../methods/money";
 import { GiftCardDTO } from "../../../../shared/modules/gift_card/gift_card.interface";
 
 export default function GiftCardManageModal({
@@ -142,7 +143,7 @@ export default function GiftCardManageModal({
                                             <TableCell>
                                                 <code className="text-xs font-mono">{card.code}</code>
                                             </TableCell>
-                                            <TableCell>${card.token_amount}</TableCell>
+                                            <TableCell>{money(card.token_amount)}</TableCell>
                                             <TableCell>
                                                 <Chip size="sm" color={statusColor(card.status)} variant="flat">
                                                     {statusLabel(card.status)}

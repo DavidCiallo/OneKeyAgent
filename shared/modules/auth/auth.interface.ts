@@ -123,10 +123,10 @@ export class AuthConfigRequest implements BaseRequest {
     }
 }
 
-export class AuthConfigResponse implements BaseResponse<{ allowed_domains: string[]; enable_recharge: boolean }> {
+export class AuthConfigResponse implements BaseResponse<{ allowed_domains: string[]; enable_recharge: boolean; usd_cny_rate: number }> {
     public success: boolean;
     public message: string;
-    public data: { allowed_domains: string[]; enable_recharge: boolean };
+    public data: { allowed_domains: string[]; enable_recharge: boolean; usd_cny_rate: number };
 
     constructor(origin: AuthConfigResponse) {
         this.success = origin.success;

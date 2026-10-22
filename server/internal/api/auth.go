@@ -65,6 +65,7 @@ func (a *App) authConfig(c *httpx.Ctx) (any, error) {
 	return map[string]any{
 		"allowed_domains": allowed,
 		"enable_recharge": enableRecharge,
+		"usd_cny_rate":    service.USDCNYRate(a.Settings),
 	}, nil
 }
 
@@ -260,9 +261,10 @@ func (a *App) accountProfile(c *httpx.Ctx) (any, error) {
 		return nil, err
 	}
 	return map[string]any{
-		"account":     account.DTO(),
-		"weeklyUsage": store.Round6(weeklyUsage),
-		"balance":     account.Balance,
+		"account":      account.DTO(),
+		"weeklyUsage":  store.Round6(weeklyUsage),
+		"balance":      account.Balance,
+		"weekly_limit": service.WeeklyLimit(a.Settings),
 	}, nil
 }
 

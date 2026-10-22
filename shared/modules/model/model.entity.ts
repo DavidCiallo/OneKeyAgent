@@ -16,6 +16,7 @@ export class ModelDTO {
     public id: string;
     public alias: string;
     public input_price: number;
+    public cache_price: number;
     public output_price: number;
     public is_public: number;
     public create_time: number;

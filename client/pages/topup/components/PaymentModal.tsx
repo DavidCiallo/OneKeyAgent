@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
+import { money } from "../../../methods/money";
 import { PAYMENT_CURRENCIES } from "../../../../shared/modules/subscription_record/subscription_record.interface";
 import { PAYMENT_ICON_MAP } from "../../../images/svg/PaymentIcons";
 
@@ -8,19 +9,19 @@ export default function PaymentModal({
     isOpen,
     onOpenChange,
     planPrice,
+    usdCnyRate,
     onProceedToPay,
     paying,
 }: {
     isOpen: boolean;
     onOpenChange: () => void;
     planPrice: number;
+    usdCnyRate: number;
     onProceedToPay: (payCurrency: string) => void;
     paying: boolean;
 }) {
     const locale = Locale("TopupPage");
     const [selectedCurrency, setSelectedCurrency] = useState<string>(PAYMENT_CURRENCIES[0].pay_currency);
-
-    const formatPrice = (dollars: number) => "$" + dollars.toFixed(2);
 
     return (
         <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="md">
@@ -30,8 +31,8 @@ export default function PaymentModal({
                     <div className="bg-gray-50 rounded-lg p-4">
                         <p className="text-sm text-gray-600">
                             <span className="text-base">{locale.DepositAmount}: </span>
-                            <span className="text-primary text-base font-bold">{formatPrice(planPrice)}</span>
-                            <span className="mx-1 text-base">USD</span>
+                            <span className="text-primary text-base font-bold">{money(planPrice)}</span>
+                            <span className="mx-1 text-sm text-gray-500">≈ ${(planPrice / (usdCnyRate || 1)).toFixed(2)}</span>
                         </p>
                     </div>
 

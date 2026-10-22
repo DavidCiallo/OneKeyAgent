@@ -28,6 +28,7 @@ export default function TopupPage() {
     const [page, setPage] = useState(1);
     const [refreshing, setRefreshing] = useState(false);
     const [enableRecharge, setEnableRecharge] = useState(false);
+    const [usdCnyRate, setUsdCnyRate] = useState(6.7);
 
     const fetchProfile = useCallback(async () => {
         const res = await accountApi.profile({});
@@ -48,6 +49,7 @@ export default function TopupPage() {
         authApi.config({}).then(res => {
             if (res.success && res.data) {
                 setEnableRecharge(res.data.enable_recharge !== false);
+                setUsdCnyRate(res.data.usd_cny_rate || 6.7);
             }
         });
     }, []);
@@ -72,7 +74,7 @@ export default function TopupPage() {
                     <CurrentPlanCard tokens={account?.balance || 0} />
 
                     <PrepaidTopup onGiftCardActivated={handleRefresh}>
-                        {enableRecharge && <TopupPack onSuccess={handleRefresh} />}
+                        {enableRecharge && <TopupPack onSuccess={handleRefresh} usdCnyRate={usdCnyRate} />}
                     </PrepaidTopup>
 
                     <Statement records={records} total={total} page={page} onPageChange={setPage} onRefresh={handleRefresh} refreshing={refreshing} />

@@ -8,5 +8,7 @@ interface Window {
         show_home_page?: boolean;
         /** IANA zone the server cut its statistics buckets in, if configured. */
         timezone?: string;
+        /** Unit the stored amounts are in: "USD" until the admin converts to "CNY". */
+        money_currency?: string;
     };
 }

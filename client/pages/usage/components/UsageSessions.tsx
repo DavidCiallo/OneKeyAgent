@@ -5,6 +5,7 @@ import {
 import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell } from "@heroui/react";
 import { UsageSessionTotals, UserSessionGroup, UserSession, ProviderUsage, ModelUsage } from "../../../../shared/modules/usage/usage.interface";
 import { stringToColor, fmtM, fmtK, format24Time, stripEmail } from "./utils";
+import { money } from "../../../methods/money";
 import { statsParts, statsAlignDown } from "../../../methods/timezone";
 
 type Props = {
@@ -177,8 +178,8 @@ export function UsageSessions({ groups, totals, recentSessions, gapMinutes, isAd
     }
 
     const isCost = valueType === "cost";
-    const formatValue = (v: number) => isCost ? `$${v.toFixed(2)}` : fmtM(v);
-    const formatValueFull = (v: number) => isCost ? `$${Number(v).toFixed(4)}` : fmtM(Number(v) || 0);
+    const formatValue = (v: number) => isCost ? money(v) : fmtM(v);
+    const formatValueFull = (v: number) => isCost ? money(v, 4) : fmtM(Number(v) || 0);
 
     return (
         <div className="flex flex-col gap-4">
@@ -202,7 +203,7 @@ export function UsageSessions({ groups, totals, recentSessions, gapMinutes, isAd
                 </div>
                 <div className="flex items-center gap-1">
                     <span className="text-default-500">Cost:</span>
-                    <span className="font-semibold font-mono">${totals.totalCost.toFixed(4)}</span>
+                    <span className="font-semibold font-mono">{money(totals.totalCost, 4)}</span>
                 </div>
             </div>
             {/* Stacked bar chart */}
@@ -235,7 +236,7 @@ export function UsageSessions({ groups, totals, recentSessions, gapMinutes, isAd
                                 [formatValueFull(Number(value)), String(name)]
                             }
                             labelFormatter={(label: any, payload: readonly any[]) => {
-                                const cost = payload?.[0]?.payload?.cost != null ? `$${Number(payload[0].payload.cost).toFixed(4)}` : "";
+                                const cost = payload?.[0]?.payload?.cost != null ? money(Number(payload[0].payload.cost), 4) : "";
                                 return `${String(label)}${cost ? ` | ${cost}` : ""}`;
                             }}
                         />
@@ -280,7 +281,7 @@ export function UsageSessions({ groups, totals, recentSessions, gapMinutes, isAd
                                     <TableCell className="hidden md:table-cell text-center font-mono">{fmtM(session.input_tokens)}</TableCell>
                                     <TableCell className="hidden md:table-cell text-center font-mono">{fmtM(session.cached_input_tokens || 0)}</TableCell>
                                     <TableCell className="hidden md:table-cell text-center font-mono">{fmtK(session.output_tokens)}</TableCell>
-                                    <TableCell className="text-center font-mono">${session.cost?.toFixed(4) || "0"}</TableCell>
+                                    <TableCell className="text-center font-mono">{money(session.cost ?? 0, 4)}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -303,7 +304,7 @@ export function UsageSessions({ groups, totals, recentSessions, gapMinutes, isAd
                                     <TableCell className="hidden md:table-cell text-center font-mono">{fmtM(session.input_tokens)}</TableCell>
                                     <TableCell className="hidden md:table-cell text-center font-mono">{fmtM(session.cached_input_tokens || 0)}</TableCell>
                                     <TableCell className="hidden md:table-cell text-center font-mono">{fmtK(session.output_tokens)}</TableCell>
-                                    <TableCell className="text-center font-mono">${session.cost?.toFixed(4) || "0"}</TableCell>
+                                    <TableCell className="text-center font-mono">{money(session.cost ?? 0, 4)}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>

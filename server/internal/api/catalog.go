@@ -432,7 +432,7 @@ func (a *App) settingsList(c *httpx.Ctx) (any, error) {
 	for _, kv := range a.Settings.GetAll() {
 		entries = append(entries, map[string]any{"key": kv[0], "value": kv[1]})
 	}
-	return map[string]any{"entries": entries}, nil
+	return map[string]any{"entries": entries, "money_currency": store.MoneyCurrency(a.DB)}, nil
 }
 
 func (a *App) settingsSave(c *httpx.Ctx) (any, error) {
@@ -464,6 +464,22 @@ func (a *App) settingsSave(c *httpx.Ctx) (any, error) {
 	// request rather than at the next restart.
 	a.ApplyStatsTimezone()
 	return map[string]any{}, nil
+}
+
+// settingsMigrateMoney — the one-way switch of the stored money unit from USD
+// to CNY, at the rate currently saved in settings. Deliberately not part of
+// startup: the wallet is live data and when to restate it in another unit is
+// the operator's call, made from the settings page.
+func (a *App) settingsMigrateMoney(c *httpx.Ctx) (any, error) {
+	if _, err := service.RequireAdmin(a.DB, c.Auth); err != nil {
+		return nil, err
+	}
+	rate := service.USDCNYRate(a.Settings)
+	migrated, err := store.MigrateMoneyToCNY(a.DB, rate)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"migrated": migrated, "rate": rate}, nil
 }
 
 // ApplyStatsTimezone — push routing_timezone into the store's stats clock. The

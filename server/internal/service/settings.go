@@ -42,14 +42,18 @@ var settingKeys = [][2]string{
 	{"fallback_model_alias", "FALLBACK_MODEL_ALIAS"},
 	{"show_home_page", "SHOW_HOME_PAGE"},
 	{"routing_timezone", "ROUTING_TIMEZONE"},
+	{"weekly_limit", "WEEKLY_LIMIT"},
+	{"usd_cny_rate", "USD_CNY_RATE"},
 }
 
 var settingDefaults = map[string]string{
-	"enable_recharge":       "true",
-	"daily_register_limit":  "5",
-	"fallback_model_alias":  "",
-	"show_home_page":        "1",
-	"routing_timezone":      DefaultRoutingTimezone,
+	"enable_recharge":      "true",
+	"daily_register_limit": "5",
+	"fallback_model_alias": "",
+	"show_home_page":       "1",
+	"routing_timezone":     DefaultRoutingTimezone,
+	"weekly_limit":         "720",
+	"usd_cny_rate":         "6.7",
 }
 
 type Settings struct {
@@ -128,7 +132,6 @@ func (s *Settings) SetMany(db *sql.DB, entries [][2]string) error {
 
 // ─────────────────────────── Auth tokens / login / register ───────────────────────────
 
-const WeeklyLimit = 100.0 // $100 per week
 var allMenus = []string{"profile", "model", "usage", "account"}
 
 func GenLoginToken(identity string) string {
@@ -319,16 +322,17 @@ func CompleteRegistration(s *Settings, db *sql.DB, token string) (*store.Account
 	}); err != nil {
 		return nil, "", err
 	}
-	// Registration bonus: +1 via a redeemed card record (same bookkeeping as TS).
+	// Registration bonus: ¥7 via a redeemed card record (same bookkeeping as TS),
+	// the equivalent of the $1 default before the switch to CNY.
 	now := store.Now()
 	if _, err := store.GenericInsert(db, "gift_card", map[string]any{
 		"code": fmt.Sprintf("register_%s_%d", id, now),
-		"token_amount": 1.0, "status": "redeemed",
+		"token_amount": 7.0, "status": "redeemed",
 		"redeemed_by": id, "redeemed_at": now,
 	}); err != nil {
 		return nil, "", err
 	}
-	if err := store.AccountAddBalance(db, id, 1.0); err != nil {
+	if err := store.AccountAddBalance(db, id, 7.0); err != nil {
 		return nil, "", err
 	}
 	account, err := store.AccountFindOne(db, id)
@@ -368,7 +372,8 @@ func ClaimDailyBonus(s *Settings, db *sql.DB, accountID string) (float64, error)
 		}
 		manualTotal += c.TokenAmount
 	}
-	amount := 0.1
+	// ¥0.7 base, the equivalent of the $0.1 it was before the switch to CNY.
+	amount := 0.7
 	if manualTotal > 0 && account.Balance > 0 {
 		ratio := manualTotal / account.Balance
 		if ratio > 0.15 {

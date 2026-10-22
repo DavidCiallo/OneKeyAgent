@@ -60,7 +60,7 @@ export function ModelFormModal({ isOpen, onOpenChange, mode, form, onFormChange,
                             value={input_priceStr}
                             onValueChange={setInputPriceStr}
                             onBlur={commitPrices}
-                            startContent={<span className="text-default-400 text-sm font-mono">$</span>}
+                            startContent={<span className="text-default-400 text-sm font-mono">¥</span>}
                             className="font-mono"
                         />
                         <Input
@@ -68,7 +68,7 @@ export function ModelFormModal({ isOpen, onOpenChange, mode, form, onFormChange,
                             value={cache_priceStr}
                             onValueChange={setCachePriceStr}
                             onBlur={commitPrices}
-                            startContent={<span className="text-default-400 text-sm font-mono">$</span>}
+                            startContent={<span className="text-default-400 text-sm font-mono">¥</span>}
                             className="font-mono"
                             description={locale.CachePriceDesc || "0 = same as input price"}
                         />
@@ -77,7 +77,7 @@ export function ModelFormModal({ isOpen, onOpenChange, mode, form, onFormChange,
                             value={output_priceStr}
                             onValueChange={setOutputPriceStr}
                             onBlur={commitPrices}
-                            startContent={<span className="text-default-400 text-sm font-mono">$</span>}
+                            startContent={<span className="text-default-400 text-sm font-mono">¥</span>}
                             className="font-mono"
                         />
                         <Switch

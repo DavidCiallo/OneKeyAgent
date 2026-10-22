@@ -255,6 +255,7 @@ export class AccountProfileResponse implements BaseResponse<AccountDTO> {
         account: AccountDTO | null;
         weeklyUsage: number;
         balance: number;
+        weekly_limit: number;
     };
 
     constructor(origin: AccountProfileResponse) {

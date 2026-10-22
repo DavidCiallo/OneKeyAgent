@@ -808,7 +808,7 @@ func (s *Server) ChatCompletionsAt(body map[string]any, accountID, endpoint stri
 		if err != nil {
 			return nil, err
 		}
-		if weekly+cost > service.WeeklyLimit {
+		if weekly+cost > service.WeeklyLimit(s.Settings) {
 			s.audit(auditRecord{
 				AccountID: accountID, AccountName: acctName, ModelAlias: alias,
 				ProviderID: provider.ID, ProviderName: provider.Name, ApiType: provider.ApiTypeStr(),
@@ -873,7 +873,7 @@ func (s *Server) StartStream(body map[string]any, accountID string) (*StreamPipe
 func (s *Server) StartStreamAt(body map[string]any, accountID, endpoint string) (*StreamPipeline, error) {
 	// Preflight: reject overdrawn accounts before any upstream call — the fix
 	// for the TS behavior where streams always completed and billed after.
-	if err := service.Preflight(s.DB, accountID); err != nil {
+	if err := service.Preflight(s.DB, accountID, service.WeeklyLimit(s.Settings)); err != nil {
 		alias, _ := body["model"].(string)
 		s.auditReject(accountID, alias, endpoint, true, 429, err)
 		return nil, err

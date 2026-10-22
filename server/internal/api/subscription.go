@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -46,27 +47,29 @@ func (a *App) subscriptionCreateTopup(c *httpx.Ctx) (any, error) {
 	if !service.TopupLimiter.Allow("createtopup:" + account.ID) {
 		return nil, fmt.Errorf("Too many requests, please try again later")
 	}
-	tokenAmount := c.Float("token_amount")
-	if tokenAmount <= 0 {
+	amount := c.Float("token_amount")
+	if amount <= 0 {
 		return nil, fmt.Errorf("token_amount must be positive")
 	}
 	payCurrency := c.Str("pay_currency")
 	if payCurrency == "" {
 		payCurrency = "USDTERC20"
 	}
-	invoiceURL, paymentID, invoiceID, err := service.NowPaymentsInvoice(a.Settings, tokenAmount, account.ID, payCurrency)
+	// The amount is a CNY credit; the invoice is opened in its USDT equivalent.
+	usd := math.Round(amount/service.USDCNYRate(a.Settings)*100) / 100
+	invoiceURL, paymentID, invoiceID, err := service.NowPaymentsInvoice(a.Settings, usd, account.ID, payCurrency)
 	if err != nil {
 		return nil, err
 	}
 	if _, err := store.GenericInsert(a.DB, "transaction", map[string]any{
-		"account_id": account.ID, "txid": invoiceID, "amount": tokenAmount,
+		"account_id": account.ID, "txid": invoiceID, "amount": amount,
 		"confirmations": 0, "status": "pending", "type": "topup",
 	}); err != nil {
 		return nil, err
 	}
 	return map[string]any{
 		"invoice_url": invoiceURL, "payment_id": paymentID,
-		"token_amount": tokenAmount, "price_dollars": tokenAmount,
+		"token_amount": amount, "price_usd": usd,
 	}, nil
 }
 

@@ -4,6 +4,7 @@ import { AuditDTO, AuditDetailDTO } from "../../../shared/modules/audit/audit.in
 import { AuditTpsChart } from "./components/AuditTpsChart";
 import { auditApi } from "../../api/instance";
 import { Locale } from "../../methods/locale";
+import { money } from "../../methods/money";
 import { Button, Chip, Tab, Tabs } from "@heroui/react";
 
 type Outcome = "success" | "failed";
@@ -22,7 +23,7 @@ function formatDuration(ms: number): string {
 
 function formatCost(cost: number): string {
     if (!cost) return "-";
-    return `$${cost.toFixed(6)}`;
+    return money(cost, 4);
 }
 
 /** Output tokens per second; dash when the attempt produced no tokens. */

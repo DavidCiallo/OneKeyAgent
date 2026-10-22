@@ -1,6 +1,7 @@
 import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Button } from "@heroui/react";
 import { AccountDTO } from "../../../../shared/modules/account/account.interface";
 import { Locale } from "../../../methods/locale";
+import { money } from "../../../methods/money";
 import { useAuth } from "../../../methods/auth-context";
 
 type Props = {
@@ -9,9 +10,9 @@ type Props = {
     onDelete: (id: string) => void;
 };
 
-const formatBalance = (dollars?: number) => {
-    if (dollars == null) return "$0.00";
-    return "$" + dollars.toFixed(2);
+const formatBalance = (balance?: number) => {
+    if (balance == null) return money(0);
+    return money(balance);
 };
 
 const columns = (locale: Record<string, string>, is_admin: boolean) => {

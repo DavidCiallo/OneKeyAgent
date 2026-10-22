@@ -3,6 +3,8 @@ package service
 import (
 	"database/sql"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"onekey/server/internal/store"
 )
@@ -139,10 +141,25 @@ func WeeklySpending(db *sql.DB, accountID string) (float64, error) {
 	return store.Round6(total), nil
 }
 
+// WeeklyLimit — the cap on trailing 7-day spend, in the money unit (CNY).
+func WeeklyLimit(s *Settings) float64 { return positiveSetting(s, "weekly_limit", 720) }
+
+// USDCNYRate — CNY per USD, an admin setting. The topup path divides a CNY
+// credit by it to open the invoice in USDT; the money conversion uses it once.
+func USDCNYRate(s *Settings) float64 { return positiveSetting(s, "usd_cny_rate", 6.7) }
+
+func positiveSetting(s *Settings, key string, def float64) float64 {
+	v, err := strconv.ParseFloat(strings.TrimSpace(s.Get(key)), 64)
+	if err != nil || v <= 0 {
+		return def
+	}
+	return v
+}
+
 // Preflight — gate before an upstream call. This is the piece the TS server
 // was missing: cost was only settled after the response, so streaming
 // requests could always overdraw.
-func Preflight(db *sql.DB, accountID string) error {
+func Preflight(db *sql.DB, accountID string, weeklyLimit float64) error {
 	balance, err := store.AccountGetBalance(db, accountID)
 	if err != nil {
 		return err
@@ -154,7 +171,7 @@ func Preflight(db *sql.DB, accountID string) error {
 	if err != nil {
 		return err
 	}
-	if weekly > WeeklyLimit {
+	if weekly > weeklyLimit {
 		return fmt.Errorf("429 Weekly spending limit reached")
 	}
 	return nil

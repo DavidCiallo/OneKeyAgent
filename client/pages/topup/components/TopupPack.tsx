@@ -1,16 +1,19 @@
 import { useState } from "react";
 import { Button, Input } from "@heroui/react";
 import { Locale } from "../../../methods/locale";
+import { money } from "../../../methods/money";
 import { subscriptionApi } from "../../../api/instance";
 import PaymentModal from "./PaymentModal";
 
 interface TopupPackProps {
     onSuccess: () => void;
+    usdCnyRate: number;
 }
 
-const PRESET_AMOUNTS = [50, 100, 500, 1000]; // USD
+const PRESET_AMOUNTS = [100, 300, 500, 1000]; // CNY
+const MIN_AMOUNT = 10;
 
-export default function TopupPack({ onSuccess }: TopupPackProps) {
+export default function TopupPack({ onSuccess, usdCnyRate }: TopupPackProps) {
     const locale = Locale("TopupPage");
 
     const [selectedAmount, setSelectedAmount] = useState<number>(PRESET_AMOUNTS[0]);
@@ -18,15 +21,15 @@ export default function TopupPack({ onSuccess }: TopupPackProps) {
     const [paying, setPaying] = useState(false);
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
-    // 1 token = 1 USD, input is in USD
-    const effectiveAmount = customAmount ? Math.max(Number(customAmount), 3) : selectedAmount;
-    const finalPrice = effectiveAmount; // dollars
+    // The amount is a CNY credit; the invoice is opened in its USDT equivalent.
+    const effectiveAmount = customAmount ? Math.max(Number(customAmount), MIN_AMOUNT) : selectedAmount;
+    const finalPrice = effectiveAmount;
 
-    const isCustomValid = !customAmount || Number(customAmount) >= 3;
+    const isCustomValid = !customAmount || Number(customAmount) >= MIN_AMOUNT;
     const canBuy = finalPrice > 0 && isCustomValid;
 
     const handleBuy = async (payCurrency: string) => {
-        const amount = customAmount ? Math.max(Number(customAmount), 3) : selectedAmount;
+        const amount = customAmount ? Math.max(Number(customAmount), MIN_AMOUNT) : selectedAmount;
         if (amount <= 0) return;
         setPaying(true);
         try {
@@ -44,8 +47,6 @@ export default function TopupPack({ onSuccess }: TopupPackProps) {
             setPaying(false);
         }
     };
-
-    const formatPrice = (dollars: number) => "$" + dollars.toFixed(2);
 
     return (
         <>
@@ -65,7 +66,7 @@ export default function TopupPack({ onSuccess }: TopupPackProps) {
                                         setCustomAmount("");
                                     }}
                                 >
-                                    ${amount}
+                                    {money(amount)}
                                 </Button>
                             ))}
                         </div>
@@ -78,13 +79,13 @@ export default function TopupPack({ onSuccess }: TopupPackProps) {
                                 if (val) setSelectedAmount(0);
                             }}
                             className="w-full text-xs"
-                            errorMessage={!isCustomValid ? "最低 $3" : undefined}
+                            errorMessage={!isCustomValid ? `最低 ${money(MIN_AMOUNT)}` : undefined}
                             isInvalid={!isCustomValid}
                         />
                     </div>
                     <div className="flex flex-col items-end gap-1 min-w-1/2 md:min-w-[180px]">
                         <span className="text-lg font-bold text-primary mx-1">
-                            {finalPrice > 0 ? formatPrice(finalPrice) : "—"}
+                            {finalPrice > 0 ? money(finalPrice) : "—"}
                         </span>
                         <Button
                             color="primary"
@@ -106,6 +107,7 @@ export default function TopupPack({ onSuccess }: TopupPackProps) {
                 isOpen={paymentModalOpen}
                 onOpenChange={() => setPaymentModalOpen(false)}
                 planPrice={finalPrice}
+                usdCnyRate={usdCnyRate}
                 onProceedToPay={handleBuy}
                 paying={paying}
             />
