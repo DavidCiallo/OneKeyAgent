@@ -76,8 +76,6 @@ var tables = []tableDef{
 		{"enabled", "INTEGER NOT NULL DEFAULT 1"},
 		// max_context — upstream context window in tokens; 0 = unlimited.
 		{"max_context", "INTEGER NOT NULL DEFAULT 0"},
-		// daily_quota — requests allowed per local day; 0 = unlimited, in-memory.
-		{"daily_quota", "INTEGER NOT NULL DEFAULT 0"},
 		// chunk_delay_ms — how long each streamed output frame is held back, in
 		// milliseconds; 0 = off. A fixed wait per SSE block slows a provider
 		// down rather than rejecting the work, and needs no token estimate to be

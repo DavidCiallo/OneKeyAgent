@@ -1,4 +1,4 @@
-import { Button, Chip, Checkbox, Tooltip } from "@heroui/react";
+import { Button, Chip, Checkbox } from "@heroui/react";
 import type { ReactNode } from "react";
 import { ProviderDTO } from "../../../../shared/modules/provider/provider.interface";
 import { Locale } from "../../../methods/locale";
@@ -75,64 +75,16 @@ function Cell({ label, children }: { label: string; children: ReactNode }) {
     );
 }
 
-// Routing state. A parked provider is silently skipped, so the reason has to be
-// visible on the card.
-function HealthChip({ item, locale }: { item: ProviderDTO; locale: any }) {
-    const now = Date.now();
-    const parkedMs = (item.cooldown_until || 0) - now;
-    const quotaSpent = !!item.daily_quota && (item.today_count || 0) >= item.daily_quota;
-
-    if (parkedMs > 0) {
-        const mins = Math.ceil(parkedMs / 60000);
-        return (
-            <Tooltip content={`${item.failures || 0} consecutive failures`}>
-                <Chip size="sm" variant="flat" color="danger" className="shrink-0">
-                    {locale.Parked} {mins}m
-                </Chip>
-            </Tooltip>
-        );
-    }
-    if (quotaSpent) {
-        return (
-            <Tooltip content={`${item.today_count}/${item.daily_quota}`}>
-                <Chip size="sm" variant="flat" color="warning" className="shrink-0">
-                    {locale.QuotaSpent}
-                </Chip>
-            </Tooltip>
-        );
-    }
-    // Show a streak before it trips the cooldown.
-    if ((item.failures || 0) > 0) {
-        return (
-            <Tooltip content={locale.FailStreakHint}>
-                <Chip size="sm" variant="flat" color="warning" className="shrink-0">
-                    ✕{item.failures}
-                </Chip>
-            </Tooltip>
-        );
-    }
-    return null;
-}
-
-// LimitRow — the four sizing/limit values on one unbreakable line: context
-// window, hourly quota (used/limit), stream rate cap, active window. They are
-// kept together so the card does not scatter them across wraps. A value is only
-// shown when it is set, and the ones that can trip (quota spent, off-window, the
-// rate cap) turn warning-coloured — no hover text: the numbers and the colour
-// carry it.
+// LimitRow — the sizing/limit values on one unbreakable line: context window,
+// stream rate cap, active window. They are kept together so the card does not
+// scatter them across wraps. A value is only shown when it is set, and the ones
+// that can trip (off-window, the rate cap) turn warning-coloured — no hover
+// text: the numbers and the colour carry it.
 function LimitRow({ item, locale }: { item: ProviderDTO; locale: any }) {
     const parts: ReactNode[] = [];
 
     if (item.max_context) {
         parts.push(<span key="ctx" className="shrink-0">{locale.Context} {humanCount(item.max_context)}</span>);
-    }
-    if (item.daily_quota) {
-        const spent = (item.today_count || 0) >= item.daily_quota;
-        parts.push(
-            <span key="quota" className={`shrink-0 ${spent ? "text-warning" : ""}`}>
-                {locale.Quota} {item.today_count || 0}/{humanCount(item.daily_quota)}
-            </span>
-        );
     }
     if (item.chunk_delay_ms) {
         parts.push(<span key="cd" className="shrink-0 text-warning">{locale.ChunkDelay} {item.chunk_delay_ms}</span>);
@@ -258,7 +210,6 @@ export function ProviderCardGrid({ list, onEdit, onCopy, onDelete, onMoveUp, onM
                             <Flag label={locale.Search} on={item.enable_search} />
 
                             <span className="text-default-200 mx-1">|</span>
-                            <HealthChip item={item} locale={locale} />
                             <LimitRow item={item} locale={locale} />
                         </div>
                     </div>

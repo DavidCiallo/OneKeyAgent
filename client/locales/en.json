@@ -78,13 +78,8 @@
         "Yes": "Yes",
         "No": "No",
         "MaxContext": "Max context",
-        "DailyQuota": "Hourly quota",
         "ChunkDelay": "Block delay (ms)",
-        "Parked": "Parked",
-        "QuotaSpent": "Quota spent",
-        "FailStreakHint": "Consecutive failures; 5 parks this provider for 300s.",
         "Context": "Context",
-        "Quota": "Quota",
         "ActiveFrom": "Active from",
         "ActiveTo": "Active to",
         "OutsideWindow": "Outside its active window; requests skip this provider."

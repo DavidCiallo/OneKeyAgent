@@ -123,7 +123,7 @@ func ModelWhere(db *sql.DB, cond string, args []any) ([]*Model, error) {
 
 // ─────────────────────────── Provider ───────────────────────────
 
-const providerCols = "id,model_alias,priority,name,base_url,model,api_key,auth_type,api_type,proxy_url,supports_thinking,supports_reasoning_effort,replay_reasoning,enable_search,extra_json,enabled,max_context,daily_quota,chunk_delay_ms,active_from,active_to,create_time,update_time,delete_time"
+const providerCols = "id,model_alias,priority,name,base_url,model,api_key,auth_type,api_type,proxy_url,supports_thinking,supports_reasoning_effort,replay_reasoning,enable_search,extra_json,enabled,max_context,chunk_delay_ms,active_from,active_to,create_time,update_time,delete_time"
 
 type Provider struct {
 	ID                     string  `json:"id"`
@@ -144,8 +144,6 @@ type Provider struct {
 	Enabled                int64   `json:"enabled"`
 	// MaxContext — declared context window; 0 = unlimited.
 	MaxContext int64 `json:"max_context"`
-	// DailyQuota — requests per local day; 0 = unlimited.
-	DailyQuota int64 `json:"daily_quota"`
 	// ChunkDelayMs — how long each streamed output frame is held back, in
 	// milliseconds; 0 = off. Applied by waiting between frames, not by
 	// rejecting requests.
@@ -164,7 +162,7 @@ func scanProvider(row interface{ Scan(...any) error }) (*Provider, error) {
 	err := row.Scan(&p.ID, &p.ModelAlias, &p.Priority, &p.Name, &p.BaseURL, &p.Model,
 		&p.ApiKey, &p.AuthType, &p.ApiType, &p.ProxyURL,
 		&p.SupportsThinking, &p.SupportsReasoningEffort, &p.ReplayReasoning, &p.EnableSearch,
-		&p.ExtraJSON, &p.Enabled, &p.MaxContext, &p.DailyQuota, &p.ChunkDelayMs, &p.ActiveFrom, &p.ActiveTo,
+		&p.ExtraJSON, &p.Enabled, &p.MaxContext, &p.ChunkDelayMs, &p.ActiveFrom, &p.ActiveTo,
 		&p.CreateTime, &p.UpdateTime, &p.DeleteTime)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -182,7 +180,7 @@ func (p *Provider) DTO() map[string]any {
 		"api_type": p.ApiType, "proxy_url": p.ProxyURL, "supports_thinking": p.SupportsThinking,
 		"supports_reasoning_effort": p.SupportsReasoningEffort, "replay_reasoning": p.ReplayReasoning,
 		"enable_search": p.EnableSearch, "extra_json": p.ExtraJSON, "enabled": p.Enabled,
-		"max_context": p.MaxContext, "daily_quota": p.DailyQuota, "chunk_delay_ms": p.ChunkDelayMs,
+		"max_context": p.MaxContext, "chunk_delay_ms": p.ChunkDelayMs,
 		"active_from": p.ActiveFrom, "active_to": p.ActiveTo, "create_time": p.CreateTime,
 		"update_time": p.UpdateTime, "delete_time": p.DeleteTime,
 	}

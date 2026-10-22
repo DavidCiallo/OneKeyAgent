@@ -76,13 +76,8 @@
         "Yes": "Sim",
         "No": "Não",
         "MaxContext": "Contexto máximo",
-        "DailyQuota": "Cota por hora",
         "ChunkDelay": "Atraso por bloco (ms)",
-        "Parked": "Pausado",
-        "QuotaSpent": "Cota esgotada",
-        "FailStreakHint": "Falhas consecutivas; 5 o pausa por 300s.",
         "Context": "Contexto",
-        "Quota": "Cota",
         "ActiveFrom": "Ativo a partir de",
         "ActiveTo": "Ativo até",
         "OutsideWindow": "Fora da janela ativa; as requisições o ignoram."

@@ -18,7 +18,6 @@ type ProviderForm = {
     enable_search: number;
     enabled: number;
     max_context: number;
-    daily_quota: number;
     chunk_delay_ms: number;
     active_from: string;
     active_to: string;
@@ -159,12 +158,6 @@ export function ProviderFormModal({ isOpen, onOpenChange, mode, form, onFormChan
                                 label={locale.MaxContext}
                                 value={String(form.max_context ?? 0)}
                                 onChange={e => onFormChange({ ...form, max_context: parseInt(e.target.value) || 0 })}
-                            />
-                            <Input
-                                type="number"
-                                label={locale.DailyQuota}
-                                value={String(form.daily_quota ?? 0)}
-                                onChange={e => onFormChange({ ...form, daily_quota: parseInt(e.target.value) || 0 })}
                             />
                             <Input
                                 type="number"

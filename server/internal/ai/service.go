@@ -761,9 +761,9 @@ func (s *Server) ChatCompletionsAt(body map[string]any, accountID, endpoint stri
 	skey := sessionKey(accountID, body)
 	acctName := s.accountName(accountID)
 
-	// Drop upstreams that are parked, out of quota, or too small for this
-	// request; selectProviders falls back to the full list if that empties it.
-	providers = s.policy.selectProviders(providers, requestTokenEstimate(body), true, true)
+	// Drop upstreams too small for this request or outside their active
+	// window; selectProviders falls back to the full list if that empties it.
+	providers = s.policy.selectProviders(providers, requestTokenEstimate(body))
 
 	for _, provider := range providers {
 		requestBody := map[string]any{}
@@ -790,14 +790,9 @@ func (s *Server) ChatCompletionsAt(body map[string]any, accountID, endpoint stri
 				Err:          uerr.msg,
 				RequestBody:  uerr.ReqBody, ResponseBody: uerr.RespBody,
 			})
-			if s.policy.recordFailure(provider.ID) {
-				fmt.Printf("[AI] provider %s parked for %ds after %d consecutive failures\n",
-					provider.Name, s.policy.cooldownMs/1000, s.policy.maxFailures)
-			}
 			s.policy.retryDelay()
 			continue
 		}
-		s.policy.recordSuccess(provider.ID)
 
 		inputPrice, cachePrice, outputPrice, err := service.ModelPrices(s.DB, alias)
 		if err != nil {
@@ -899,7 +894,7 @@ func (s *Server) StartStreamAt(body map[string]any, accountID, endpoint string) 
 	acctName := s.accountName(accountID)
 
 	// Same filters as the non-streaming path.
-	providers = s.policy.selectProviders(providers, requestTokenEstimate(body), true, true)
+	providers = s.policy.selectProviders(providers, requestTokenEstimate(body))
 
 	for _, provider := range providers {
 		requestBody := map[string]any{}
@@ -927,14 +922,9 @@ func (s *Server) StartStreamAt(body map[string]any, accountID, endpoint string) 
 				Stream:       true, Err: uerr.msg,
 				RequestBody: uerr.ReqBody, ResponseBody: uerr.RespBody,
 			})
-			if s.policy.recordFailure(provider.ID) {
-				fmt.Printf("[AI] provider %s parked for %ds after %d consecutive failures\n",
-					provider.Name, s.policy.cooldownMs/1000, s.policy.maxFailures)
-			}
 			s.policy.retryDelay()
 			continue
 		}
-		s.policy.recordSuccess(provider.ID)
 
 		// Convert upstream protocol to OpenAI SSE first (like the TS pipeline).
 		var converted io.Reader

@@ -73,13 +73,8 @@
         "Yes": "Có",
         "No": "Không",
         "MaxContext": "Giới hạn ngữ cảnh",
-        "DailyQuota": "Hạn mức mỗi giờ",
         "ChunkDelay": "Độ trễ mỗi khối (ms)",
-        "Parked": "Tạm dừng",
-        "QuotaSpent": "Hết hạn mức",
-        "FailStreakHint": "Số lần lỗi liên tiếp; 5 lần sẽ tạm dừng 300 giây.",
         "Context": "Ngữ cảnh",
-        "Quota": "Hạn mức",
         "ActiveFrom": "Hiệu lực từ",
         "ActiveTo": "Hiệu lực đến",
         "OutsideWindow": "Ngoài khung giờ hoạt động; yêu cầu sẽ bỏ qua nhà cung cấp này."
