@@ -53,27 +53,3 @@ export class SettingsListResponse implements BaseResponse<null> {
         this.data = origin.data;
     }
 }
-
-export class SettingsMigrateMoneyRequest implements BaseRequest {
-    public auth?: string;
-
-    constructor(origin: Partial<SettingsMigrateMoneyRequest>) {
-        if (false) throw new Error("Unexpected error");
-        origin.auth && (this.auth = origin.auth);
-    }
-    static self(unsafe: SettingsMigrateMoneyRequest) {
-        return new SettingsMigrateMoneyRequest(unsafe);
-    }
-}
-
-export class SettingsMigrateMoneyResponse implements BaseResponse<{ migrated: boolean; rate: number }> {
-    public success: boolean;
-    public message: string;
-    public data: { migrated: boolean; rate: number };
-
-    constructor(origin: SettingsMigrateMoneyResponse) {
-        this.success = origin.success;
-        this.message = origin.message;
-        this.data = origin.data;
-    }
-}

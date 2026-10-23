@@ -20,7 +20,7 @@ const FIELD_LABELS: Record<string, string> = {
     show_home_page: "Show Home Page",
     routing_timezone: "Routing Timezone",
     weekly_limit: "Weekly Spending Limit (CNY)",
-    usd_cny_rate: "USD → CNY Rate (topup invoice & conversion)",
+    usd_cny_rate: "USD → CNY Rate (topup invoice)",
 };
 
 export default function SettingsPage() {
@@ -29,16 +29,12 @@ export default function SettingsPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [msg, setMsg] = useState("");
-    const [moneyCurrency, setMoneyCurrency] = useState("USD");
-    const [converting, setConverting] = useState(false);
-    const [convertMsg, setConvertMsg] = useState("");
 
     const fetchSettings = async () => {
         setLoading(true);
         const res = await settingsApi.list({});
         if (res.success && res.data) {
             setEntries(res.data.entries);
-            setMoneyCurrency(res.data.money_currency || "USD");
         }
         setLoading(false);
     };
@@ -61,30 +57,6 @@ export default function SettingsPage() {
 
     const updateEntry = (key: string, value: string) => {
         setEntries(prev => prev.map(e => e.key === key ? { ...e, value } : e));
-    };
-
-    // Saves first: the conversion reads the rate from settings, so an edited
-    // rate must be persisted before it can be the one applied.
-    const handleConvert = async () => {
-        setConverting(true);
-        setConvertMsg("");
-        const saved = await settingsApi.save({ entries });
-        if (!saved.success) {
-            setConvertMsg("Could not save the rate, nothing converted");
-            setConverting(false);
-            return;
-        }
-        const res = await settingsApi.migrateMoney({});
-        if (!res.success) {
-            setConvertMsg("Conversion failed");
-        } else {
-            // The rest of the app reads the symbol from the boot config; flip it
-            // in place so the pages already rendered switch without a reload.
-            if (window.__APP_CONFIG__) window.__APP_CONFIG__.money_currency = "CNY";
-            setMoneyCurrency("CNY");
-            setConvertMsg(res.data.migrated ? `Converted at ${res.data.rate} CNY per USD` : "Already in CNY, nothing changed");
-        }
-        setConverting(false);
     };
 
     return (
@@ -119,21 +91,6 @@ export default function SettingsPage() {
                                     {msg}
                                 </span>
                             )}
-                        </div>
-                        <div className="border-t pt-4 max-w-lg flex flex-col gap-2">
-                            <span className="text-sm font-medium text-gray-600">Currency Conversion</span>
-                            <p className="text-xs text-gray-500">
-                                Balances, model prices, usage and topup records are still stored in USD. Converting
-                                multiplies them by the saved rate once and cannot be undone.
-                            </p>
-                            {moneyCurrency === "CNY" ? (
-                                <span className="text-green-600 text-sm">Stored in CNY</span>
-                            ) : (
-                                <Button size="sm" color="warning" className="self-start" isLoading={converting} onPress={handleConvert}>
-                                    Convert to CNY
-                                </Button>
-                            )}
-                            {convertMsg && <span className="text-sm text-gray-600">{convertMsg}</span>}
                         </div>
                     </>
                 )}

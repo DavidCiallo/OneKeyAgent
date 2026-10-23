@@ -14,7 +14,6 @@ import (
 	"onekey/server/internal/ai"
 	"onekey/server/internal/httpx"
 	"onekey/server/internal/service"
-	"onekey/server/internal/store"
 	"onekey/server/internal/sync"
 )
 
@@ -107,7 +106,6 @@ func (a *App) Routes() *http.ServeMux {
 		// settings
 		{"/api/settings/list", a.wrap(a.settingsList)},
 		{"/api/settings/save", a.wrap(a.settingsSave)},
-		{"/api/settings/migrateMoney", a.wrap(a.settingsMigrateMoney)},
 		// usage
 		{"/api/usage/list", a.wrap(a.usageList)},
 		{"/api/usage/stats", a.wrap(a.usageStats)},
@@ -235,9 +233,6 @@ func (a *App) bootConfig() map[string]any {
 		// formats every timestamp in its own zone, so an admin reading the panel
 		// from another region would see labels shifted against the buckets.
 		"timezone": a.StatsTimezoneName(),
-		// The unit the stored amounts are actually in: USD until an admin runs
-		// the conversion, so the pages label them correctly in between.
-		"money_currency": store.MoneyCurrency(a.DB),
 	}
 }
 

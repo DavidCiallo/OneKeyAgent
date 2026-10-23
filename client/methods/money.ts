@@ -1,11 +1,6 @@
-// All money amounts share one unit per database. The server injects which one
-// into the page, so the symbol follows the admin's conversion instead of
-// assuming it already happened.
-function symbol(): string {
-    return window.__APP_CONFIG__?.money_currency === "CNY" ? "\u00a5" : "$";
-}
-
+// All money amounts are in CNY; the symbol and precision live here so a future
+// unit change is one edit, not twenty.
 export function money(value: number, digits = 2): string {
     const sign = value < 0 ? "-" : "";
-    return `${sign}${symbol()}${Math.abs(value).toFixed(digits)}`;
+    return `${sign}\u00a5${Math.abs(value).toFixed(digits)}`;
 }
