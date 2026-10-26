@@ -154,3 +154,54 @@ export class AuditTpsResponse implements BaseResponse<AuditTpsPoint> {
         this.data = origin.data;
     }
 }
+
+/** Request files: the unabridged body of every relayed attempt, written to disk
+ *  while the switch is on. A type alias for the same reason as AuditTpsProvider. */
+export type AuditFileLogState = {
+    /** Writing right now. False once the window has run out. */
+    enabled: boolean;
+    /** Whether this node can write them at all — replicas cannot. */
+    available: boolean;
+    /** When the current window ends (Unix ms), 0 when off. */
+    until: number;
+    seconds_left: number;
+    window_seconds: number;
+};
+
+export class AuditFileLogRequest implements BaseRequest {
+    public auth?: string;
+
+    constructor(origin: Partial<AuditFileLogRequest>) {
+        if (false) throw new Error("Unexpected error");
+        origin.auth && (this.auth = origin.auth);
+    }
+    static self(unsafe: AuditFileLogRequest) {
+        return new AuditFileLogRequest(unsafe);
+    }
+}
+
+export class AuditFileLogSetRequest implements BaseRequest {
+    public auth?: string;
+    public enabled: boolean;
+
+    constructor(origin: Partial<AuditFileLogSetRequest>) {
+        if (false) throw new Error("Unexpected error");
+        origin.auth && (this.auth = origin.auth);
+        this.enabled = !!origin.enabled;
+    }
+    static self(unsafe: AuditFileLogSetRequest) {
+        return new AuditFileLogSetRequest(unsafe);
+    }
+}
+
+export class AuditFileLogResponse implements BaseResponse<AuditFileLogState> {
+    public success: boolean;
+    public message: string;
+    public data: AuditFileLogState;
+
+    constructor(origin: AuditFileLogResponse) {
+        this.success = origin.success;
+        this.message = origin.message;
+        this.data = origin.data;
+    }
+}

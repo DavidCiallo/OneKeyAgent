@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"onekey/server/internal/ai"
 	"onekey/server/internal/httpx"
 	"onekey/server/internal/service"
 	"onekey/server/internal/store"
@@ -65,6 +66,46 @@ func (a *App) auditDetail(c *httpx.Ctx) (any, error) {
 		"request_body":  row.RequestBody,
 		"response_body": row.ResponseBody,
 	}, nil
+}
+
+// auditFileLog — whether the unabridged request files are being written, and
+// when that stops. These are the files an admin turns on to debug one specific
+// request; they switch themselves off after one window.
+func (a *App) auditFileLog(c *httpx.Ctx) (any, error) {
+	if _, err := service.RequireAdmin(a.DB, c.Auth); err != nil {
+		return nil, err
+	}
+	return a.fileLogStatus(), nil
+}
+
+// auditFileLogSet — start one window (enabled=true) or stop now.
+func (a *App) auditFileLogSet(c *httpx.Ctx) (any, error) {
+	if _, err := service.RequireAdmin(a.DB, c.Auth); err != nil {
+		return nil, err
+	}
+	if _, err := a.AI.SetRequestFiles(c.Bool("enabled")); err != nil {
+		return nil, err
+	}
+	return a.fileLogStatus(), nil
+}
+
+func (a *App) fileLogStatus() map[string]any {
+	enabled, until := a.AI.RequestFileStatus()
+	status := map[string]any{
+		"enabled":        enabled,
+		"until":          until,
+		"available":      a.AI.RequestFilesAvailable(),
+		"window_seconds": int(ai.RequestFileWindow.Seconds()),
+		"seconds_left":   0,
+	}
+	if enabled {
+		left := (until - store.Now()) / 1000
+		if left < 0 {
+			left = 0
+		}
+		status["seconds_left"] = left
+	}
+	return status
 }
 
 // throughput — output tokens per second of generation, derived here rather than

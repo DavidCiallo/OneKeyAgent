@@ -1,11 +1,11 @@
 import { Header } from "../../components/header/Header";
 import { useEffect, useMemo, useState, useCallback, Fragment } from "react";
-import { AuditDTO, AuditDetailDTO } from "../../../shared/modules/audit/audit.interface";
+import { AuditDTO, AuditDetailDTO, AuditFileLogState } from "../../../shared/modules/audit/audit.interface";
 import { AuditTpsChart } from "./components/AuditTpsChart";
 import { auditApi } from "../../api/instance";
 import { Locale } from "../../methods/locale";
 import { money } from "../../methods/money";
-import { Button, Chip, Tab, Tabs } from "@heroui/react";
+import { Button, Chip, Switch, Tab, Tabs } from "@heroui/react";
 
 type Outcome = "success" | "failed";
 
@@ -119,6 +119,43 @@ export default function AuditPage() {
     };
     const hasDetail = (r: AuditDTO) => !!r.has_detail;
 
+    // Full request files: off by default, and one switch-on lasts a window. The
+    // countdown is local — the server reports when the window ends, and the
+    // switch reads as off once that moment passes.
+    const [fileLog, setFileLog] = useState<AuditFileLogState>({
+        enabled: false, available: false, until: 0, seconds_left: 0, window_seconds: 300,
+    });
+    const [now, setNow] = useState(Date.now());
+
+    const fetchFileLog = useCallback(async () => {
+        const res = await auditApi.fileLog({});
+        if (res.success && res.data) {
+            setFileLog(res.data);
+            setNow(Date.now());
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchFileLog();
+    }, [fetchFileLog]);
+
+    useEffect(() => {
+        if (!fileLog.enabled) return;
+        const timer = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(timer);
+    }, [fileLog.enabled]);
+
+    const toggleFileLog = async (on: boolean) => {
+        const res = await auditApi.setFileLog({ enabled: on });
+        if (res.success && res.data) {
+            setFileLog(res.data);
+            setNow(Date.now());
+        }
+    };
+
+    const fileLogSeconds = fileLog.enabled ? Math.max(0, Math.ceil((fileLog.until - now) / 1000)) : 0;
+    const fileLogOn = fileLog.enabled && fileLogSeconds > 0;
+
     return (
         <div className="max-w-screen flex flex-col h-screen">
             <Header name={locale.Title || "Audit"} />
@@ -133,6 +170,22 @@ export default function AuditPage() {
                         <Tab key="failed" title={`${locale.Failed || "Failed"} (${failedRows.length})`} />
                     </Tabs>
                     <div className="flex flex-row items-center gap-3">
+                        <div className="flex flex-row items-center gap-2 rounded-lg border border-gray-200 px-3 py-1">
+                            <span className="text-xs text-gray-600">
+                                {locale.FileLog || "Full request files"}
+                            </span>
+                            <Switch
+                                size="sm"
+                                isSelected={fileLogOn}
+                                isDisabled={!fileLog.available}
+                                onValueChange={toggleFileLog}
+                            />
+                            {fileLogOn && (
+                                <span className="text-xs text-gray-500 tabular-nums">
+                                    {Math.floor(fileLogSeconds / 60)}:{String(fileLogSeconds % 60).padStart(2, "0")}
+                                </span>
+                            )}
+                        </div>
                         <Button size="sm" variant="flat" isLoading={loading} onPress={() => fetchList(true)}>
                             {locale.Refresh || "Refresh"}
                         </Button>

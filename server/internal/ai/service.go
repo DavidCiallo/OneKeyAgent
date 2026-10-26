@@ -39,6 +39,10 @@ type Server struct {
 
 	// policy holds the in-memory provider selection state.
 	policy *providerPolicy
+
+	// files is nil unless the main node enabled request files; replicas leave
+	// it nil so only the main node writes them.
+	files *requestFiles
 }
 
 func NewServer(db *sql.DB, settings *service.Settings) *Server {
@@ -163,6 +167,9 @@ type auditRecord struct {
 	// summary-only so the table does not fill up with prompts.
 	RequestBody  string
 	ResponseBody string
+	// RawRequest is the body exactly as it went upstream, kept for the request
+	// file only — the table always gets the summary above.
+	RawRequest string
 }
 
 // audit persists one attempt. Best-effort by design: a broken audit trail must
@@ -190,6 +197,16 @@ func (s *Server) audit(r auditRecord) {
 	}
 	if err := store.AuditInsert(s.DB, rec); err != nil {
 		fmt.Println("[Audit] insert failed:", err)
+	}
+	if s.files != nil {
+		s.files.write(requestFileRecord{
+			Ts: store.Now(), Success: r.Success, StatusCode: r.StatusCode, Endpoint: r.Endpoint,
+			AccountID: r.AccountID, AccountName: r.AccountName, ModelAlias: r.ModelAlias,
+			ProviderID: r.ProviderID, ProviderName: r.ProviderName, ApiType: r.ApiType,
+			Stream: r.Stream, DurationMs: r.DurationMs, TtftMs: r.TtftMs,
+			InputTokens: r.InputTokens, CachedInput: r.CachedInput, OutputTokens: r.OutputTokens,
+			Cost: r.Cost, Err: r.Err, Request: json.RawMessage(r.RawRequest),
+		})
 	}
 }
 
@@ -450,12 +467,14 @@ type upstreamErr struct {
 	RespBody string
 }
 
-// tryProvider — non-stream call; converts to OpenAI format.
-func (s *Server) tryProvider(p *store.Provider, body map[string]any) (map[string]any, *upstreamErr) {
+// tryProvider — non-stream call; converts to OpenAI format. The second return
+// is the body as actually sent (after the provider-specific rewrite), which is
+// what the request file stores.
+func (s *Server) tryProvider(p *store.Provider, body map[string]any) (map[string]any, string, *upstreamErr) {
 	cfg := buildRequestConfig(p, body, false)
 	req, err := http.NewRequest("POST", cfg.url, strings.NewReader(cfg.body))
 	if err != nil {
-		return nil, &upstreamErr{msg: "build request: " + err.Error()}
+		return nil, cfg.body, &upstreamErr{msg: "build request: " + err.Error()}
 	}
 	for _, h := range cfg.headers {
 		req.Header.Set(h[0], h[1])
@@ -463,14 +482,14 @@ func (s *Server) tryProvider(p *store.Provider, body map[string]any) (map[string
 	resp, err := s.HTTPClient(p.ProxyStr()).Do(req)
 	if err != nil {
 		fmt.Printf("[AI] upstream request failed (%s -> %s): %v\n", p.Name, cfg.url, err)
-		return nil, &upstreamErr{msg: err.Error(), ReqBody: cfg.body}
+		return nil, cfg.body, &upstreamErr{msg: err.Error(), ReqBody: cfg.body}
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, maxUpstreamErrRead))
 		msg := strings.TrimSpace(string(snippet))
 		fmt.Printf("[AI] upstream %s returned %d (%s): %s\n", p.Name, resp.StatusCode, cfg.url, firstLine(msg, 300))
-		return nil, &upstreamErr{
+		return nil, cfg.body, &upstreamErr{
 			status:   resp.StatusCode,
 			msg:      fmt.Sprintf("upstream http %d: %s", resp.StatusCode, firstLine(msg, 300)),
 			ReqBody:  auditBodySummary(cfg.body, maxAuditReqBody),
@@ -479,15 +498,15 @@ func (s *Server) tryProvider(p *store.Provider, body map[string]any) (map[string
 	}
 	var parsed map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil || parsed == nil {
-		return nil, &upstreamErr{status: resp.StatusCode, msg: "invalid upstream JSON: " + errString(err)}
+		return nil, cfg.body, &upstreamErr{status: resp.StatusCode, msg: "invalid upstream JSON: " + errString(err)}
 	}
 	switch p.ApiTypeStr() {
 	case "anthropic":
-		return anthropicToOpenAI(parsed, p.Model), nil
+		return anthropicToOpenAI(parsed, p.Model), cfg.body, nil
 	case "gemini":
-		return geminiToOpenAI(parsed, p.Model), nil
+		return geminiToOpenAI(parsed, p.Model), cfg.body, nil
 	default:
-		return parsed, nil
+		return parsed, cfg.body, nil
 	}
 }
 
@@ -499,11 +518,11 @@ func errString(err error) string {
 }
 
 // tryProviderStream — streaming call; returns the raw upstream body.
-func (s *Server) tryProviderStream(p *store.Provider, body map[string]any) (io.ReadCloser, *upstreamErr) {
+func (s *Server) tryProviderStream(p *store.Provider, body map[string]any) (io.ReadCloser, string, *upstreamErr) {
 	cfg := buildRequestConfig(p, body, true)
 	req, err := http.NewRequest("POST", cfg.url, strings.NewReader(cfg.body))
 	if err != nil {
-		return nil, &upstreamErr{msg: "build request: " + err.Error()}
+		return nil, cfg.body, &upstreamErr{msg: "build request: " + err.Error()}
 	}
 	for _, h := range cfg.headers {
 		req.Header.Set(h[0], h[1])
@@ -511,21 +530,21 @@ func (s *Server) tryProviderStream(p *store.Provider, body map[string]any) (io.R
 	resp, err := s.HTTPClient(p.ProxyStr()).Do(req)
 	if err != nil {
 		fmt.Printf("[AI] upstream request failed (%s -> %s): %v\n", p.Name, cfg.url, err)
-		return nil, &upstreamErr{msg: err.Error(), ReqBody: cfg.body}
+		return nil, cfg.body, &upstreamErr{msg: err.Error(), ReqBody: cfg.body}
 	}
 	if resp.StatusCode != http.StatusOK {
 		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, maxUpstreamErrRead))
 		msg := strings.TrimSpace(string(snippet))
 		fmt.Printf("[AI] upstream %s returned %d (%s): %s\n", p.Name, resp.StatusCode, cfg.url, firstLine(msg, 300))
 		resp.Body.Close()
-		return nil, &upstreamErr{
+		return nil, cfg.body, &upstreamErr{
 			status:   resp.StatusCode,
 			msg:      fmt.Sprintf("upstream http %d: %s", resp.StatusCode, firstLine(msg, 300)),
 			ReqBody:  auditBodySummary(cfg.body, maxAuditReqBody),
 			RespBody: auditBodySummary(msg, maxAuditRespBody),
 		}
 	}
-	return resp.Body, nil
+	return resp.Body, cfg.body, nil
 }
 
 // firstLine — the error text for the summary column: one line, bounded, so a
@@ -730,11 +749,13 @@ func findLastToolCallID(body map[string]any) string {
 
 // auditReject — a request that failed before any upstream call (bad alias,
 // unauthorized model, preflight gate). Recorded so the audit view shows the
-// full failure picture, not just upstream errors.
-func (s *Server) auditReject(accountID, alias, endpoint string, stream bool, status int, err error) {
+// full failure picture, not just upstream errors. body is the caller's request,
+// which no provider rewrote yet.
+func (s *Server) auditReject(accountID, alias, endpoint string, stream bool, status int, err error, body map[string]any) {
 	s.audit(auditRecord{
 		AccountID: accountID, AccountName: s.accountName(accountID), ModelAlias: alias,
 		Endpoint: endpoint, StatusCode: status, Stream: stream, Err: err.Error(),
+		RawRequest: jStringify(body),
 	})
 }
 
@@ -749,13 +770,13 @@ func (s *Server) ChatCompletions(body map[string]any, accountID string) (map[str
 func (s *Server) ChatCompletionsAt(body map[string]any, accountID, endpoint string) (map[string]any, error) {
 	alias, _ := body["model"].(string)
 	if err := s.requireModelAccess(accountID, alias); err != nil {
-		s.auditReject(accountID, alias, endpoint, false, 403, err)
+		s.auditReject(accountID, alias, endpoint, false, 403, err, body)
 		return nil, err
 	}
 	fallback := s.Settings.Get("fallback_model_alias")
 	providers, err := s.providersForAlias(alias, fallback)
 	if err != nil {
-		s.auditReject(accountID, alias, endpoint, false, 404, err)
+		s.auditReject(accountID, alias, endpoint, false, 404, err, body)
 		return nil, err
 	}
 	skey := sessionKey(accountID, body)
@@ -781,14 +802,15 @@ func (s *Server) ChatCompletionsAt(body map[string]any, accountID, endpoint stri
 		}
 
 		started := time.Now()
-		rdata, uerr := s.tryProvider(provider, requestBody)
+		rdata, rawBody, uerr := s.tryProvider(provider, requestBody)
 		if uerr != nil {
 			s.audit(auditRecord{
 				AccountID: accountID, AccountName: acctName, ModelAlias: alias,
 				ProviderID: provider.ID, ProviderName: provider.Name, ApiType: provider.ApiTypeStr(),
 				Endpoint: endpoint, StatusCode: uerr.status, DurationMs: elapsedMs(started),
-				Err:          uerr.msg,
-				RequestBody:  uerr.ReqBody, ResponseBody: uerr.RespBody,
+				Err:         uerr.msg,
+				RequestBody: uerr.ReqBody, ResponseBody: uerr.RespBody,
+				RawRequest: rawBody,
 			})
 			s.policy.retryDelay()
 			continue
@@ -814,7 +836,8 @@ func (s *Server) ChatCompletionsAt(body map[string]any, accountID, endpoint stri
 				ProviderID: provider.ID, ProviderName: provider.Name, ApiType: provider.ApiTypeStr(),
 				Endpoint: endpoint, StatusCode: 429, DurationMs: elapsedMs(started),
 				InputTokens: rawInput, CachedInput: cachedInput, OutputTokens: rawOutput, Cost: cost,
-				Err: "429 Weekly spending limit reached",
+				Err:        "429 Weekly spending limit reached",
+				RawRequest: rawBody,
 			})
 			return nil, fmt.Errorf("429 Weekly spending limit reached")
 		}
@@ -828,7 +851,8 @@ func (s *Server) ChatCompletionsAt(body map[string]any, accountID, endpoint stri
 				ProviderID: provider.ID, ProviderName: provider.Name, ApiType: provider.ApiTypeStr(),
 				Endpoint: endpoint, StatusCode: 429, DurationMs: elapsedMs(started),
 				InputTokens: rawInput, CachedInput: cachedInput, OutputTokens: rawOutput, Cost: cost,
-				Err: "429 Insufficient balance",
+				Err:        "429 Insufficient balance",
+				RawRequest: rawBody,
 			})
 			return nil, fmt.Errorf("429 Insufficient balance")
 		}
@@ -851,6 +875,7 @@ func (s *Server) ChatCompletionsAt(body map[string]any, accountID, endpoint stri
 			ProviderID: provider.ID, ProviderName: provider.Name, ApiType: provider.ApiTypeStr(),
 			Endpoint: endpoint, Success: true, StatusCode: 200, DurationMs: duration,
 			InputTokens: rawInput, CachedInput: cachedInput, OutputTokens: rawOutput, Cost: cost,
+			RawRequest: rawBody,
 		})
 		return rdata, nil
 	}
@@ -875,18 +900,18 @@ func (s *Server) StartStreamAt(body map[string]any, accountID, endpoint string) 
 	// for the TS behavior where streams always completed and billed after.
 	if err := service.Preflight(s.DB, accountID, service.WeeklyLimit(s.Settings)); err != nil {
 		alias, _ := body["model"].(string)
-		s.auditReject(accountID, alias, endpoint, true, 429, err)
+		s.auditReject(accountID, alias, endpoint, true, 429, err, body)
 		return nil, err
 	}
 	alias, _ := body["model"].(string)
 	if err := s.requireModelAccess(accountID, alias); err != nil {
-		s.auditReject(accountID, alias, endpoint, true, 403, err)
+		s.auditReject(accountID, alias, endpoint, true, 403, err, body)
 		return nil, err
 	}
 	fallback := s.Settings.Get("fallback_model_alias")
 	providers, err := s.providersForAlias(alias, fallback)
 	if err != nil {
-		s.auditReject(accountID, alias, endpoint, true, 404, err)
+		s.auditReject(accountID, alias, endpoint, true, 404, err, body)
 		return nil, err
 	}
 	skey := sessionKey(accountID, body)
@@ -913,14 +938,15 @@ func (s *Server) StartStreamAt(body map[string]any, accountID, endpoint string) 
 		}
 
 		started := time.Now()
-		raw, uerr := s.tryProviderStream(provider, requestBody)
+		raw, rawBody, uerr := s.tryProviderStream(provider, requestBody)
 		if uerr != nil {
 			s.audit(auditRecord{
 				AccountID: accountID, AccountName: acctName, ModelAlias: alias,
 				ProviderID: provider.ID, ProviderName: provider.Name, ApiType: provider.ApiTypeStr(),
 				Endpoint: endpoint, StatusCode: uerr.status, DurationMs: elapsedMs(started),
-				Stream:       true, Err: uerr.msg,
+				Stream: true, Err: uerr.msg,
 				RequestBody: uerr.ReqBody, ResponseBody: uerr.RespBody,
+				RawRequest: rawBody,
 			})
 			s.policy.retryDelay()
 			continue
@@ -998,7 +1024,8 @@ func (s *Server) StartStreamAt(body map[string]any, accountID, endpoint string) 
 				Endpoint: endpoint, Success: true, StatusCode: 200, DurationMs: duration,
 				TtftMs:      ttft,
 				InputTokens: rawInput, CachedInput: cachedInput, OutputTokens: rawOutput, Cost: cost,
-				Stream: true,
+				Stream:     true,
+				RawRequest: rawBody,
 			})
 			pw.Close()
 		}()

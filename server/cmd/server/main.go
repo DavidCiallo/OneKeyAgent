@@ -95,6 +95,15 @@ func main() {
 	staticDir := resolveStaticDir()
 
 	app := api.NewApp(db, settings, staticDir, syncer)
+
+	// Request files hold the unabridged body of every relayed attempt. Only the
+	// main node can produce them — a replica's traffic is a copy of what the main
+	// node already serves. They stay off until an admin switches them on from the
+	// audit page; see ai.RequestFileWindow.
+	if !isReplica {
+		app.AI.EnableRequestFiles(requestLogDir(dbPath))
+	}
+
 	fmt.Printf("\nServer is running at http://localhost:%s\n", port)
 	if err := http.ListenAndServe(":"+port, app.Routes()); err != nil {
 		fmt.Println("Server failed:", err)
@@ -139,6 +148,16 @@ func seedAdmin(db *sql.DB, settings *service.Settings) {
 	if ierr != nil {
 		fmt.Println("[Init] admin creation failed:", ierr)
 	}
+}
+
+// requestLogDir — where the request files go: REQUEST_LOG_DIR, else a
+// "requests" directory beside the database. Sitting next to the db keeps one
+// directory to back up or prune instead of two.
+func requestLogDir(dbPath string) string {
+	if d := os.Getenv("REQUEST_LOG_DIR"); d != "" {
+		return d
+	}
+	return filepath.Join(filepath.Dir(dbPath), "requests")
 }
 
 // resolveStaticDir — env STATIC_DIR, else ./dist, else ../dist (repo layout).

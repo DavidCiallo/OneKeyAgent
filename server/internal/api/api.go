@@ -115,6 +115,8 @@ func (a *App) Routes() *http.ServeMux {
 		{"/api/audit/list", a.wrap(a.auditList)},
 		{"/api/audit/detail", a.wrap(a.auditDetail)},
 		{"/api/audit/tps", a.wrap(a.auditTps)},
+		{"/api/audit/fileLog", a.wrap(a.auditFileLog)},
+		{"/api/audit/fileLog/set", a.wrap(a.auditFileLogSet)},
 		// node sync (replica ⇄ main database; SYNC_SECRET, not a user token)
 		{"/api/sync/snapshot", a.wrap(a.syncSnapshot)},
 		{"/api/sync/push", a.wrap(a.syncPush)},
