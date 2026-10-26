@@ -792,9 +792,8 @@ func inList(name string, list []string) bool {
 	return false
 }
 
-// replacePrompt — apply the provider's literal replacements to system messages
-// only. Tool results and user text carry the caller's own data; rewriting them
-// would change what the model reads rather than how the client introduces itself.
+// replacePrompt — apply the provider's literal replacements to every message
+// whose content is a string, history included.
 func replacePrompt(body map[string]any, rules []store.PromptRule) map[string]any {
 	if len(rules) == 0 {
 		return body
@@ -808,7 +807,7 @@ func replacePrompt(body map[string]any, rules []store.PromptRule) map[string]any
 	for _, m := range msgs {
 		msg, _ := m.(map[string]any)
 		content, isStr := jGet(msg, "content").(string)
-		if !isStr || jStr(jGet(msg, "role")) != "system" {
+		if !isStr {
 			kept = append(kept, m)
 			continue
 		}

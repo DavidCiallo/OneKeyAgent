@@ -594,7 +594,7 @@ func (p *Provider) StripToolsList() []string {
 	return names
 }
 
-// PromptRule is one literal find/replace over the system message.
+// PromptRule is one literal find/replace over message content.
 type PromptRule struct {
 	From string `json:"from"`
 	To   string `json:"to"`
