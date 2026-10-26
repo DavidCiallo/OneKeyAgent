@@ -398,36 +398,12 @@ func buildRequestConfig(p *store.Provider, body map[string]any, stream bool) ups
 			}
 			delete(clean, "max_completion_tokens")
 		}
-		// The effort value travels normalized, not verbatim: clients send
-		// things like "Max" that strict OpenAI-compatible upstreams reject with
-		// a 400. Unrecognized values are dropped entirely rather than relayed.
-		effort := normalizeReasoningEffort(body["reasoning_effort"])
-		if effort == "" {
-			thinking := jMap(body["thinking"])
-			if thinking != nil && thinking["type"] == "enabled" {
-				effort = "high"
-				if b, ok := thinking["budget_tokens"].(float64); ok {
-					switch {
-					case b >= 16384:
-						effort = "high"
-					case b >= 8192:
-						effort = "medium"
-					default:
-						effort = "low"
-					}
-				}
-			}
-		}
-		// The provider's "supports reasoning effort" toggle finally means
-		// something: off strips the parameter for this upstream.
-		if p.SupportsReasoningEffort != nil && *p.SupportsReasoningEffort == 0 {
-			effort = ""
-		}
-		if effort != "" {
-			clean["reasoning_effort"] = effort
-		} else {
-			delete(clean, "reasoning_effort")
-		}
+		// reasoning_effort is not relayed at all: it is only a hint, and one
+		// upstream we go through answers it with a channel-verification 400
+		// ("Illegal API invocation from an unapproved channel") instead of
+		// reaching the model. Dropping it costs nothing but the hint — the
+		// upstream then runs the level it considers default.
+		delete(clean, "reasoning_effort")
 		delete(clean, "thinking")
 		postBody = mustJSON(clean)
 	}
