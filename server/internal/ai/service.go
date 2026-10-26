@@ -675,43 +675,96 @@ func mergeExtraJSON(body map[string]any, extra string) {
 
 // stripTools — drop the provider's configured tools from a request. Some
 // upstreams refuse a call outright when it carries a tool they don't expect, and
-// the caller has no way to know which; the provider row does. A request with
-// nothing to drop is returned untouched, so the common path copies nothing.
+// the caller has no way to know which; the provider row does.
+//
+// The history has to follow: a tool_call whose definition is gone names a
+// function the upstream never heard of, and leaving its result behind would
+// leave a tool message without the call it answers.
 func stripTools(body map[string]any, drop []string) map[string]any {
 	if len(drop) == 0 {
-		return body
-	}
-	tools, ok := body["tools"].([]any)
-	if !ok || len(tools) == 0 {
-		return body
-	}
-	kept := make([]any, 0, len(tools))
-	for _, t := range tools {
-		name := jStrField(jGet(t, "function"), "name")
-		skip := false
-		for _, d := range drop {
-			if d == name {
-				skip = true
-				break
-			}
-		}
-		if !skip {
-			kept = append(kept, t)
-		}
-	}
-	if len(kept) == len(tools) {
 		return body
 	}
 	out := make(map[string]any, len(body))
 	for k, v := range body {
 		out[k] = v
 	}
-	if len(kept) == 0 {
-		delete(out, "tools")
-	} else {
-		out["tools"] = kept
+	changed := false
+
+	if tools, ok := body["tools"].([]any); ok && len(tools) > 0 {
+		kept := make([]any, 0, len(tools))
+		for _, t := range tools {
+			if inList(jStrField(jGet(t, "function"), "name"), drop) {
+				changed = true
+				continue
+			}
+			kept = append(kept, t)
+		}
+		if len(kept) == 0 {
+			delete(out, "tools")
+		} else {
+			out["tools"] = kept
+		}
+	}
+
+	if msgs, ok := body["messages"].([]any); ok && len(msgs) > 0 {
+		calls := map[string]bool{}
+		for _, m := range msgs {
+			for _, tc := range jArr(jGet(m, "tool_calls")) {
+				if inList(jStrField(jGet(tc, "function"), "name"), drop) {
+					calls[jStr(jGet(tc, "id"))] = true
+				}
+			}
+		}
+		if len(calls) > 0 {
+			kept := make([]any, 0, len(msgs))
+			for _, m := range msgs {
+				if jStr(jGet(m, "role")) == "tool" && calls[jStr(jGet(m, "tool_call_id"))] {
+					continue
+				}
+				msg, _ := m.(map[string]any)
+				own := jArr(jGet(msg, "tool_calls"))
+				next := make([]any, 0, len(own))
+				for _, tc := range own {
+					if !calls[jStr(jGet(tc, "id"))] {
+						next = append(next, tc)
+					}
+				}
+				if len(next) == len(own) {
+					kept = append(kept, m)
+					continue
+				}
+				clone := make(map[string]any, len(msg))
+				for k, v := range msg {
+					clone[k] = v
+				}
+				if len(next) == 0 {
+					delete(clone, "tool_calls")
+					if c := clone["content"]; c == nil || c == "" {
+						continue
+					}
+				} else {
+					clone["tool_calls"] = next
+				}
+				kept = append(kept, clone)
+			}
+			out["messages"] = kept
+			changed = true
+		}
+	}
+
+	if !changed {
+		return body
 	}
 	return out
+}
+
+func inList(name string, list []string) bool {
+	for _, v := range list {
+		if v == name {
+			return true
+		}
+	}
+	return false
 }
 
 func thinkingEnabled(body map[string]any) bool {
