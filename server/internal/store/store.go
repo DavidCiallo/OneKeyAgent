@@ -73,6 +73,9 @@ var tables = []tableDef{
 		{"replay_reasoning", "INTEGER"},
 		{"enable_search", "INTEGER"},
 		{"extra_json", "TEXT"},
+		// strip_tools — JSON array of tool names to remove from a request before
+		// it goes upstream; see stripTools in the ai package.
+		{"strip_tools", "TEXT"},
 		{"enabled", "INTEGER NOT NULL DEFAULT 1"},
 		// max_context — upstream context window in tokens; 0 = unlimited.
 		{"max_context", "INTEGER NOT NULL DEFAULT 0"},

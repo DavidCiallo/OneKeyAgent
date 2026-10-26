@@ -344,6 +344,7 @@ type upstreamReq struct {
 }
 
 func buildRequestConfig(p *store.Provider, body map[string]any, stream bool) upstreamReq {
+	body = stripTools(body, p.StripToolsList())
 	apiType := ""
 	if p.ApiType != nil {
 		apiType = *p.ApiType
@@ -670,6 +671,47 @@ func mergeExtraJSON(body map[string]any, extra string) {
 	for k, v := range m {
 		body[k] = v
 	}
+}
+
+// stripTools — drop the provider's configured tools from a request. Some
+// upstreams refuse a call outright when it carries a tool they don't expect, and
+// the caller has no way to know which; the provider row does. A request with
+// nothing to drop is returned untouched, so the common path copies nothing.
+func stripTools(body map[string]any, drop []string) map[string]any {
+	if len(drop) == 0 {
+		return body
+	}
+	tools, ok := body["tools"].([]any)
+	if !ok || len(tools) == 0 {
+		return body
+	}
+	kept := make([]any, 0, len(tools))
+	for _, t := range tools {
+		name := jStrField(jGet(t, "function"), "name")
+		skip := false
+		for _, d := range drop {
+			if d == name {
+				skip = true
+				break
+			}
+		}
+		if !skip {
+			kept = append(kept, t)
+		}
+	}
+	if len(kept) == len(tools) {
+		return body
+	}
+	out := make(map[string]any, len(body))
+	for k, v := range body {
+		out[k] = v
+	}
+	if len(kept) == 0 {
+		delete(out, "tools")
+	} else {
+		out["tools"] = kept
+	}
+	return out
 }
 
 func thinkingEnabled(body map[string]any) bool {

@@ -16,6 +16,8 @@ export interface ProviderEntity extends BaseEntity {
     replay_reasoning?: number;
     enable_search?: number;
     extra_json?: string;
+    /** JSON array of tool names to remove from a request before it is relayed. */
+    strip_tools?: string;
     enabled: number;
     /** Context window in tokens; 0 = unlimited. */
     max_context?: number;

@@ -12,6 +12,7 @@ type ProviderForm = {
     api_type: string;
     proxy_url?: string;
     extra_json?: string;
+    strip_tools?: string;
     supports_thinking: number;
     supports_reasoning_effort: number;
     replay_reasoning: number;
@@ -185,6 +186,12 @@ export function ProviderFormModal({ isOpen, onOpenChange, mode, form, onFormChan
                             placeholder={'{"provider":{"order":["OpenAI","Anthropic"]},"route":"fallback"}'}
                             value={form.extra_json || ""}
                             onChange={e => onFormChange({ ...form, extra_json: e.target.value })}
+                        />
+                        <Textarea
+                            label={locale.StripTools || "Remove tools (JSON array)"}
+                            placeholder={'["plugin_manager","schedule_create"]'}
+                            value={form.strip_tools || ""}
+                            onChange={e => onFormChange({ ...form, strip_tools: e.target.value })}
                         />
                     </div>
                 </ModalBody>
