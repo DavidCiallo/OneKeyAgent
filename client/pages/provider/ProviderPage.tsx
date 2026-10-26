@@ -21,7 +21,6 @@ type ProviderForm = {
     api_type: string;
     proxy_url?: string;
     extra_json?: string;
-    strip_tools?: string;
     prompt_replace?: string;
     supports_thinking: number;
     supports_reasoning_effort: number;
@@ -37,7 +36,7 @@ type ProviderForm = {
 // 0 = no limit for both composite fields.
 const emptyForm = (): ProviderForm => ({
     model_alias: "", priority: 1, name: "", base_url: "", model: "",
-    auth_type: "bearer", api_type: "openai", extra_json: "", strip_tools: "", prompt_replace: "",
+    auth_type: "bearer", api_type: "openai", extra_json: "", prompt_replace: "",
     supports_thinking: 0, supports_reasoning_effort: 0, replay_reasoning: 0,
     enable_search: 0, enabled: 1, max_context: 0,
     chunk_delay_ms: 0,
@@ -172,7 +171,6 @@ export default function ProviderPage() {
                 replay_reasoning: item.replay_reasoning ?? 0,
                 enable_search: item.enable_search ?? 0,
                 extra_json: item.extra_json || undefined,
-                strip_tools: item.strip_tools || undefined,
                 prompt_replace: item.prompt_replace || undefined,
                 enabled: item.enabled,
                 max_context: item.max_context ?? 0,
@@ -200,7 +198,6 @@ export default function ProviderPage() {
             api_type: item.api_type || "openai",
             proxy_url: item.proxy_url || "",
             extra_json: item.extra_json || "",
-            strip_tools: item.strip_tools || "",
             prompt_replace: item.prompt_replace || "",
             supports_thinking: item.supports_thinking ?? 0,
             supports_reasoning_effort: item.supports_reasoning_effort ?? 0,
@@ -233,7 +230,6 @@ export default function ProviderPage() {
                     replay_reasoning: form.replay_reasoning,
                     enable_search: form.enable_search,
                     extra_json: form.extra_json || undefined,
-                    strip_tools: form.strip_tools || undefined,
                     prompt_replace: form.prompt_replace || undefined,
                     enabled: form.enabled,
                     max_context: form.max_context,
@@ -269,7 +265,6 @@ export default function ProviderPage() {
                     replay_reasoning: form.replay_reasoning !== undefined ? form.replay_reasoning : undefined,
                     enable_search: form.enable_search !== undefined ? form.enable_search : undefined,
                     extra_json: form.extra_json !== undefined ? form.extra_json : undefined,
-                    strip_tools: form.strip_tools !== undefined ? form.strip_tools : undefined,
                     prompt_replace: form.prompt_replace !== undefined ? form.prompt_replace : undefined,
                     enabled: form.enabled !== undefined ? form.enabled : undefined,
                     max_context: form.max_context !== undefined ? form.max_context : undefined,

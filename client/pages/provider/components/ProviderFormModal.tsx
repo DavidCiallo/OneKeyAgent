@@ -1,4 +1,5 @@
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Textarea, Select, SelectItem, Switch } from "@heroui/react";
+import { useState } from "react";
 import { Locale } from "../../../methods/locale";
 
 type ProviderForm = {
@@ -12,7 +13,6 @@ type ProviderForm = {
     api_type: string;
     proxy_url?: string;
     extra_json?: string;
-    strip_tools?: string;
     prompt_replace?: string;
     supports_thinking: number;
     supports_reasoning_effort: number;
@@ -37,176 +37,186 @@ type Props = {
 export function ProviderFormModal({ isOpen, onOpenChange, mode, form, onFormChange, onConfirm }: Props) {
     const locale = Locale("ProviderPage");
     const common = Locale("Common");
+    const [advancedOpen, setAdvancedOpen] = useState(false);
 
     return (
-        <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="2xl">
-            <ModalContent>
-                <ModalHeader>{mode === "create" ? locale.CreateTitle : locale.EditTitle}</ModalHeader>
-                <ModalBody>
-                    <div className="flex flex-col gap-3">
-                        <Input
-                            label={locale.ModelAlias}
-                            value={form.model_alias}
-                            onChange={e => onFormChange({ ...form, model_alias: e.target.value })}
-                            isRequired
-                        />
-                        <Select
-                            label={locale.Priority}
-                            selectedKeys={[String(form.priority)]}
-                            onChange={e => onFormChange({ ...form, priority: parseInt(e.target.value) })}
-                        >
-                            <SelectItem key="1">1</SelectItem>
-                            <SelectItem key="2">2</SelectItem>
-                            <SelectItem key="3">3</SelectItem>
-                            <SelectItem key="4">4</SelectItem>
-                            <SelectItem key="5">5</SelectItem>
-                        </Select>
-                        <Input
-                            label={locale.Name}
-                            value={form.name}
-                            onChange={e => onFormChange({ ...form, name: e.target.value })}
-                            isRequired
-                        />
-                        <div className="flex flex-row gap-3">
+        <>
+            <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="2xl">
+                <ModalContent>
+                    <ModalHeader>{mode === "create" ? locale.CreateTitle : locale.EditTitle}</ModalHeader>
+                    <ModalBody>
+                        <div className="flex flex-col gap-3">
                             <Input
-                                label={locale.BaseURL}
-                                value={form.base_url}
-                                onChange={e => onFormChange({ ...form, base_url: e.target.value })}
+                                label={locale.ModelAlias}
+                                value={form.model_alias}
+                                onChange={e => onFormChange({ ...form, model_alias: e.target.value })}
                                 isRequired
-                                className="flex-[3]"
                             />
+                            <Select
+                                label={locale.Priority}
+                                selectedKeys={[String(form.priority)]}
+                                onChange={e => onFormChange({ ...form, priority: parseInt(e.target.value) })}
+                            >
+                                <SelectItem key="1">1</SelectItem>
+                                <SelectItem key="2">2</SelectItem>
+                                <SelectItem key="3">3</SelectItem>
+                                <SelectItem key="4">4</SelectItem>
+                                <SelectItem key="5">5</SelectItem>
+                            </Select>
                             <Input
-                                label={locale.Model}
-                                value={form.model}
-                                onChange={e => onFormChange({ ...form, model: e.target.value })}
+                                label={locale.Name}
+                                value={form.name}
+                                onChange={e => onFormChange({ ...form, name: e.target.value })}
                                 isRequired
-                                className="flex-[2]"
                             />
-                        </div>
-                        <Input
-                            label={locale.ApiKey}
-                            value={form.api_key || ""}
-                            onChange={e => onFormChange({ ...form, api_key: e.target.value })}
-                        />
-                        <div className="flex flex-row gap-3">
-                            <Select
-                                label={locale.AuthType}
-                                selectedKeys={[form.auth_type]}
-                                onChange={e => onFormChange({ ...form, auth_type: e.target.value })}
-                            >
-                                <SelectItem key="bearer">Bearer</SelectItem>
-                                <SelectItem key="custom">Custom</SelectItem>
-                            </Select>
-                            <Select
-                                label={locale.ApiType}
-                                selectedKeys={[form.api_type]}
-                                onChange={e => onFormChange({ ...form, api_type: e.target.value })}
-                            >
-                                <SelectItem key="openai">OpenAI</SelectItem>
-                                <SelectItem key="anthropic">Anthropic</SelectItem>
-                                <SelectItem key="gemini">Gemini</SelectItem>
-                            </Select>
-                        </div>
-                        <div className="flex flex-row items-center gap-4 flex-wrap">
-                            <div className="flex flex-row items-center gap-1.5">
-                                <span className="text-sm whitespace-nowrap">{locale.Search}</span>
-                                <Switch
-                                    size="sm"
-                                    isSelected={form.enable_search === 1}
-                                    onValueChange={v => onFormChange({ ...form, enable_search: v ? 1 : 0 })}
+                            <div className="flex flex-row gap-3">
+                                <Input
+                                    label={locale.BaseURL}
+                                    value={form.base_url}
+                                    onChange={e => onFormChange({ ...form, base_url: e.target.value })}
+                                    isRequired
+                                    className="flex-[3]"
+                                />
+                                <Input
+                                    label={locale.Model}
+                                    value={form.model}
+                                    onChange={e => onFormChange({ ...form, model: e.target.value })}
+                                    isRequired
+                                    className="flex-[2]"
                                 />
                             </div>
-                            <div className="flex flex-row items-center gap-1.5">
-                                <span className="text-sm whitespace-nowrap">{locale.SupportsThinking}</span>
-                                <Switch
-                                    size="sm"
-                                    isSelected={form.supports_thinking === 1}
-                                    onValueChange={v => onFormChange({ ...form, supports_thinking: v ? 1 : 0 })}
-                                />
-                            </div>
-                            <div className="flex flex-row items-center gap-1.5">
-                                <span className="text-sm whitespace-nowrap">{locale.SupportsReasoningEffort}</span>
-                                <Switch
-                                    size="sm"
-                                    isSelected={form.supports_reasoning_effort === 1}
-                                    onValueChange={v => onFormChange({ ...form, supports_reasoning_effort: v ? 1 : 0 })}
-                                />
-                            </div>
-                            <div className="flex flex-row items-center gap-1.5">
-                                <span className="text-sm whitespace-nowrap">{locale.ReplayReasoning}</span>
-                                <Switch
-                                    size="sm"
-                                    isSelected={form.replay_reasoning === 1}
-                                    onValueChange={v => onFormChange({ ...form, replay_reasoning: v ? 1 : 0 })}
-                                />
-                            </div>
-                            <div className="flex flex-row items-center gap-1.5">
-                                <span className="text-sm whitespace-nowrap">{locale.Enabled}</span>
-                                <Switch
-                                    size="sm"
-                                    isSelected={form.enabled === 1}
-                                    onValueChange={v => onFormChange({ ...form, enabled: v ? 1 : 0 })}
-                                />
-                            </div>
-                        </div>
-                        <Input
-                            label={locale.ProxyURL}
-                            value={form.proxy_url || ""}
-                            onChange={e => onFormChange({ ...form, proxy_url: e.target.value })}
-                        />
-                        <div className="flex flex-row gap-3">
                             <Input
-                                type="number"
-                                label={locale.MaxContext}
-                                value={String(form.max_context ?? 0)}
-                                onChange={e => onFormChange({ ...form, max_context: parseInt(e.target.value) || 0 })}
+                                label={locale.ApiKey}
+                                value={form.api_key || ""}
+                                onChange={e => onFormChange({ ...form, api_key: e.target.value })}
                             />
-                            <Input
-                                type="number"
-                                label={locale.ChunkDelay}
-                                value={String(form.chunk_delay_ms ?? 0)}
-                                onChange={e => onFormChange({ ...form, chunk_delay_ms: parseInt(e.target.value) || 0 })}
+                            <div className="flex flex-row gap-3">
+                                <Select
+                                    label={locale.AuthType}
+                                    selectedKeys={[form.auth_type]}
+                                    onChange={e => onFormChange({ ...form, auth_type: e.target.value })}
+                                >
+                                    <SelectItem key="bearer">Bearer</SelectItem>
+                                    <SelectItem key="custom">Custom</SelectItem>
+                                </Select>
+                                <Select
+                                    label={locale.ApiType}
+                                    selectedKeys={[form.api_type]}
+                                    onChange={e => onFormChange({ ...form, api_type: e.target.value })}
+                                >
+                                    <SelectItem key="openai">OpenAI</SelectItem>
+                                    <SelectItem key="anthropic">Anthropic</SelectItem>
+                                    <SelectItem key="gemini">Gemini</SelectItem>
+                                </Select>
+                            </div>
+                            <div className="flex flex-row items-center gap-4 flex-wrap">
+                                <div className="flex flex-row items-center gap-1.5">
+                                    <span className="text-sm whitespace-nowrap">{locale.Search}</span>
+                                    <Switch
+                                        size="sm"
+                                        isSelected={form.enable_search === 1}
+                                        onValueChange={v => onFormChange({ ...form, enable_search: v ? 1 : 0 })}
+                                    />
+                                </div>
+                                <div className="flex flex-row items-center gap-1.5">
+                                    <span className="text-sm whitespace-nowrap">{locale.SupportsThinking}</span>
+                                    <Switch
+                                        size="sm"
+                                        isSelected={form.supports_thinking === 1}
+                                        onValueChange={v => onFormChange({ ...form, supports_thinking: v ? 1 : 0 })}
+                                    />
+                                </div>
+                                <div className="flex flex-row items-center gap-1.5">
+                                    <span className="text-sm whitespace-nowrap">{locale.SupportsReasoningEffort}</span>
+                                    <Switch
+                                        size="sm"
+                                        isSelected={form.supports_reasoning_effort === 1}
+                                        onValueChange={v => onFormChange({ ...form, supports_reasoning_effort: v ? 1 : 0 })}
+                                    />
+                                </div>
+                                <div className="flex flex-row items-center gap-1.5">
+                                    <span className="text-sm whitespace-nowrap">{locale.ReplayReasoning}</span>
+                                    <Switch
+                                        size="sm"
+                                        isSelected={form.replay_reasoning === 1}
+                                        onValueChange={v => onFormChange({ ...form, replay_reasoning: v ? 1 : 0 })}
+                                    />
+                                </div>
+                                <div className="flex flex-row items-center gap-1.5">
+                                    <span className="text-sm whitespace-nowrap">{locale.Enabled}</span>
+                                    <Switch
+                                        size="sm"
+                                        isSelected={form.enabled === 1}
+                                        onValueChange={v => onFormChange({ ...form, enabled: v ? 1 : 0 })}
+                                    />
+                                </div>
+                            </div>
+                            <Textarea
+                                label={locale.PromptReplace}
+                                placeholder={'[{"from":"whose URL the runtime context names","to":"at http://127.0.0.1:3080"}]'}
+                                value={form.prompt_replace || ""}
+                                onChange={e => onFormChange({ ...form, prompt_replace: e.target.value })}
                             />
                         </div>
-                        <div className="flex flex-row gap-3">
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button variant="flat" onPress={onOpenChange}>{common.ButtonCancel}</Button>
+                        <Button variant="flat" onPress={() => setAdvancedOpen(true)}>{locale.Advanced}</Button>
+                        <Button color="primary" onPress={onConfirm}>{common.ButtonConfirm}</Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
+            <Modal isOpen={advancedOpen} onOpenChange={setAdvancedOpen} size="lg">
+                <ModalContent>
+                    <ModalHeader>{locale.Advanced}</ModalHeader>
+                    <ModalBody>
+                        <div className="flex flex-col gap-3">
                             <Input
-                                type="time"
-                                label={locale.ActiveFrom}
-                                value={form.active_from}
-                                onChange={e => onFormChange({ ...form, active_from: e.target.value })}
+                                label={locale.ProxyURL}
+                                value={form.proxy_url || ""}
+                                onChange={e => onFormChange({ ...form, proxy_url: e.target.value })}
                             />
-                            <Input
-                                type="time"
-                                label={locale.ActiveTo}
-                                value={form.active_to}
-                                onChange={e => onFormChange({ ...form, active_to: e.target.value })}
+                            <div className="flex flex-row gap-3">
+                                <Input
+                                    type="number"
+                                    label={locale.MaxContext}
+                                    value={String(form.max_context ?? 0)}
+                                    onChange={e => onFormChange({ ...form, max_context: parseInt(e.target.value) || 0 })}
+                                />
+                                <Input
+                                    type="number"
+                                    label={locale.ChunkDelay}
+                                    value={String(form.chunk_delay_ms ?? 0)}
+                                    onChange={e => onFormChange({ ...form, chunk_delay_ms: parseInt(e.target.value) || 0 })}
+                                />
+                            </div>
+                            <div className="flex flex-row gap-3">
+                                <Input
+                                    type="time"
+                                    label={locale.ActiveFrom}
+                                    value={form.active_from}
+                                    onChange={e => onFormChange({ ...form, active_from: e.target.value })}
+                                />
+                                <Input
+                                    type="time"
+                                    label={locale.ActiveTo}
+                                    value={form.active_to}
+                                    onChange={e => onFormChange({ ...form, active_to: e.target.value })}
+                                />
+                            </div>
+                            <Textarea
+                                label={locale.ExtraJson}
+                                placeholder={'{"provider":{"order":["OpenAI","Anthropic"]},"route":"fallback"}'}
+                                value={form.extra_json || ""}
+                                onChange={e => onFormChange({ ...form, extra_json: e.target.value })}
                             />
                         </div>
-                        <Textarea
-                            label={locale.ExtraJson}
-                            placeholder={'{"provider":{"order":["OpenAI","Anthropic"]},"route":"fallback"}'}
-                            value={form.extra_json || ""}
-                            onChange={e => onFormChange({ ...form, extra_json: e.target.value })}
-                        />
-                        <Textarea
-                            label={locale.StripTools || "Remove tools (JSON array)"}
-                            placeholder={'["plugin_manager","schedule_create"]'}
-                            value={form.strip_tools || ""}
-                            onChange={e => onFormChange({ ...form, strip_tools: e.target.value })}
-                        />
-                        <Textarea
-                            label={locale.PromptReplace || "Prompt replace (JSON array of from/to)"}
-                            placeholder={'[{"from":"whose URL the runtime context names","to":"at http://127.0.0.1:3080"}]'}
-                            value={form.prompt_replace || ""}
-                            onChange={e => onFormChange({ ...form, prompt_replace: e.target.value })}
-                        />
-                    </div>
-                </ModalBody>
-                <ModalFooter>
-                    <Button variant="flat" onPress={onOpenChange}>{common.ButtonCancel}</Button>
-                    <Button color="primary" onPress={onConfirm}>{common.ButtonConfirm}</Button>
-                </ModalFooter>
-            </ModalContent>
-        </Modal>
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button color="primary" onPress={() => setAdvancedOpen(false)}>{common.ButtonConfirm}</Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
+        </>
     );
 }

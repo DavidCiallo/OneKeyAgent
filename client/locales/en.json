@@ -82,6 +82,8 @@
         "Context": "Context",
         "ActiveFrom": "Active from",
         "ActiveTo": "Active to",
+        "Advanced": "Advanced",
+        "PromptReplace": "Prompt replace (JSON)",
         "OutsideWindow": "Outside its active window; requests skip this provider."
     },
     "UsagePage": {

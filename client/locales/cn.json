@@ -85,6 +85,8 @@
         "Context": "上下文",
         "ActiveFrom": "生效起",
         "ActiveTo": "生效止",
+        "Advanced": "高级设置",
+        "PromptReplace": "提示词替换 (JSON)",
         "OutsideWindow": "当前不在生效时段，请求会跳过该供应商。"
     },
     "UsagePage": {

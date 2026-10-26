@@ -17,7 +17,6 @@ export class ProviderDTO {
     public replay_reasoning?: number;
     public enable_search?: number;
     public extra_json?: string;
-    public strip_tools?: string;
     public prompt_replace?: string;
     public enabled: number;
     public max_context?: number;
@@ -46,7 +45,6 @@ export class ProviderDTO {
         this.replay_reasoning = origin.replay_reasoning;
         this.enable_search = origin.enable_search;
         this.extra_json = origin.extra_json;
-        this.strip_tools = origin.strip_tools;
         this.prompt_replace = origin.prompt_replace;
         this.enabled = origin.enabled;
         this.max_context = (origin as any).max_context;
@@ -74,7 +72,6 @@ export class ProviderCreateBody {
     public replay_reasoning?: number;
     public enable_search?: number;
     public extra_json?: string;
-    public strip_tools?: string;
     public prompt_replace?: string;
     public enabled?: number;
     public max_context?: number;
@@ -82,7 +79,7 @@ export class ProviderCreateBody {
     public active_from?: number;
     public active_to?: number;
 
-    constructor(origin: Pick<ProviderEntity, "model_alias" | "base_url" | "model" | "priority" | "name"> & Partial<Pick<ProviderEntity, "api_key" | "auth_type" | "api_type" | "proxy_url" | "supports_thinking" | "supports_reasoning_effort" | "replay_reasoning" | "enable_search" | "extra_json" | "strip_tools" | "prompt_replace" | "enabled" | "max_context" | "chunk_delay_ms" | "active_from" | "active_to">>) {
+    constructor(origin: Pick<ProviderEntity, "model_alias" | "base_url" | "model" | "priority" | "name"> & Partial<Pick<ProviderEntity, "api_key" | "auth_type" | "api_type" | "proxy_url" | "supports_thinking" | "supports_reasoning_effort" | "replay_reasoning" | "enable_search" | "extra_json" | "prompt_replace" | "enabled" | "max_context" | "chunk_delay_ms" | "active_from" | "active_to">>) {
         if (!origin.model_alias || !origin.base_url || !origin.model || origin.priority === undefined) {
             throw new Error("model_alias, base_url, model and priority are required");
         }
@@ -100,7 +97,6 @@ export class ProviderCreateBody {
         this.replay_reasoning = origin.replay_reasoning;
         this.enable_search = origin.enable_search;
         this.extra_json = origin.extra_json;
-        this.strip_tools = origin.strip_tools;
         this.prompt_replace = origin.prompt_replace;
         this.enabled = origin.enabled ?? 1;
         this.max_context = origin.max_context;
@@ -129,7 +125,6 @@ export class ProviderUpdateBody {
     public replay_reasoning?: number;
     public enable_search?: number;
     public extra_json?: string;
-    public strip_tools?: string;
     public prompt_replace?: string;
     public enabled?: number;
     public max_context?: number;
@@ -144,7 +139,7 @@ export class ProviderUpdateBody {
             origin.model_alias, origin.priority, origin.base_url, origin.model,
             origin.api_key, origin.auth_type, origin.api_type, origin.proxy_url,
             origin.supports_thinking, origin.supports_reasoning_effort, origin.replay_reasoning,
-            origin.enable_search, origin.extra_json, origin.strip_tools, origin.prompt_replace, origin.enabled,
+            origin.enable_search, origin.extra_json, origin.prompt_replace, origin.enabled,
             origin.max_context, origin.chunk_delay_ms, origin.active_from, origin.active_to,
         ];
         if (fields.every(v => v === undefined)) {
@@ -164,7 +159,6 @@ export class ProviderUpdateBody {
         origin.replay_reasoning !== undefined && (this.replay_reasoning = origin.replay_reasoning);
         origin.enable_search !== undefined && (this.enable_search = origin.enable_search);
         origin.extra_json !== undefined && (this.extra_json = origin.extra_json);
-        origin.strip_tools !== undefined && (this.strip_tools = origin.strip_tools);
         origin.prompt_replace !== undefined && (this.prompt_replace = origin.prompt_replace);
         origin.enabled !== undefined && (this.enabled = origin.enabled);
         origin.max_context !== undefined && (this.max_context = origin.max_context);

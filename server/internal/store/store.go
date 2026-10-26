@@ -73,9 +73,6 @@ var tables = []tableDef{
 		{"replay_reasoning", "INTEGER"},
 		{"enable_search", "INTEGER"},
 		{"extra_json", "TEXT"},
-		// strip_tools — JSON array of tool names to remove from a request before
-		// it goes upstream; see stripTools in the ai package.
-		{"strip_tools", "TEXT"},
 		// prompt_replace — JSON array of {"from","to"} pairs applied to message
 		// content; see replacePrompt in the ai package.
 		{"prompt_replace", "TEXT"},

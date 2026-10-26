@@ -124,7 +124,7 @@ func ModelWhere(db *sql.DB, cond string, args []any) ([]*Model, error) {
 
 // ─────────────────────────── Provider ───────────────────────────
 
-const providerCols = "id,model_alias,priority,name,base_url,model,api_key,auth_type,api_type,proxy_url,supports_thinking,supports_reasoning_effort,replay_reasoning,enable_search,extra_json,strip_tools,prompt_replace,enabled,max_context,chunk_delay_ms,active_from,active_to,create_time,update_time,delete_time"
+const providerCols = "id,model_alias,priority,name,base_url,model,api_key,auth_type,api_type,proxy_url,supports_thinking,supports_reasoning_effort,replay_reasoning,enable_search,extra_json,prompt_replace,enabled,max_context,chunk_delay_ms,active_from,active_to,create_time,update_time,delete_time"
 
 type Provider struct {
 	ID                     string  `json:"id"`
@@ -142,7 +142,6 @@ type Provider struct {
 	ReplayReasoning        *int64  `json:"replay_reasoning"`
 	EnableSearch           *int64  `json:"enable_search"`
 	ExtraJSON              *string `json:"extra_json"`
-	StripTools             *string `json:"strip_tools"`
 	PromptReplace          *string `json:"prompt_replace"`
 	Enabled                int64   `json:"enabled"`
 	// MaxContext — declared context window; 0 = unlimited.
@@ -165,7 +164,7 @@ func scanProvider(row interface{ Scan(...any) error }) (*Provider, error) {
 	err := row.Scan(&p.ID, &p.ModelAlias, &p.Priority, &p.Name, &p.BaseURL, &p.Model,
 		&p.ApiKey, &p.AuthType, &p.ApiType, &p.ProxyURL,
 		&p.SupportsThinking, &p.SupportsReasoningEffort, &p.ReplayReasoning, &p.EnableSearch,
-		&p.ExtraJSON, &p.StripTools, &p.PromptReplace, &p.Enabled, &p.MaxContext, &p.ChunkDelayMs, &p.ActiveFrom, &p.ActiveTo,
+		&p.ExtraJSON, &p.PromptReplace, &p.Enabled, &p.MaxContext, &p.ChunkDelayMs, &p.ActiveFrom, &p.ActiveTo,
 		&p.CreateTime, &p.UpdateTime, &p.DeleteTime)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -183,7 +182,7 @@ func (p *Provider) DTO() map[string]any {
 		"api_type": p.ApiType, "proxy_url": p.ProxyURL, "supports_thinking": p.SupportsThinking,
 		"supports_reasoning_effort": p.SupportsReasoningEffort, "replay_reasoning": p.ReplayReasoning,
 		"enable_search": p.EnableSearch, "extra_json": p.ExtraJSON, "enabled": p.Enabled,
-		"strip_tools": p.StripTools, "prompt_replace": p.PromptReplace,
+		"prompt_replace": p.PromptReplace,
 		"max_context": p.MaxContext, "chunk_delay_ms": p.ChunkDelayMs,
 		"active_from": p.ActiveFrom, "active_to": p.ActiveTo, "create_time": p.CreateTime,
 		"update_time": p.UpdateTime, "delete_time": p.DeleteTime,
@@ -578,20 +577,6 @@ func (p *Provider) ExtraJSONStr() string {
 		return ""
 	}
 	return *p.ExtraJSON
-}
-
-// StripToolsList — tool names to drop from requests to this provider, parsed
-// from the strip_tools JSON array. Anything unparseable yields nothing, so a
-// typo in the field disables it rather than failing the relay.
-func (p *Provider) StripToolsList() []string {
-	if p.StripTools == nil || *p.StripTools == "" {
-		return nil
-	}
-	var names []string
-	if err := json.Unmarshal([]byte(*p.StripTools), &names); err != nil {
-		return nil
-	}
-	return names
 }
 
 // PromptRule is one literal find/replace over message content.
