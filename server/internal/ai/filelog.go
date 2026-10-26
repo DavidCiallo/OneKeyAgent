@@ -142,8 +142,9 @@ func jsonBody(s string) json.RawMessage {
 	return bytes.TrimRight(buf.Bytes(), "\n")
 }
 
-// write — <model>-<provider>-<ts>.json, never overwriting: two attempts of the
-// same pair inside one millisecond get -2, -3 on the end rather than losing one.
+// write — <model>-<provider>-<ok|fail>-<ts>.json, never overwriting: two attempts
+// of the same pair inside one millisecond get -2, -3 on the end rather than
+// losing one.
 func (f *requestFiles) write(rec requestFileRecord) {
 	if f == nil {
 		return
@@ -167,7 +168,11 @@ func (f *requestFiles) write(rec requestFileRecord) {
 		return
 	}
 	data := buf.Bytes()
-	base := fmt.Sprintf("%s-%s-%d", fileSafeName(rec.ModelAlias), fileSafeName(rec.ProviderName), rec.Ts)
+	outcome := "ok"
+	if !rec.Success {
+		outcome = "fail"
+	}
+	base := fmt.Sprintf("%s-%s-%s-%d", fileSafeName(rec.ModelAlias), fileSafeName(rec.ProviderName), outcome, rec.Ts)
 	for n := 0; n < 50; n++ {
 		name := base
 		if n > 0 {
