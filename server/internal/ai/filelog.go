@@ -14,6 +14,7 @@ package ai
 // for, so the switch is the whole retention policy.
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -58,6 +59,10 @@ type requestFileRecord struct {
 	Cost         float64         `json:"cost"`
 	Err          string          `json:"err,omitempty"`
 	Request      json.RawMessage `json:"request"`
+	// Response is the upstream's failure body — the same text the audit row keeps
+	// a summary of. Successes have nothing to put here: a streamed reply has no
+	// single document to store.
+	Response json.RawMessage `json:"response,omitempty"`
 }
 
 // EnableRequestFiles — point request files at dir. They stay off until an admin
@@ -117,6 +122,26 @@ func (f *requestFiles) state() (bool, int64) {
 	return true, f.until.UnixMilli()
 }
 
+// jsonBody — a captured upstream body for the file. Almost always JSON, embedded
+// as-is so it reads like the response did; anything else (an HTML page from a
+// proxy in front of the provider) is written as a quoted string, because a raw
+// fragment would make the whole record unparseable.
+func jsonBody(s string) json.RawMessage {
+	if s == "" {
+		return nil
+	}
+	if json.Valid([]byte(s)) {
+		return json.RawMessage(s)
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(s); err != nil {
+		return nil
+	}
+	return bytes.TrimRight(buf.Bytes(), "\n")
+}
+
 // write — <model>-<provider>-<ts>.json, never overwriting: two attempts of the
 // same pair inside one millisecond get -2, -3 on the end rather than losing one.
 func (f *requestFiles) write(rec requestFileRecord) {
@@ -131,11 +156,17 @@ func (f *requestFiles) write(rec requestFileRecord) {
 	if len(rec.Request) == 0 {
 		rec.Request = nil
 	}
-	data, err := json.Marshal(rec)
-	if err != nil {
+	// Encoder rather than Marshal for the escaping switch: the HTML page a proxy
+	// returns on a 502 is the case this file exists for, and \u003c in it is
+	// unreadable.
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(rec); err != nil {
 		fmt.Println("[Audit] request file marshal failed:", err)
 		return
 	}
+	data := buf.Bytes()
 	base := fmt.Sprintf("%s-%s-%d", fileSafeName(rec.ModelAlias), fileSafeName(rec.ProviderName), rec.Ts)
 	for n := 0; n < 50; n++ {
 		name := base

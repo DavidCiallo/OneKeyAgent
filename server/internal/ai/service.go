@@ -168,8 +168,10 @@ type auditRecord struct {
 	RequestBody  string
 	ResponseBody string
 	// RawRequest is the body exactly as it went upstream, kept for the request
-	// file only — the table always gets the summary above.
-	RawRequest string
+	// file only — the table always gets the summary above. RawResponse is the
+	// upstream's failure body, likewise file-only.
+	RawRequest  string
+	RawResponse string
 }
 
 // audit persists one attempt. Best-effort by design: a broken audit trail must
@@ -206,6 +208,7 @@ func (s *Server) audit(r auditRecord) {
 			Stream: r.Stream, DurationMs: r.DurationMs, TtftMs: r.TtftMs,
 			InputTokens: r.InputTokens, CachedInput: r.CachedInput, OutputTokens: r.OutputTokens,
 			Cost: r.Cost, Err: r.Err, Request: json.RawMessage(r.RawRequest),
+			Response: jsonBody(r.RawResponse),
 		})
 	}
 }
@@ -465,6 +468,9 @@ type upstreamErr struct {
 	// was actually sent.
 	ReqBody  string
 	RespBody string
+	// RawResp is that same response before summarising, kept for the request
+	// file — the summary above is what the table gets.
+	RawResp string
 }
 
 // tryProvider — non-stream call; converts to OpenAI format. The second return
@@ -494,6 +500,7 @@ func (s *Server) tryProvider(p *store.Provider, body map[string]any) (map[string
 			msg:      fmt.Sprintf("upstream http %d: %s", resp.StatusCode, firstLine(msg, 300)),
 			ReqBody:  auditBodySummary(cfg.body, maxAuditReqBody),
 			RespBody: auditBodySummary(msg, maxAuditRespBody),
+			RawResp:  msg,
 		}
 	}
 	var parsed map[string]any
@@ -542,6 +549,7 @@ func (s *Server) tryProviderStream(p *store.Provider, body map[string]any) (io.R
 			msg:      fmt.Sprintf("upstream http %d: %s", resp.StatusCode, firstLine(msg, 300)),
 			ReqBody:  auditBodySummary(cfg.body, maxAuditReqBody),
 			RespBody: auditBodySummary(msg, maxAuditRespBody),
+			RawResp:  msg,
 		}
 	}
 	return resp.Body, cfg.body, nil
@@ -810,7 +818,7 @@ func (s *Server) ChatCompletionsAt(body map[string]any, accountID, endpoint stri
 				Endpoint: endpoint, StatusCode: uerr.status, DurationMs: elapsedMs(started),
 				Err:         uerr.msg,
 				RequestBody: uerr.ReqBody, ResponseBody: uerr.RespBody,
-				RawRequest: rawBody,
+				RawRequest: rawBody, RawResponse: uerr.RawResp,
 			})
 			s.policy.retryDelay()
 			continue
@@ -946,7 +954,7 @@ func (s *Server) StartStreamAt(body map[string]any, accountID, endpoint string) 
 				Endpoint: endpoint, StatusCode: uerr.status, DurationMs: elapsedMs(started),
 				Stream: true, Err: uerr.msg,
 				RequestBody: uerr.ReqBody, ResponseBody: uerr.RespBody,
-				RawRequest: rawBody,
+				RawRequest: rawBody, RawResponse: uerr.RawResp,
 			})
 			s.policy.retryDelay()
 			continue
