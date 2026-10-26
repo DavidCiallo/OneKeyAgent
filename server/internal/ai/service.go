@@ -345,6 +345,7 @@ type upstreamReq struct {
 
 func buildRequestConfig(p *store.Provider, body map[string]any, stream bool) upstreamReq {
 	body = stripTools(body, p.StripToolsList())
+	body = replacePrompt(body, p.PromptRules())
 	apiType := ""
 	if p.ApiType != nil {
 		apiType = *p.ApiType
@@ -765,6 +766,53 @@ func inList(name string, list []string) bool {
 		}
 	}
 	return false
+}
+
+// replacePrompt — apply the provider's literal replacements to system messages
+// only. Tool results and user text carry the caller's own data; rewriting them
+// would change what the model reads rather than how the client introduces itself.
+func replacePrompt(body map[string]any, rules []store.PromptRule) map[string]any {
+	if len(rules) == 0 {
+		return body
+	}
+	msgs, ok := body["messages"].([]any)
+	if !ok || len(msgs) == 0 {
+		return body
+	}
+	changed := false
+	kept := make([]any, 0, len(msgs))
+	for _, m := range msgs {
+		msg, _ := m.(map[string]any)
+		content, isStr := jGet(msg, "content").(string)
+		if !isStr || jStr(jGet(msg, "role")) != "system" {
+			kept = append(kept, m)
+			continue
+		}
+		next := content
+		for _, r := range rules {
+			next = strings.ReplaceAll(next, r.From, r.To)
+		}
+		if next == content {
+			kept = append(kept, m)
+			continue
+		}
+		clone := make(map[string]any, len(msg))
+		for k, v := range msg {
+			clone[k] = v
+		}
+		clone["content"] = next
+		kept = append(kept, clone)
+		changed = true
+	}
+	if !changed {
+		return body
+	}
+	out := make(map[string]any, len(body))
+	for k, v := range body {
+		out[k] = v
+	}
+	out["messages"] = kept
+	return out
 }
 
 func thinkingEnabled(body map[string]any) bool {

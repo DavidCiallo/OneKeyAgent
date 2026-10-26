@@ -13,6 +13,7 @@ type ProviderForm = {
     proxy_url?: string;
     extra_json?: string;
     strip_tools?: string;
+    prompt_replace?: string;
     supports_thinking: number;
     supports_reasoning_effort: number;
     replay_reasoning: number;
@@ -192,6 +193,12 @@ export function ProviderFormModal({ isOpen, onOpenChange, mode, form, onFormChan
                             placeholder={'["plugin_manager","schedule_create"]'}
                             value={form.strip_tools || ""}
                             onChange={e => onFormChange({ ...form, strip_tools: e.target.value })}
+                        />
+                        <Textarea
+                            label={locale.PromptReplace || "Prompt replace (JSON array of from/to)"}
+                            placeholder={'[{"from":"whose URL the runtime context names","to":"at http://127.0.0.1:3080"}]'}
+                            value={form.prompt_replace || ""}
+                            onChange={e => onFormChange({ ...form, prompt_replace: e.target.value })}
                         />
                     </div>
                 </ModalBody>

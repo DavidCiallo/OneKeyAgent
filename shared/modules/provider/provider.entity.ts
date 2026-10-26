@@ -18,6 +18,8 @@ export interface ProviderEntity extends BaseEntity {
     extra_json?: string;
     /** JSON array of tool names to remove from a request before it is relayed. */
     strip_tools?: string;
+    /** JSON array of {"from","to"} literal replacements over system messages. */
+    prompt_replace?: string;
     enabled: number;
     /** Context window in tokens; 0 = unlimited. */
     max_context?: number;

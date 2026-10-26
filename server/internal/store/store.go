@@ -76,6 +76,9 @@ var tables = []tableDef{
 		// strip_tools — JSON array of tool names to remove from a request before
 		// it goes upstream; see stripTools in the ai package.
 		{"strip_tools", "TEXT"},
+		// prompt_replace — JSON array of {"from","to"} pairs applied to the
+		// system message; see replacePrompt in the ai package.
+		{"prompt_replace", "TEXT"},
 		{"enabled", "INTEGER NOT NULL DEFAULT 1"},
 		// max_context — upstream context window in tokens; 0 = unlimited.
 		{"max_context", "INTEGER NOT NULL DEFAULT 0"},
