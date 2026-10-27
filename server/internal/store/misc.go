@@ -256,9 +256,16 @@ func CardCleanupExpired(db *sql.DB, before int64) (int64, error) {
 
 // ─────────────────────────── Export / Import helpers ───────────────────────────
 
-// AllRowsIgnoreDelete — full table read as JSON-ready maps (export).
-func AllRowsIgnoreDelete(db *sql.DB, table string) ([]map[string]any, error) {
-	rows, err := db.Query(fmt.Sprintf("SELECT * FROM \"%s\"", table))
+// SyncRows — a table read for the sync snapshot. where, when non-empty, is
+// appended to the SELECT and its placeholders are filled from args: tables whose
+// row count grows without bound ship only the window a replica can use, the rest
+// are read whole.
+func SyncRows(db *sql.DB, table, where string, args ...any) ([]map[string]any, error) {
+	q := fmt.Sprintf("SELECT * FROM \"%s\"", table)
+	if where != "" {
+		q += " WHERE " + where
+	}
+	rows, err := db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -272,6 +279,11 @@ func AllRowsIgnoreDelete(db *sql.DB, table string) ([]map[string]any, error) {
 		out = append(out, m)
 	}
 	return out, rows.Err()
+}
+
+// AllRowsIgnoreDelete — full table read as JSON-ready maps (export).
+func AllRowsIgnoreDelete(db *sql.DB, table string) ([]map[string]any, error) {
+	return SyncRows(db, table, "")
 }
 
 // Truncate — wipe a collection (import).

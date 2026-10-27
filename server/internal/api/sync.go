@@ -27,18 +27,29 @@ var syncTables = []struct {
 	table  string
 	key    string
 	ignore bool // include soft-deleted rows?
+	// window, when set, appends a WHERE to the read and takes one argument: the
+	// cut-off in epoch milliseconds, days ago. For tables that grow without
+	// bound; the rest are small enough to ship whole.
+	window string
+	days   int
 }{
-	{"account", "accounts", false},
-	{"model", "models", false},
-	{"provider", "providers", false},
-	{"role", "roles", false},
-	{"account_role", "account_roles", false},
-	{"account_group", "account_groups", false},
-	{"account_group_member", "account_group_members", false},
-	{"settings", "settings", false},
-	{"gift_card", "gift_cards", false},
-	{"usage_bucket", "usage_buckets", false},
-	{"transaction", "transactions", false},
+	{table: "account", key: "accounts"},
+	{table: "model", key: "models"},
+	{table: "provider", key: "providers"},
+	{table: "role", key: "roles"},
+	{table: "account_role", key: "account_roles"},
+	{table: "account_group", key: "account_groups"},
+	{table: "account_group_member", key: "account_group_members"},
+	{table: "settings", key: "settings"},
+	{table: "gift_card", key: "gift_cards"},
+	// Hourly rows for the last eight days, not the whole table. 1m buckets are
+	// the dense ones (they are most of the payload) and exist only for seven
+	// days; the money path a replica has to get right — the weekly limit gate in
+	// service.WeeklySpending — sums 60m rows over a trailing week, so eight days
+	// covers every row it reads with an hour to spare. Admin usage queries are
+	// forwarded to the main database anyway.
+	{table: "usage_bucket", key: "usage_buckets", window: "granularity = '60m' AND bucket_time >= ?", days: 8},
+	{table: "transaction", key: "transactions"},
 }
 
 // requireSyncAuth — constant-time comparison against SYNC_SECRET. An empty
@@ -70,7 +81,11 @@ func (a *App) syncSnapshot(c *httpx.Ctx) (any, error) {
 	}
 	data := map[string]any{}
 	for _, t := range syncTables {
-		rows, err := store.AllRowsIgnoreDelete(a.DB, t.table)
+		var args []any
+		if t.window != "" {
+			args = append(args, store.Now()-int64(t.days)*86_400_000)
+		}
+		rows, err := store.SyncRows(a.DB, t.table, t.window, args...)
 		if err != nil {
 			return nil, err
 		}
