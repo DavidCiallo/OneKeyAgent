@@ -77,6 +77,9 @@ type Syncer struct {
 	db      *sql.DB
 	cfg     Config
 	client  *http.Client
+	// pull is the snapshot client: a full snapshot serializes every row of
+	// eleven tables, so it needs far longer than a push batch to arrive.
+	pull    *http.Client
 	trigger chan struct{}
 
 	// flushMu serializes Flush. Three goroutines can flush concurrently (the
@@ -101,6 +104,7 @@ func New(db *sql.DB, cfg Config) *Syncer {
 		db:      db,
 		cfg:     cfg,
 		client:  &http.Client{Timeout: 60 * time.Second},
+		pull:    &http.Client{Timeout: 5 * time.Minute},
 		trigger: make(chan struct{}, 1),
 	}
 }
@@ -137,7 +141,7 @@ func (s *Syncer) Bootstrap() error {
 		req.Header.Set("x-node-id", id)
 	}
 
-	resp, err := s.client.Do(req)
+	resp, err := s.pull.Do(req)
 	if err != nil {
 		return fmt.Errorf("snapshot request: %w", err)
 	}
@@ -187,7 +191,7 @@ func (s *Syncer) Refresh() error {
 		req.Header.Set("x-node-id", id)
 	}
 
-	resp, err := s.client.Do(req)
+	resp, err := s.pull.Do(req)
 	if err != nil {
 		return fmt.Errorf("refresh request: %w", err)
 	}

@@ -73,11 +73,12 @@ func main() {
 		syncer = sync.New(db, syncerCfg)
 		if err := syncer.Bootstrap(); err != nil {
 			// Not fatal: the node still serves traffic from its local data, and
-			// a later restart retries. Running on stale data beats not starting.
+			// the refresh loop retries the snapshot every SYNC_PULL_SECONDS.
+			// Start() runs either way — without it nothing is pushed to the main
+			// database until the node restarts.
 			fmt.Println("[Sync] bootstrap failed (continuing on local data):", err)
-		} else {
-			syncer.Start()
 		}
+		syncer.Start()
 	}
 
 	seedAdmin(db, settings)
