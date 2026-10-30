@@ -837,9 +837,13 @@ func (s *Server) ChatCompletionsAt(body map[string]any, accountID, endpoint stri
 	skey := sessionKey(accountID, body)
 	acctName := s.accountName(accountID)
 
-	// Drop upstreams too small for this request or outside their active
-	// window; selectProviders falls back to the full list if that empties it.
-	providers = s.policy.selectProviders(providers, requestTokenEstimate(body))
+	// Drop upstreams outside their active window, and refuse the request when
+	// none of them declares a window large enough for it.
+	providers, err = s.policy.selectProviders(providers, requestTokenEstimate(body))
+	if err != nil {
+		s.auditReject(accountID, alias, endpoint, false, 400, err, body)
+		return nil, err
+	}
 
 	for _, provider := range providers {
 		requestBody := map[string]any{}
@@ -974,7 +978,11 @@ func (s *Server) StartStreamAt(body map[string]any, accountID, endpoint string) 
 	acctName := s.accountName(accountID)
 
 	// Same filters as the non-streaming path.
-	providers = s.policy.selectProviders(providers, requestTokenEstimate(body))
+	providers, err = s.policy.selectProviders(providers, requestTokenEstimate(body))
+	if err != nil {
+		s.auditReject(accountID, alias, endpoint, true, 400, err, body)
+		return nil, err
+	}
 
 	for _, provider := range providers {
 		requestBody := map[string]any{}

@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -169,23 +170,29 @@ func fitsContext(declaredTokens int64, requestTokens int) bool {
 // ─────────────────────────── selection ───────────────────────────
 
 // selectProviders filters a priority-ordered candidate list by active window
-// and context size. When every candidate is filtered out the original list is
-// returned, since trying a slightly-too-small upstream beats failing the
-// request — which also means a window is a preference, not a gate.
+// and context size. A candidate whose declared window cannot take the request is
+// dropped; when every candidate is too small the request is refused, because the
+// upstream would reject it too. Candidates dropped only by their active window
+// fall back to the original order — a window is a preference, a declared context
+// size is a limit.
 func (p *providerPolicy) selectProviders(
 	providers []*store.Provider,
 	requestedTokens int,
-) []*store.Provider {
+) ([]*store.Provider, error) {
 	if len(providers) == 0 {
-		return providers
+		return providers, nil
 	}
 
 	local := p.routingNow()
 	minute := minuteOfDay(local)
 
 	kept := make([]*store.Provider, 0, len(providers))
+	var largest int64
 	for _, pr := range providers {
 		if !fitsContext(pr.MaxContext, requestedTokens) {
+			if pr.MaxContext > largest {
+				largest = pr.MaxContext
+			}
 			continue
 		}
 		if !windowCovers(pr.ActiveFrom, pr.ActiveTo, minute) {
@@ -194,11 +201,16 @@ func (p *providerPolicy) selectProviders(
 		kept = append(kept, pr)
 	}
 
-	// All filtered: fall back to the original order.
-	if len(kept) == 0 {
-		return providers
+	if len(kept) > 0 {
+		return kept, nil
 	}
-	return kept
+	if largest > 0 {
+		return nil, fmt.Errorf("400 Context too large: this request is about %d tokens, the largest window on this model is %d",
+			requestedTokens, largest)
+	}
+	// Every candidate was outside its active window: trying a slightly-too-small
+	// upstream beats failing the request.
+	return providers, nil
 }
 
 // ─────────────────────────── request size ───────────────────────────
